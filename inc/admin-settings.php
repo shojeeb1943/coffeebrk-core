@@ -1,6 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
-// Admin settings page for Supabase credentials
+// Admin settings page for Supabase credentials / auth
 add_action('admin_menu', function() {
     add_options_page('Coffeebrk Auth', 'Coffeebrk Auth', 'manage_options', 'coffeebrk-auth-settings', 'coffeebrk_auth_settings_page');
 });
