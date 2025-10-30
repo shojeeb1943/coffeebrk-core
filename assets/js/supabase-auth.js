@@ -42,7 +42,10 @@
     if (!s) return;
     btn.addEventListener('click', async ()=>{
       try {
-        await s.auth.signInWithOAuth({ provider:'google' });
+        await s.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.href }
+        });
       } catch(e) { console.error(e); }
     });
   }
