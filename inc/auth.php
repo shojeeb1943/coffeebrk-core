@@ -133,6 +133,17 @@ add_filter('rest_pre_serve_request', function($served, $result){
     return $served;
 }, 10, 2);
 
+// Hide admin bar for non-admins and on auth pages
+add_filter('show_admin_bar', function($show){
+    if ( is_admin() ) return $show;
+    // Hide for non-admins
+    if ( ! current_user_can('manage_options') ) return false;
+    // Also hide on our auth pages even for admins
+    $ids = (array) get_option('coffeebrk_core_pages', []);
+    if ( is_page( array_values($ids) ) ) return false;
+    return $show;
+});
+
 // -------- Shortcodes: markup + handlers --------
 function coffeebrk_enqueue_auth_styles(){
     wp_enqueue_style('coffeebrk-auth', COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-auth.css', [], '1.0.0');
@@ -215,11 +226,15 @@ add_shortcode('coffeebrk_onboarding', function(){
         $out .= '<div class="cbk-pills">';
         foreach ($aspire_options as $opt){
             $is = in_array($opt, $selected, true) ? ' active' : '';
-            $out .= '<label class="cbk-pill'.$is.'"><input style="display:none" type="checkbox" name="aspire[]" value="'.esc_attr($opt).'" '.checked(true, in_array($opt,$selected,true), false).' />'.esc_html($opt).'</label>';
+            $checked = in_array($opt,$selected,true) ? 'checked' : '';
+            $out .= '<label class="cbk-pill'.$is.'" role="checkbox" aria-checked="'.($checked?'true':'false').'" tabindex="0">'
+                 . '<input type="checkbox" name="aspire[]" value="'.esc_attr($opt).'" '.$checked.' />'
+                 . esc_html($opt)
+                 . '</label>';
         }
         $out .= '</div>';
         $out .= '<div class="cbk-center" style="margin-top:16px;"><button class="cbk-btn" type="submit">Start Your Coffee Break</button></div>';
-        $out .= '<script>document.querySelectorAll(".cbk-pill").forEach(p=>{p.addEventListener("click",()=>{const cb=p.querySelector("input"); cb.checked=!cb.checked; p.classList.toggle("active");});});</script>';
+        $out .= '<script>(function(){document.addEventListener("click",function(e){var p=e.target.closest(".cbk-pill");if(!p)return;var cb=p.querySelector("input[type=checkbox]");if(!cb)return;cb.checked=!cb.checked;p.classList.toggle("active", cb.checked);p.setAttribute("aria-checked", cb.checked?"true":"false");});document.addEventListener("keydown",function(e){if((e.key===" "||e.key==="Enter")&&e.target.classList&&e.target.classList.contains("cbk-pill")){e.preventDefault();e.target.click();}});}());</script>';
         $out .= '</form>';
     }
     $out .= '</div></div>';
