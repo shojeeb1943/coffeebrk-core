@@ -58,88 +58,69 @@ add_action('template_redirect', function(){
     exit;
 });
 
-// -------- Google OAuth routes --------
-add_action('init', function(){
-    add_rewrite_rule('^coffeebrk-oauth/google/?', 'index.php?coffeebrk_oauth=google', 'top');
-    add_rewrite_tag('%coffeebrk_oauth%', '([^&]+)');
-});
-
-add_action('template_redirect', function(){
-    $q = get_query_var('coffeebrk_oauth');
-    if ( $q !== 'google' ) return;
-    $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : 'start';
-    if ( $action === 'start' ) {
-        coffeebrk_google_oauth_start();
-    } else {
-        coffeebrk_google_oauth_callback();
-    }
-    exit;
-});
-
-function coffeebrk_google_oauth_start(){
-    $client_id = coffeebrk_core_get_option('google_client_id');
-    $redirect_uri = add_query_arg(['action'=>'callback'], home_url('/coffeebrk-oauth/google'));
-    $state = wp_create_nonce('coffeebrk_google_state');
-    $params = [
-        'client_id' => $client_id,
-        'redirect_uri' => $redirect_uri,
-        'response_type' => 'code',
-        'scope' => 'openid email profile',
-        'state' => $state,
-        'prompt' => 'consent',
-        'access_type' => 'offline',
-    ];
-    wp_safe_redirect( 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query($params) );
-    exit;
-}
-
-function coffeebrk_google_oauth_callback(){
-    if ( ! isset($_GET['state']) || ! wp_verify_nonce($_GET['state'], 'coffeebrk_google_state') ) {
-        coffeebrk_log_error('Google OAuth invalid state');
-        wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') );
-        return;
-    }
-    $code = isset($_GET['code']) ? sanitize_text_field($_GET['code']) : '';
-    if ( ! $code ) { wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') ); return; }
-    $client_id = coffeebrk_core_get_option('google_client_id');
-    $client_secret = coffeebrk_core_get_option('google_client_secret');
-    $redirect_uri = add_query_arg(['action'=>'callback'], home_url('/coffeebrk-oauth/google'));
-    $resp = wp_remote_post('https://oauth2.googleapis.com/token', [
-        'body' => [
-            'code' => $code,
-            'client_id' => $client_id,
-            'client_secret' => $client_secret,
-            'redirect_uri' => $redirect_uri,
-            'grant_type' => 'authorization_code'
-        ]
-    ]);
-    if ( is_wp_error($resp) ) { coffeebrk_log_error('Google token error', ['err'=>$resp->get_error_message()]); wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') ); return; }
-    $data = json_decode( wp_remote_retrieve_body($resp), true );
-    $access = $data['access_token'] ?? '';
-    if ( ! $access ) { coffeebrk_log_error('Google token missing'); wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') ); return; }
-    $u = wp_remote_get('https://openidconnect.googleapis.com/v1/userinfo', [ 'headers' => [ 'Authorization' => 'Bearer ' . $access ]]);
-    if ( is_wp_error($u) ) { coffeebrk_log_error('Google userinfo error', ['err'=>$u->get_error_message()]); wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') ); return; }
-    $info = json_decode( wp_remote_retrieve_body($u), true );
-    $email = sanitize_email( $info['email'] ?? '' );
-    if ( ! $email ) { wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') ); return; }
-    $user = get_user_by('email', $email);
-    if ( ! $user ) {
-        $login = sanitize_user( current( explode('@', $email) ), true );
-        if ( username_exists($login) ) { $login = $login . '_' . wp_generate_password(4, false); }
-        $uid = wp_create_user( $login, wp_generate_password(20), $email );
-        if ( ! is_wp_error($uid) ) {
-            $user = get_user_by('id', $uid);
-            wp_update_user([ 'ID'=>$uid, 'first_name' => sanitize_text_field( $info['given_name'] ?? ($info['name'] ?? '') ) ]);
+// -------- Supabase OAuth finalize endpoint --------
+add_action('rest_api_init', function(){
+    register_rest_route('coffeebrk/v1', '/supabase/login', [
+        'methods' => 'POST',
+        'permission_callback' => '__return_true',
+        'callback' => function( WP_REST_Request $req ){
+            $access = sanitize_text_field( $req->get_param('access_token') );
+            if ( ! $access ) return new WP_REST_Response(['error'=>'missing_access_token'], 400);
+            $supabase_url = rtrim( coffeebrk_core_get_option('supabase_url'), '/' );
+            $anon = coffeebrk_core_get_option('supabase_anon_key');
+            $resp = wp_remote_get( $supabase_url . '/auth/v1/user', [ 'headers' => [ 'Authorization' => 'Bearer ' . $access, 'apikey' => $anon ] ] );
+            if ( is_wp_error($resp) ) { coffeebrk_log_error('supabase user fetch error', ['err'=>$resp->get_error_message()]); return new WP_REST_Response(['error'=>'upstream_error'], 500); }
+            $code = wp_remote_retrieve_response_code($resp);
+            if ( $code !== 200 ) { coffeebrk_log_error('supabase user non-200', ['code'=>$code, 'body'=> wp_remote_retrieve_body($resp)]); return new WP_REST_Response(['error'=>'invalid_token'], 401); }
+            $info = json_decode( wp_remote_retrieve_body($resp), true );
+            $email = sanitize_email( $info['email'] ?? '' );
+            $given = sanitize_text_field( $info['user_metadata']['full_name'] ?? ($info['user_metadata']['name'] ?? ($info['user_metadata']['given_name'] ?? '')) );
+            if ( ! $email ) return new WP_REST_Response(['error'=>'no_email'], 400);
+            $user = get_user_by('email', $email);
+            if ( ! $user ) {
+                $login = sanitize_user( current( explode('@', $email) ), true );
+                if ( username_exists($login) ) { $login = $login . '_' . wp_generate_password(4, false); }
+                $uid = wp_create_user( $login, wp_generate_password(20), $email );
+                if ( is_wp_error($uid) ) return new WP_REST_Response(['error'=>'create_failed'], 500);
+                if ( $given ) wp_update_user([ 'ID'=>$uid, 'first_name'=>$given ]);
+                $user = get_user_by('id', $uid);
+            }
+            if ( $user instanceof WP_User ) {
+                wp_set_current_user($user->ID);
+                wp_set_auth_cookie($user->ID, true);
+                do_action('wp_login', $user->user_login, $user);
+                return new WP_REST_Response(['success'=>true, 'redirect'=> coffeebrk_core_page_url('coffeebrk-onboarding') ], 200);
+            }
+            return new WP_REST_Response(['error'=>'login_failed'], 500);
         }
-    }
-    if ( $user instanceof WP_User ) {
-        wp_set_current_user($user->ID);
-        wp_set_auth_cookie($user->ID, true);
-        wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-onboarding') );
-        return;
-    }
-    wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') );
+    ]);
+});
+
+// ---- CORS for finalize endpoint (supports multiple domains) ----
+function coffeebrk_core_allowed_origins(): array {
+    $raw = (string) coffeebrk_core_get_option('allowed_origins', '');
+    $lines = array_filter(array_map('trim', preg_split('/\r?\n/', $raw)));
+    return $lines;
 }
+
+add_filter('rest_pre_serve_request', function($served, $result){
+    $req_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+    if ( strpos($req_uri, '/coffeebrk/v1/supabase/login') === false ) return $served;
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+    $allowed = coffeebrk_core_allowed_origins();
+    if ( $origin && in_array($origin, $allowed, true) ) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Headers: Content-Type');
+        header('Access-Control-Allow-Methods: POST, OPTIONS');
+    }
+    if ( 'OPTIONS' === ($_SERVER['REQUEST_METHOD'] ?? '') ) {
+        echo '';
+        return true;
+    }
+    return $served;
+}, 10, 2);
 
 // -------- Shortcodes: markup + handlers --------
 function coffeebrk_enqueue_auth_styles(){
@@ -149,11 +130,24 @@ function coffeebrk_enqueue_auth_styles(){
     wp_add_inline_style('coffeebrk-auth-inline', $css);
 }
 
+function coffeebrk_enqueue_supabase_assets(string $context){
+    $cfg = [
+        'supabaseUrl' => rtrim( coffeebrk_core_get_option('supabase_url'), '/' ),
+        'supabaseAnonKey' => coffeebrk_core_get_option('supabase_anon_key'),
+        'finalizeUrl' => rest_url('coffeebrk/v1/supabase/login'),
+        'redirectAfter' => coffeebrk_core_page_url('coffeebrk-onboarding'),
+        'context' => $context,
+    ];
+    wp_enqueue_script('supabase-js', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js', [], '2.47.10', true);
+    wp_enqueue_script('coffeebrk-supabase-auth', COFFEEBRK_CORE_URL . 'assets/js/supabase-auth.js', ['supabase-js'], '1.0.0', true);
+    wp_localize_script('coffeebrk-supabase-auth', 'CoffeebrkAuth', $cfg);
+}
+
 add_shortcode('coffeebrk_login', function(){
     if ( is_user_logged_in() ) return '<div class="cbk-wrap"><div class="cbk-card"><p class="cbk-center">You are already logged in.</p></div></div>';
     coffeebrk_enqueue_auth_styles();
+    coffeebrk_enqueue_supabase_assets('login');
     $action = esc_url( get_permalink() );
-    $google_url = esc_url( add_query_arg(['action'=>'start'], home_url('/coffeebrk-oauth/google')) );
     $out = '<div class="cbk-wrap"><div class="cbk-card">';
     $out .= '<div class="cbk-title">Login to your account</div>';
     $out .= '<form method="post" action="'.$action.'">';
@@ -163,7 +157,7 @@ add_shortcode('coffeebrk_login', function(){
     $out .= '<button class="cbk-btn" type="submit">Login</button>';
     $out .= '</form>';
     $out .= '<div class="cbk-divider"></div>';
-    $out .= '<a class="cbk-google" href="'.$google_url.'">Sign in with Google</a>';
+    $out .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google">Sign in with Google</button>';
     $out .= '<p class="cbk-center" style="margin-top:12px;">Don\'t have an account? <a href="'.esc_url( coffeebrk_core_page_url('coffeebrk-signup') ).'">Sign Up</a></p>';
     $out .= '</div></div>';
     // Handle POST
@@ -186,8 +180,8 @@ add_shortcode('coffeebrk_login', function(){
 add_shortcode('coffeebrk_signup', function(){
     if ( is_user_logged_in() ) { wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-onboarding') ); exit; }
     coffeebrk_enqueue_auth_styles();
+    coffeebrk_enqueue_supabase_assets('signup');
     $action = esc_url( get_permalink() );
-    $google_url = esc_url( add_query_arg(['action'=>'start'], home_url('/coffeebrk-oauth/google')) );
     $out = '<div class="cbk-wrap"><div class="cbk-card">';
     $out .= '<div class="cbk-title">Create Account</div>';
     $out .= '<form method="post" action="'.$action.'">';
@@ -198,7 +192,7 @@ add_shortcode('coffeebrk_signup', function(){
     $out .= '<button class="cbk-btn" type="submit">Sign Up</button>';
     $out .= '</form>';
     $out .= '<div class="cbk-divider"></div>';
-    $out .= '<a class="cbk-google" href="'.$google_url.'">Sign in with Google</a>';
+    $out .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google">Sign in with Google</button>';
     $out .= '<p class="cbk-center" style="margin-top:12px;">Already have an account? <a href="'.esc_url( coffeebrk_core_page_url('coffeebrk-login') ).'">Log In</a></p>';
     $out .= '</div></div>';
     // Handle POST

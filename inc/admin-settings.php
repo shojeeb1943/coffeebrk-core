@@ -4,15 +4,16 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // Register settings used by the Auth page
 add_action('admin_init', function() {
     register_setting('coffeebrk_auth_options', 'coffeebrk_core_settings');
-    add_settings_section('coffeebrk_auth_section','Supabase / Auth Settings',function(){echo'<p>Configure Supabase credentials.</p>';},'coffeebrk_auth_options');
+    add_settings_section('coffeebrk_auth_section','Supabase / Auth Settings',function(){echo'<p>Configure Supabase credentials. Do not expose Service Role on frontend. Supabase OAuth runs on client; server only validates tokens.</p>';},'coffeebrk_auth_options');
     foreach([
         'supabase_url'=>'Supabase URL',
         'supabase_anon_key'=>'Supabase Anon Key',
         'supabase_service_role'=>'Supabase Service Role Key (server-only)',
         'google_client_id' => 'Google Client ID',
-        'google_client_secret' => 'Google Client Secret'
+        'google_client_secret' => 'Google Client Secret',
+        'allowed_origins' => 'Allowed Origins (one per line)'
     ] as $key=>$label){
-        add_settings_field($key,$label,function()use($key){$opt=get_option('coffeebrk_core_settings',[]);$type=$key==='supabase_service_role'?'password':'text';printf('<input type="%s" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;">',$type,$key,esc_attr($opt[$key]??''));},'coffeebrk_auth_options','coffeebrk_auth_section');
+        add_settings_field($key,$label,function()use($key){$opt=get_option('coffeebrk_core_settings',[]);if($key==='allowed_origins'){printf('<textarea name="coffeebrk_core_settings[%s]" rows="3" style="width:100%%;" placeholder="https://wp.coffeebrk.ai\nhttps://app.coffeebrk.ai">%s</textarea>',$key,esc_textarea($opt[$key]??''));}else{$type=$key==='supabase_service_role'?'password':'text';printf('<input type="%s" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;">',$type,$key,esc_attr($opt[$key]??''));}},'coffeebrk_auth_options','coffeebrk_auth_section');
     }
 });
 
