@@ -24,6 +24,12 @@ register_activation_hook( __FILE__, function() {
     if ( function_exists( 'coffeebrk_logger_ensure_paths' ) ) {
         coffeebrk_logger_ensure_paths();
     }
+    do_action('coffeebrk_core_activate');
+    flush_rewrite_rules();
+});
+
+register_deactivation_hook( __FILE__, function() {
+    flush_rewrite_rules();
 });
 
 /**
@@ -123,35 +129,7 @@ add_filter( 'the_content', function( $content ) {
     return $content;
 });
 
-/**
- * --------------------------------------------------------------
- * SECTION 5: Auth Shortcode and Assets
- * --------------------------------------------------------------
- */
-add_shortcode( 'coffeebrk_login', function( $atts ) {
-    $opts = get_option( 'coffeebrk_core_settings', [] );
-    $supabase_url = rtrim( (string) ( $opts['supabase_url'] ?? '' ), '/' );
-    $supabase_anon = (string) ( $opts['supabase_anon_key'] ?? '' );
-
-    wp_enqueue_style( 'coffeebrk-auth', COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-auth.css', [], '1.0' );
-    wp_enqueue_script( 'coffeebrk-supabase-auth', COFFEEBRK_CORE_URL . 'assets/js/supabase-auth.js', [], '1.0', true );
-
-    $config = [
-        'supabaseUrl'    => $supabase_url,
-        'supabaseAnonKey'=> $supabase_anon,
-        'restUrl'        => rest_url( 'coffeebrk/v1/auth' ),
-    ];
-    wp_add_inline_script( 'coffeebrk-supabase-auth', 'window.coffeebrkAuthConfig = ' . wp_json_encode( $config ) . ';', 'before' );
-
-    if ( empty( $supabase_url ) || empty( $supabase_anon ) ) {
-        if ( current_user_can( 'manage_options' ) ) {
-            return '<div id="coffeebrk-auth-root"><p>Supabase is not configured. Please set it in Settings → Coffeebrk Auth.</p></div>';
-        }
-    }
-
-    return '<div id="coffeebrk-auth-root"></div>';
-});
-
 // Register includes
 require_once COFFEEBRK_CORE_PATH . 'inc/admin-settings.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/admin-login-dashboard.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/auth.php';

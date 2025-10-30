@@ -8,7 +8,9 @@ add_action('admin_init', function() {
     foreach([
         'supabase_url'=>'Supabase URL',
         'supabase_anon_key'=>'Supabase Anon Key',
-        'supabase_service_role'=>'Supabase Service Role Key (server-only)'
+        'supabase_service_role'=>'Supabase Service Role Key (server-only)',
+        'google_client_id' => 'Google Client ID',
+        'google_client_secret' => 'Google Client Secret'
     ] as $key=>$label){
         add_settings_field($key,$label,function()use($key){$opt=get_option('coffeebrk_core_settings',[]);$type=$key==='supabase_service_role'?'password':'text';printf('<input type="%s" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;">',$type,$key,esc_attr($opt[$key]??''));},'coffeebrk_auth_options','coffeebrk_auth_section');
     }
