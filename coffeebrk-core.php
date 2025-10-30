@@ -11,12 +11,15 @@ Text Domain: coffeebrk-core
 */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+<<<<<<< HEAD
 if ( ! defined( 'COFFEEBRK_CORE_PATH' ) ) {
     define( 'COFFEEBRK_CORE_PATH', plugin_dir_path( __FILE__ ) );
 }
 if ( ! defined( 'COFFEEBRK_CORE_URL' ) ) {
     define( 'COFFEEBRK_CORE_URL', plugin_dir_url( __FILE__ ) );
 }
+=======
+>>>>>>> 0327526ed2e6f2103d278bada0b4323d0643da45
 
 /**
  * --------------------------------------------------------------
@@ -41,7 +44,11 @@ add_action( 'init', function() {
 
 /**
  * --------------------------------------------------------------
+<<<<<<< HEAD
  * SECTION 2: Add Meta Box in Post Editor (Source Information)
+=======
+ * SECTION 2: Add Meta Box in Post Editor
+>>>>>>> 0327526ed2e6f2103d278bada0b4323d0643da45
  * --------------------------------------------------------------
  */
 add_action( 'add_meta_boxes', function() {
@@ -114,6 +121,7 @@ add_filter( 'the_content', function( $content ) {
     }
     return $content;
 });
+<<<<<<< HEAD
 
 /**
  * --------------------------------------------------------------
@@ -148,3 +156,5 @@ add_shortcode( 'coffeebrk_login', function( $atts ) {
 require_once COFFEEBRK_CORE_PATH . 'inc/admin-settings.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/admin-dashboard.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/auth-rest.php';
+=======
+>>>>>>> 0327526ed2e6f2103d278bada0b4323d0643da45
