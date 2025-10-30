@@ -22,6 +22,7 @@ add_action('coffeebrk_core_activate', function(){
     $pages = [
         'coffeebrk-login' => [ 'title' => 'Login', 'shortcode' => '[coffeebrk_login]' ],
         'coffeebrk-signup' => [ 'title' => 'Sign Up', 'shortcode' => '[coffeebrk_signup]' ],
+        'coffeebrk-hello' => [ 'title' => 'Hello', 'shortcode' => '[coffeebrk_hello]' ],
         'coffeebrk-onboarding' => [ 'title' => 'Onboarding', 'shortcode' => '[coffeebrk_onboarding]' ],
     ];
     $ids = [];
@@ -53,8 +54,8 @@ add_action('template_redirect', function(){
     if ( is_admin() || defined('REST_REQUEST') || wp_doing_cron() ) return;
     if ( is_user_logged_in() ) return;
     $ids = (array) get_option('coffeebrk_core_pages', []);
-    if ( is_page( array_values($ids) ) ) return; // allow our auth/onboarding pages
-    wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-login') );
+    if ( is_page( array_values($ids) ) ) return; // allow our auth/onboarding pages (hello/login/signup/onboarding)
+    wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-hello') );
     exit;
 });
 
@@ -124,10 +125,7 @@ add_filter('rest_pre_serve_request', function($served, $result){
 
 // -------- Shortcodes: markup + handlers --------
 function coffeebrk_enqueue_auth_styles(){
-    $css = 'body{background:#111!important;color:#f6f2e8}.cbk-wrap{min-height:70vh;display:flex;align-items:center;justify-content:center}.cbk-card{max-width:520px;margin:0 auto}.cbk-title{font-size:40px;font-weight:600;text-align:center;margin-bottom:24px;color:#f5e6c8;font-family:Georgia,serif}.cbk-input{width:100%;padding:12px 14px;border-radius:8px;background:#1a1a1a;border:1px solid #333;color:#fff;margin:10px 0}.cbk-btn{display:inline-block;background:#8b5e2e;color:#fff;border:none;border-radius:8px;padding:12px 18px;cursor:pointer;width:100%;margin-top:10px}.cbk-btn:hover{background:#a8743c}.cbk-divider{height:1px;background:#333;margin:24px 0}.cbk-center{text-align:center}.cbk-google{display:block;background:#fff;color:#222;border-radius:8px;padding:10px 12px;text-align:center}.cbk-pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}.cbk-pill{padding:10px 14px;border:1px solid #3a3a3a;border-radius:999px;color:#ddd;cursor:pointer;background:#141414}.cbk-pill.active{background:#0f3d2e;border-color:#1d5f49}';
-    wp_register_style('coffeebrk-auth-inline', false);
-    wp_enqueue_style('coffeebrk-auth-inline');
-    wp_add_inline_style('coffeebrk-auth-inline', $css);
+    wp_enqueue_style('coffeebrk-auth', COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-auth.css', [], '1.0.0');
 }
 
 function coffeebrk_enqueue_supabase_assets(string $context){
@@ -160,20 +158,6 @@ add_shortcode('coffeebrk_login', function(){
     $out .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google">Sign in with Google</button>';
     $out .= '<p class="cbk-center" style="margin-top:12px;">Don\'t have an account? <a href="'.esc_url( coffeebrk_core_page_url('coffeebrk-signup') ).'">Sign Up</a></p>';
     $out .= '</div></div>';
-    // Handle POST
-    if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset($_POST['coffeebrk_login_nonce']) && wp_verify_nonce($_POST['coffeebrk_login_nonce'],'coffeebrk_login') ){
-        $email = sanitize_email($_POST['email'] ?? '');
-        $user = $email ? get_user_by('email', $email) : false;
-        $username = $user ? $user->user_login : sanitize_text_field($_POST['email'] ?? '');
-        $creds = [
-            'user_login' => $username,
-            'user_password' => (string) ($_POST['password'] ?? ''),
-            'remember' => true,
-        ];
-        $user = wp_signon($creds, false);
-        if ( ! is_wp_error($user) ) { wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-onboarding') ); exit; }
-        $out .= '<p class="cbk-center" style="color:#f66">'.esc_html($user->get_error_message()).'</p>';
-    }
     return $out;
 });
 
@@ -195,21 +179,6 @@ add_shortcode('coffeebrk_signup', function(){
     $out .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google">Sign in with Google</button>';
     $out .= '<p class="cbk-center" style="margin-top:12px;">Already have an account? <a href="'.esc_url( coffeebrk_core_page_url('coffeebrk-login') ).'">Log In</a></p>';
     $out .= '</div></div>';
-    // Handle POST
-    if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset($_POST['coffeebrk_signup_nonce']) && wp_verify_nonce($_POST['coffeebrk_signup_nonce'],'coffeebrk_signup') ){
-        $email = sanitize_email($_POST['email'] ?? '');
-        $pass = (string) ($_POST['password'] ?? '');
-        $pass2 = (string) ($_POST['password2'] ?? '');
-        if ( ! $email || ! is_email($email) ) { return $out.'<p class="cbk-center" style="color:#f66">Invalid email.</p>'; }
-        if ( $pass !== $pass2 ) { return $out.'<p class="cbk-center" style="color:#f66">Passwords do not match.</p>'; }
-        if ( email_exists($email) ) { return $out.'<p class="cbk-center" style="color:#f66">Email already registered.</p>'; }
-        $login = sanitize_user( current( explode('@',$email) ), true );
-        if ( username_exists($login) ) { $login = $login . '_' . wp_generate_password(4, false); }
-        $uid = wp_create_user($login, $pass, $email);
-        if ( is_wp_error($uid) ) { return $out.'<p class="cbk-center" style="color:#f66">'.esc_html($uid->get_error_message()).'</p>'; }
-        wp_set_current_user($uid); wp_set_auth_cookie($uid,true);
-        wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-onboarding') ); exit;
-    }
     return $out;
 });
 
@@ -245,20 +214,98 @@ add_shortcode('coffeebrk_onboarding', function(){
         $out .= '</form>';
     }
     $out .= '</div></div>';
-
-    // Handle steps
-    if ( 'POST' === $_SERVER['REQUEST_METHOD'] ){
-        if ( isset($_POST['coffeebrk_onboard_name_nonce']) && wp_verify_nonce($_POST['coffeebrk_onboard_name_nonce'],'coffeebrk_onboard_name') ){
-            $first = sanitize_text_field($_POST['first_name'] ?? '');
-            wp_update_user([ 'ID'=>$user->ID, 'first_name'=>$first ]);
-            wp_safe_redirect( add_query_arg('step','aspire', get_permalink() ) ); exit;
-        }
-        if ( isset($_POST['coffeebrk_onboard_aspire_nonce']) && wp_verify_nonce($_POST['coffeebrk_onboard_aspire_nonce'],'coffeebrk_onboard_aspire') ){
-            $vals = array_map('sanitize_text_field', (array)($_POST['aspire'] ?? []));
-            update_user_meta($user->ID, 'aspire', array_values(array_unique($vals)) );
-            wp_safe_redirect( home_url('/') ); exit;
-        }
-    }
-
     return $out;
 });
+
+// Hello step (welcome screen)
+add_shortcode('coffeebrk_hello', function(){
+    coffeebrk_enqueue_auth_styles();
+    $login = esc_url( coffeebrk_core_page_url('coffeebrk-login') );
+    $out = '<div class="cbk-wrap"><div class="cbk-card cbk-hello">';
+    $out .= '<div class="cbk-hello-title">👋 Hey there, welcome to CoffeeBrk</div>';
+    $out .= '<p class="cbk-hello-sub">Where curious professionals start their day with 5 minutes of AI — stories, ideas, and tools that matter to you.</p>';
+    $out .= '<div class="cbk-center"><a class="cbk-btn" href="'.$login.'">Continue</a></div>';
+    $out .= '</div></div>';
+    return $out;
+});
+
+// -------- Early POST handlers to avoid header warnings --------
+add_action('template_redirect', function(){
+    if ( 'POST' !== ($_SERVER['REQUEST_METHOD'] ?? '') ) return;
+    $ids = (array) get_option('coffeebrk_core_pages', []);
+    // Login POST
+    if ( isset($ids['coffeebrk-login']) && is_page( (int) $ids['coffeebrk-login'] ) ){
+        if ( isset($_POST['coffeebrk_login_nonce']) && wp_verify_nonce($_POST['coffeebrk_login_nonce'],'coffeebrk_login') ){
+            $email = sanitize_email($_POST['email'] ?? '');
+            $u = $email ? get_user_by('email', $email) : false;
+            $username = $u ? $u->user_login : sanitize_text_field($_POST['email'] ?? '');
+            $creds = [ 'user_login'=>$username, 'user_password'=>(string)($_POST['password'] ?? ''), 'remember'=>true ];
+            $user = wp_signon($creds, false);
+            if ( ! is_wp_error($user) ) { wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-onboarding') ); exit; }
+            add_filter('the_content', function($c) use ($user){ return $c.'<p class="cbk-center" style="color:#f66">'.esc_html($user->get_error_message()).'</p>'; });
+        }
+        return;
+    }
+    // Signup POST
+    if ( isset($ids['coffeebrk-signup']) && is_page( (int) $ids['coffeebrk-signup'] ) ){
+        if ( isset($_POST['coffeebrk_signup_nonce']) && wp_verify_nonce($_POST['coffeebrk_signup_nonce'],'coffeebrk_signup') ){
+            $email = sanitize_email($_POST['email'] ?? '');
+            $pass = (string) ($_POST['password'] ?? '');
+            $pass2 = (string) ($_POST['password2'] ?? '');
+            if ( ! $email || ! is_email($email) ) { return; }
+            if ( $pass !== $pass2 ) { return; }
+            if ( email_exists($email) ) { return; }
+            $login = sanitize_user( current( explode('@',$email) ), true );
+            if ( username_exists($login) ) { $login = $login . '_' . wp_generate_password(4, false); }
+            $uid = wp_create_user($login, $pass, $email);
+            if ( is_wp_error($uid) ) { return; }
+            wp_set_current_user($uid); wp_set_auth_cookie($uid,true);
+            wp_safe_redirect( coffeebrk_core_page_url('coffeebrk-onboarding') ); exit;
+        }
+        return;
+    }
+    // Onboarding POST
+    if ( isset($ids['coffeebrk-onboarding']) && is_page( (int) $ids['coffeebrk-onboarding'] ) ){
+        if ( isset($_POST['coffeebrk_onboard_name_nonce']) && wp_verify_nonce($_POST['coffeebrk_onboard_name_nonce'],'coffeebrk_onboard_name') ){
+            $user = wp_get_current_user();
+            if ( $user && $user->ID ) {
+                $first = sanitize_text_field($_POST['first_name'] ?? '');
+                wp_update_user([ 'ID'=>$user->ID, 'first_name'=>$first ]);
+                wp_safe_redirect( add_query_arg('step','aspire', get_permalink( (int) $ids['coffeebrk-onboarding'] ) ) ); exit;
+            }
+        }
+        if ( isset($_POST['coffeebrk_onboard_aspire_nonce']) && wp_verify_nonce($_POST['coffeebrk_onboard_aspire_nonce'],'coffeebrk_onboard_aspire') ){
+            $user = wp_get_current_user();
+            if ( $user && $user->ID ) {
+                $vals = array_map('sanitize_text_field', (array)($_POST['aspire'] ?? []));
+                update_user_meta($user->ID, 'aspire', array_values(array_unique($vals)) );
+                wp_safe_redirect( home_url('/') ); exit;
+            }
+        }
+        return;
+    }
+});
+
+// Hide page/site titles and chrome for our auth pages
+add_filter('body_class', function($classes){
+    $ids = (array) get_option('coffeebrk_core_pages', []);
+    if ( is_page( array_values($ids) ) ) { $classes[] = 'coffeebrk-auth'; }
+    return $classes;
+});
+
+add_filter('document_title_parts', function($parts){
+    $ids = (array) get_option('coffeebrk_core_pages', []);
+    if ( is_page( array_values($ids) ) ) {
+        $parts['title'] = '';
+        $parts['site'] = '';
+    }
+    return $parts;
+});
+
+add_filter('the_title', function($title, $post_id){
+    $ids = (array) get_option('coffeebrk_core_pages', []);
+    if ( in_array($post_id, array_map('intval', array_values($ids)), true) ) {
+        return '';
+    }
+    return $title;
+}, 10, 2);

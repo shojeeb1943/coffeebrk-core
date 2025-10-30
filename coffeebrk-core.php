@@ -3,7 +3,7 @@
 Plugin Name: Coffeebrk Core
 Plugin URI: https://coffeebrk.ai
 Description: Core functionality plugin for coffeebrk.ai — adds global fields, Elementor dynamic tags, and future features.
-Version: 1.2.2
+Version: 1.2.5
 Author: Coffeebrk
 Author URI: https://coffeebrk.ai
 License: GPL2+
@@ -103,7 +103,10 @@ add_action( 'save_post', function( $post_id ) {
  * --------------------------------------------------------------
  */
 add_action( 'elementor/init', function() {
-    require_once __DIR__ . '/inc/class-coffeebrk-elementor-tags.php';
+    $f = __DIR__ . '/inc/class-coffeebrk-elementor-tags.php';
+    if ( file_exists( $f ) ) {
+        require_once $f;
+    }
 });
 
 /**
