@@ -41,7 +41,7 @@ add_action( 'init', function() {
 
 /**
  * --------------------------------------------------------------
- * SECTION 2: Add Meta Box in Post Editor
+ * SECTION 2: Add Meta Box in Post Editor (Source Information)
  * --------------------------------------------------------------
  */
 add_action( 'add_meta_boxes', function() {
