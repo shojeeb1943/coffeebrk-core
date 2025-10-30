@@ -63,9 +63,25 @@ function coffeebrk_safe_redirect($url){
 // -------- Content gating (force login) --------
 add_action('template_redirect', function(){
     if ( is_admin() || defined('REST_REQUEST') || wp_doing_cron() ) return;
-    if ( is_user_logged_in() ) return;
     $ids = (array) get_option('coffeebrk_core_pages', []);
-    if ( is_page( array_values($ids) ) ) return; // allow our auth/onboarding pages (hello/login/signup/onboarding)
+    // If logged-in: push away from hello/login/signup; allow onboarding only if not completed
+    if ( is_user_logged_in() ) {
+        if ( isset($ids['coffeebrk-onboarding']) && is_page( (int) $ids['coffeebrk-onboarding'] ) ) {
+            $u = wp_get_current_user();
+            $has_name = (bool) ($u->first_name);
+            $has_aspire = ! empty( get_user_meta($u->ID, 'aspire', true) );
+            if ( $has_name && $has_aspire ) {
+                coffeebrk_safe_redirect( home_url('/') );
+            }
+            return; // let incomplete users finish onboarding
+        }
+        if ( is_page( [ (int)($ids['coffeebrk-hello'] ?? 0), (int)($ids['coffeebrk-login'] ?? 0), (int)($ids['coffeebrk-signup'] ?? 0) ] ) ) {
+            coffeebrk_safe_redirect( home_url('/') );
+        }
+        return;
+    }
+    // Anonymous: only allow our auth/onboarding pages
+    if ( is_page( array_values($ids) ) ) return;
     coffeebrk_safe_redirect( coffeebrk_core_page_url('coffeebrk-hello') );
 });
 
@@ -318,6 +334,7 @@ add_filter('body_class', function($classes){
 });
 
 add_filter('document_title_parts', function($parts){
+    if ( is_admin() ) return $parts;
     $ids = (array) get_option('coffeebrk_core_pages', []);
     if ( is_page( array_values($ids) ) ) {
         $parts['title'] = '';
@@ -327,6 +344,7 @@ add_filter('document_title_parts', function($parts){
 });
 
 add_filter('the_title', function($title, $post_id){
+    if ( is_admin() ) return $title; // keep meaningful titles in admin
     $ids = (array) get_option('coffeebrk_core_pages', []);
     if ( in_array($post_id, array_map('intval', array_values($ids)), true) ) {
         return '';
