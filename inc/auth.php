@@ -223,7 +223,15 @@ add_shortcode('coffeebrk_onboarding', function(){
     coffeebrk_enqueue_auth_styles();
     $user = wp_get_current_user();
     $provided_name = $user->first_name ?: '';
-    $aspire_options = [ 'Developer','Designer','Marketer','Writer / Content Creator','Product Manager','Data / AI Engineer','Student / Explorer' ];
+    $aspire_options = [
+        'Developer' => '🧑‍💻',
+        'Designer' => '🎨',
+        'Marketer' => '📈',
+        'Writer / Content Creator' => '🖋️',
+        'Product Manager' => '🧠',
+        'Data / AI Engineer' => '🤖',
+        'Student / Explorer' => '🌱',
+    ];
     $selected = (array) get_user_meta($user->ID, 'aspire', true);
     $action = esc_url( get_permalink() );
 
@@ -237,15 +245,17 @@ add_shortcode('coffeebrk_onboarding', function(){
         $out .= '</form>';
     } elseif ( $_GET['step']==='aspire' ){
         $out .= '<div class="cbk-title">What do you do (or aspire to do)?</div>';
+        $out .= '<p class="cbk-hello-sub">We\'ll personalize your daily AI feed around your world.</p>';
         $out .= '<form method="post" action="'.$action.'?step=aspire">';
         $out .= wp_nonce_field('coffeebrk_onboard_aspire','coffeebrk_onboard_aspire_nonce',true,false);
         $out .= '<div class="cbk-pills">';
-        foreach ($aspire_options as $opt){
-            $is = in_array($opt, $selected, true) ? ' active' : '';
-            $checked = in_array($opt,$selected,true) ? 'checked' : '';
+        foreach ($aspire_options as $label => $icon){
+            $is = in_array($label, $selected, true) ? ' active' : '';
+            $checked = in_array($label,$selected,true) ? 'checked' : '';
             $out .= '<label class="cbk-pill'.$is.'" role="checkbox" aria-checked="'.($checked?'true':'false').'" tabindex="0">'
-                 . '<input type="checkbox" name="aspire[]" value="'.esc_attr($opt).'" '.$checked.' />'
-                 . esc_html($opt)
+                 . '<input type="checkbox" name="aspire[]" value="'.esc_attr($label).'" '.$checked.' />'
+                 . '<span class="cbk-pill-icon">'.esc_html($icon).'</span> '
+                 . '<span class="cbk-pill-label">'.esc_html($label).'</span>'
                  . '</label>';
         }
         $out .= '</div>';
@@ -318,7 +328,9 @@ add_action('template_redirect', function(){
             $user = wp_get_current_user();
             if ( $user && $user->ID ) {
                 $vals = array_map('sanitize_text_field', (array)($_POST['aspire'] ?? []));
-                update_user_meta($user->ID, 'aspire', array_values(array_unique($vals)) );
+                $vals = array_values(array_unique(array_filter($vals)));
+                update_user_meta($user->ID, 'aspire', $vals );
+                update_user_meta($user->ID, 'aspire_csv', implode(', ', $vals) );
                 coffeebrk_safe_redirect( home_url('/') );
             }
         }

@@ -34,8 +34,13 @@ body.coffeebrk-auth { background:#11100d !important; color:#f6f2e8; font-family:
 
 /* Pills */
 .cbk-pills { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
-.cbk-pill { padding:10px 14px; border:1px solid #3a342a; border-radius:999px; color:#e8e0cf; cursor:pointer; background:#171511; user-select:none; }
+.cbk-pill { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid #3a342a; border-radius:999px; color:#e8e0cf; cursor:pointer; background:#171511; user-select:none; transition:background .2s,border-color .2s,transform .02s ease; }
+.cbk-pill:hover { border-color:#5a4c3a; }
+.cbk-pill:active { transform:translateY(1px); }
 .cbk-pill.active { background:#0f3d2e; border-color:#1d5f49; }
+.cbk-pill input { display:none; }
+.cbk-pill-label { font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-weight:500; font-size:16px; line-height:1; }
+.cbk-pill-icon { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; }
 
 /* Hello screen */
 .cbk-hello .cbk-btn { width:auto; min-width:160px; }
