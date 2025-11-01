@@ -34,6 +34,12 @@ register_activation_hook( __FILE__, function() {
         ];
         update_option('coffeebrk_dynamic_fields', $seed, false);
     }
+    // Seed default aspires if empty
+    $as = get_option('coffeebrk_aspires', []);
+    if ( empty($as) || !is_array($as) ) {
+        $defaults = [ 'Developer','Designer','Marketer','Writer / Content Creator','Product Manager','Data / AI Engineer','Student / Explorer' ];
+        update_option('coffeebrk_aspires', $defaults, false);
+    }
     flush_rewrite_rules();
 });
 
@@ -153,4 +159,5 @@ require_once COFFEEBRK_CORE_PATH . 'dashboard/admin-dynamic-fields.php';
 require_once COFFEEBRK_CORE_PATH . 'dashboard/admin-aspires.php';
 require_once COFFEEBRK_CORE_PATH . 'meta/meta-dynamic-fields.php';
 require_once COFFEEBRK_CORE_PATH . 'meta/meta-aspires.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/feed.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/auth.php';
