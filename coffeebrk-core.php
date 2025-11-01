@@ -25,6 +25,15 @@ register_activation_hook( __FILE__, function() {
         coffeebrk_logger_ensure_paths();
     }
     do_action('coffeebrk_core_activate');
+    // Seed default dynamic fields if empty
+    $dyn = get_option('coffeebrk_dynamic_fields', []);
+    if ( empty($dyn) || !is_array($dyn) ) {
+        $seed = [
+            [ 'id'=> 'seed_sn', 'label' => 'Source Name', 'key' => '_source_name', 'type' => 'text', 'choices' => '' ],
+            [ 'id'=> 'seed_su', 'label' => 'Source URL',  'key' => '_source_url',  'type' => 'url',  'choices' => '' ],
+        ];
+        update_option('coffeebrk_dynamic_fields', $seed, false);
+    }
     flush_rewrite_rules();
 });
 
@@ -59,6 +68,11 @@ add_action( 'init', function() {
  * --------------------------------------------------------------
  */
 add_action( 'add_meta_boxes', function() {
+    // Hide legacy box if Dynamic Fields contains Source Name & URL
+    $dyn = (array) get_option('coffeebrk_dynamic_fields', []);
+    $has_sn = false; $has_su = false;
+    foreach ($dyn as $f){ $k = $f['key'] ?? ''; if ($k === '_source_name') $has_sn = true; if ($k === '_source_url') $has_su = true; }
+    if ( $has_sn && $has_su ) return;
     add_meta_box(
         'coffeebrk_source_meta',
         'Source Information',
@@ -135,4 +149,6 @@ add_filter( 'the_content', function( $content ) {
 // Register includes
 require_once COFFEEBRK_CORE_PATH . 'inc/admin-settings.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/admin-login-dashboard.php';
+require_once COFFEEBRK_CORE_PATH . 'dashboard/admin-dynamic-fields.php';
+require_once COFFEEBRK_CORE_PATH . 'meta/meta-dynamic-fields.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/auth.php';
