@@ -19,7 +19,7 @@ body.coffeebrk-auth { background:#11100d !important; color:#f6f2e8; font-family:
 
 /* Titles */
 .cbk-title, .cbk-hello-title { font-family: CalvinoItalicVarTrial, Georgia, 'Times New Roman', serif; font-weight:625; font-style:italic; font-size:40px; line-height:1; letter-spacing:0; text-align:center; color:#f5e6c8; margin:0 0 24px; }
-.cbk-hello-sub { text-align:center; color:#c3b79f; max-width:520px; margin:0 auto 24px; line-height:1.5; }
+.cbk-hello-sub { text-align:center; color:#c3b79f; max-width:520px; margin:0 auto 24px; line-height:1; font-family:Poppins, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-weight:300; font-size:16px; }
 
 /* Inputs */
 .cbk-input { width:100%; padding:12px 14px; border-radius:10px; background:#1a1916; border:1px solid #2f2c26; color:#fff; margin:10px 0; outline:none; }
@@ -34,11 +34,11 @@ body.coffeebrk-auth { background:#11100d !important; color:#f6f2e8; font-family:
 
 /* Pills */
 .cbk-pills { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
-.cbk-pill { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid #3a342a; border-radius:999px; color:#e8e0cf; cursor:pointer; background:#171511; user-select:none; transition:background .2s,border-color .2s,transform .02s ease; }
+.cbk-pill { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border:1px solid #241703; border-radius:999px; color:#e8e0cf; cursor:pointer; background:#11100d; user-select:none; transition:background .2s,border-color .2s,transform .02s ease; }
 .cbk-pill:hover { border-color:#5a4c3a; }
 .cbk-pill:active { transform:translateY(1px); }
-.cbk-pill.active { background:#0f3d2e; border-color:#1d5f49; }
-.cbk-pill input { display:none; }
+.cbk-pill.active { background:#161008; border-color:#533911; }
+.cbk-pill input { position:absolute; opacity:0; pointer-events:none; appearance:none; -webkit-appearance:none; -moz-appearance:none; }
 .cbk-pill-label { font-family:Poppins,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-weight:500; font-size:16px; line-height:1; }
 .cbk-pill-icon { width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center; }
 
