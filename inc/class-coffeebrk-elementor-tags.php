@@ -26,6 +26,8 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
         $key = $f['key'] ?? '';
         $label = $f['label'] ?? '';
         if (!$key || !$label) continue;
+        // Avoid duplicates with legacy tags
+        if ($key === '_source_name' || $key === '_source_url') { continue; }
         // Use anonymous class to avoid eval and support older Elementor versions
         $tag = new class($key, $label) extends \Elementor\Core\DynamicTags\Tag {
             private $cbk_key; private $cbk_label;

@@ -74,7 +74,7 @@ function coffeebrk_core_dashboard_page(){
         .'<a class="button button-primary" href="'.$auth.'">Auth Settings</a>'
         .'<a class="button" href="'.$dyn.'">Dynamic Fields</a>'
         .'<a class="button" href="'.$asp.'">Aspire Manager</a>'
-        .'<a class="button" href="'.$logs+'">View Logs</a>'
+        .'<a class="button" href="'.$logs.'">View Logs</a>'
         .'</div></div>';
     echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">Status</h2>'
         .'<ul style="margin:0;padding-left:18px;">'
