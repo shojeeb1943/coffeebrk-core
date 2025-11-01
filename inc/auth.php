@@ -236,10 +236,22 @@ add_shortcode('coffeebrk_onboarding', function(){
     $configured = (array) get_option('coffeebrk_aspires', []);
     $aspire_options = [];
     if ($configured) {
-        foreach ($configured as $label) {
-            $key = strtolower(trim($label));
-            $icon = $defaults[$key] ?? '✨';
-            $aspire_options[$label] = $icon;
+        // New structure: each row is ['label'=>..., 'icon'=>...]
+        if (is_array($configured) && isset($configured[0]) && is_array($configured[0])) {
+            foreach ($configured as $row) {
+                $label = trim((string)($row['label'] ?? ''));
+                if ($label==='') continue;
+                $key = strtolower($label);
+                $icon = $row['icon'] !== '' ? $row['icon'] : ($defaults[$key] ?? '✨');
+                $aspire_options[$label] = $icon;
+            }
+        } else {
+            // Legacy string list
+            foreach ($configured as $label) {
+                $key = strtolower(trim($label));
+                $icon = $defaults[$key] ?? '✨';
+                $aspire_options[$label] = $icon;
+            }
         }
     } else {
         // fallback to defaults order if option not set

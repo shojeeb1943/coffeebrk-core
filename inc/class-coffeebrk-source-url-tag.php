@@ -9,7 +9,7 @@ class Coffeebrk_Source_Url_Tag extends Tag {
     public function get_title() { return __( 'Source URL', 'coffeebrk-core' ); }
     public function get_group() { return 'coffeebrk-meta'; }
     public function get_categories() {
-        return [ \Elementor\Modules\DynamicTags\Module::URL_CATEGORY ];
+        return [ \Elementor\Modules\DynamicTags\Module::URL_CATEGORY, \Elementor\Modules\DynamicTags\Module::TEXT_CATEGORY ];
     }
 
     protected function register_controls() {}
