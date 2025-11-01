@@ -363,3 +363,31 @@ add_filter('the_title', function($title, $post_id){
     }
     return $title;
 }, 10, 2);
+
+// User profile field: Aspire (CSV)
+add_action('show_user_profile', function($user){
+    $vals = (array) get_user_meta($user->ID, 'aspire', true);
+    $csv  = get_user_meta($user->ID, 'aspire_csv', true);
+    if ( ! $csv && $vals ) { $csv = implode(', ', array_map('strval', $vals)); }
+    echo '<h2>Coffeebrk – Aspire</h2>';
+    echo '<table class="form-table" role="presentation"><tr><th><label for="coffeebrk_aspire_csv">Aspire</label></th><td>';
+    echo '<input type="text" name="coffeebrk_aspire_csv" id="coffeebrk_aspire_csv" class="regular-text" value="'.esc_attr($csv).'" />';
+    echo '<p class="description">Comma-separated list, e.g. Developer, Designer</p>';
+    echo '</td></tr></table>';
+});
+
+add_action('edit_user_profile', function($user){
+    do_action('show_user_profile', $user);
+});
+
+add_action('personal_options_update', function($user_id){
+    if ( ! current_user_can('edit_user', $user_id) ) return;
+    $csv = isset($_POST['coffeebrk_aspire_csv']) ? wp_unslash($_POST['coffeebrk_aspire_csv']) : '';
+    $parts = array_filter(array_map(function($s){ return trim( sanitize_text_field($s) ); }, explode(',', (string) $csv)));
+    update_user_meta($user_id, 'aspire', array_values(array_unique($parts)) );
+    update_user_meta($user_id, 'aspire_csv', implode(', ', array_values(array_unique($parts))) );
+});
+
+add_action('edit_user_profile_update', function($user_id){
+    do_action('personal_options_update', $user_id);
+});
