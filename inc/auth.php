@@ -223,15 +223,30 @@ add_shortcode('coffeebrk_onboarding', function(){
     coffeebrk_enqueue_auth_styles();
     $user = wp_get_current_user();
     $provided_name = $user->first_name ?: '';
-    $aspire_options = [
-        'Developer' => '🧑‍💻',
-        'Designer' => '🎨',
-        'Marketer' => '📈',
-        'Writer / Content Creator' => '🖋️',
-        'Product Manager' => '🧠',
-        'Data / AI Engineer' => '🤖',
-        'Student / Explorer' => '🌱',
+    // Build aspire options from settings, keeping icons via a default mapping
+    $defaults = [
+        'developer' => '🧑‍💻',
+        'designer' => '🎨',
+        'marketer' => '📈',
+        'writer / content creator' => '🖋️',
+        'product manager' => '🧠',
+        'data / ai engineer' => '🤖',
+        'student / explorer' => '🌱',
     ];
+    $configured = (array) get_option('coffeebrk_aspires', []);
+    $aspire_options = [];
+    if ($configured) {
+        foreach ($configured as $label) {
+            $key = strtolower(trim($label));
+            $icon = $defaults[$key] ?? '✨';
+            $aspire_options[$label] = $icon;
+        }
+    } else {
+        // fallback to defaults order if option not set
+        foreach ($defaults as $label_key => $icon) {
+            $aspire_options[ucwords($label_key)] = $icon;
+        }
+    }
     $selected = (array) get_user_meta($user->ID, 'aspire', true);
     $action = esc_url( get_permalink() );
 
