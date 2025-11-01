@@ -62,14 +62,31 @@ add_action('admin_menu', function() {
 
 function coffeebrk_core_dashboard_page(){
     if(!current_user_can('manage_options'))return;
-    echo '<div class="wrap">';
-    echo '<h1>Coffeebrk Core</h1>';
-    echo '<p>Welcome to Coffeebrk Core. Use the submenus for Auth settings and Logs.</p>';
-    echo '<ul style="list-style:disc;margin-left:20px;">';
-    echo '<li><a href="' . admin_url('admin.php?page=coffeebrk-core-auth') . '">Auth Settings</a></li>';
-    echo '<li><a href="' . admin_url('admin.php?page=coffeebrk-core-logs') . '">View Logs</a></li>';
-    echo '</ul>';
-    echo '</div>';
+    $auth = admin_url('admin.php?page=coffeebrk-core-auth');
+    $dyn  = admin_url('admin.php?page=coffeebrk-core-dynfields');
+    $asp  = admin_url('admin.php?page=coffeebrk-core-aspires');
+    $logs = admin_url('admin.php?page=coffeebrk-core-logs');
+    echo '<div class="wrap cbk-admin">';
+    echo '<h1 style="margin-bottom:10px;">Coffeebrk Core</h1>';
+    echo '<p style="max-width:760px;color:#555;">Auth + Onboarding via Supabase, Dynamic Post Meta, Aspire mapping, Elementor dynamic tags, and a simple personalized feed endpoint.</p>';
+    echo '<div class="cbk-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:20px;">';
+    echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">Quick Links</h2><div style="display:flex;flex-direction:column;gap:8px;">'
+        .'<a class="button button-primary" href="'.$auth.'">Auth Settings</a>'
+        .'<a class="button" href="'.$dyn.'">Dynamic Fields</a>'
+        .'<a class="button" href="'.$asp.'">Aspire Manager</a>'
+        .'<a class="button" href="'.$logs+'">View Logs</a>'
+        .'</div></div>';
+    echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">Status</h2>'
+        .'<ul style="margin:0;padding-left:18px;">'
+        .'<li>Plugin version: '.esc_html( get_file_data( COFFEEBRK_CORE_PATH.'coffeebrk-core.php', ['Version'=>'Version'] )['Version'] ?? '' ).'</li>'
+        .'<li>Supabase URL set: '.( get_option('coffeebrk_core_settings')['supabase_url'] ? 'Yes' : 'No').'</li>'
+        .'<li>Dynamic fields: '.count((array)get_option('coffeebrk_dynamic_fields',[])).'</li>'
+        .'<li>Aspire options: '.count((array)get_option('coffeebrk_aspires',[])).'</li>'
+        .'</ul></div>';
+    echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">Developer Notes</h2>'
+        .'<p style="margin:0;color:#555;">Use the feed endpoint <code>/wp-json/coffeebrk/v1/feed</code> to power a personalized UI. Elementor tags appear under <em>Coffeebrk Meta</em> and are generated from Dynamic Fields.</p>'
+        .'</div>';
+    echo '</div></div>';
 }
 
 function coffeebrk_auth_settings_page(){
