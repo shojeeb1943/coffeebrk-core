@@ -6,7 +6,17 @@ add_action('add_meta_boxes', function(){
     $post_types = apply_filters('coffeebrk_meta_post_types', ['post']);
     foreach ($post_types as $pt){
         add_meta_box('coffeebrk_post_aspires','Aspires for this post', function($post){
-            $opts = (array) get_option('coffeebrk_aspires', []);
+            $opts_raw = (array) get_option('coffeebrk_aspires', []);
+            // Normalize to labels list
+            $opts = [];
+            foreach ($opts_raw as $row){
+                if (is_array($row)) {
+                    $label = trim((string)($row['label'] ?? ''));
+                } else {
+                    $label = trim((string)$row);
+                }
+                if ($label !== '') $opts[] = $label;
+            }
             $saved = (array) get_post_meta($post->ID, '_post_aspires', true);
             wp_nonce_field('coffeebrk_post_aspires_save','coffeebrk_post_aspires_nonce');
             if (empty($opts)) { echo '<p>No aspires configured. Configure them under Coffeebrk Core → Aspire Manager.</p>'; return; }
