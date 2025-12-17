@@ -19,10 +19,17 @@ if ( ! defined( 'COFFEEBRK_CORE_URL' ) ) {
 }
  
 require_once COFFEEBRK_CORE_PATH . 'inc/logger.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/rss.php';
  
 register_activation_hook( __FILE__, function() {
     if ( function_exists( 'coffeebrk_logger_ensure_paths' ) ) {
         coffeebrk_logger_ensure_paths();
+    }
+    if ( function_exists( 'coffeebrk_rss_install' ) ) {
+        coffeebrk_rss_install();
+    }
+    if ( function_exists( 'coffeebrk_rss_schedule_cron' ) ) {
+        coffeebrk_rss_schedule_cron();
     }
     do_action('coffeebrk_core_activate');
     // Seed default dynamic fields if empty
@@ -44,6 +51,9 @@ register_activation_hook( __FILE__, function() {
 });
 
 register_deactivation_hook( __FILE__, function() {
+    if ( function_exists( 'coffeebrk_rss_clear_cron' ) ) {
+        coffeebrk_rss_clear_cron();
+    }
     flush_rewrite_rules();
 });
 
