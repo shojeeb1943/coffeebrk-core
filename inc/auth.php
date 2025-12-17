@@ -162,7 +162,9 @@ add_filter('show_admin_bar', function($show){
 
 // -------- Shortcodes: markup + handlers --------
 function coffeebrk_enqueue_auth_styles(){
-    wp_enqueue_style('coffeebrk-auth', COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-auth.css', [], '1.0.0');
+    $file = COFFEEBRK_CORE_PATH . 'assets/css/coffeebrk-auth.css';
+    $ver = file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
+    wp_enqueue_style('coffeebrk-auth', COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-auth.css', [], $ver);
 }
 
 function coffeebrk_enqueue_supabase_assets(string $context){
@@ -178,24 +180,55 @@ function coffeebrk_enqueue_supabase_assets(string $context){
     wp_localize_script('coffeebrk-supabase-auth', 'CoffeebrkAuth', $cfg);
 }
 
+function coffeebrk_auth_logo_html() : string {
+    $src = COFFEEBRK_CORE_URL . 'assets/img/coffeebrk%20logo.svg';
+    $href = 'https://app.coffeebrk.ai/';
+    return '<div class="cbk-logo"><a href="' . esc_url( $href ) . '" aria-label="Coffeebrk"><img src="' . esc_url( $src ) . '" alt="Coffeebrk" loading="eager" /></a></div>';
+}
+
+function coffeebrk_auth_right_panel_html() : string {
+    $img = COFFEEBRK_CORE_URL . 'assets/img/person1.png';
+    $out = '<div class="cbk-right">';
+    $out .= '<div class="cbk-right-hero">';
+    $out .= '<img src="' . esc_url( $img ) . '" alt="" loading="eager" />';
+    $out .= '<div class="cbk-right-person"><strong>Darlene Robertson</strong>Big Kahuna Burger Ltd.</div>';
+    $out .= '</div>';
+    $out .= '<h2 class="cbk-right-title">Motivation That Sticks</h2>';
+    $out .= '<p class="cbk-right-quote">"I used to quit self-improvement apps after a week. This one? I\'m on day 42. The 5-minute challenges fit perfectly into my routine — no pressure, just progress."</p>';
+    $out .= '</div>';
+    return $out;
+}
+
+function coffeebrk_auth_shell_html( string $left_html ) : string {
+    $out = '<div class="cbk-shell">';
+    $out .= '<div class="cbk-shell__left"><div class="cbk-left">';
+    $out .= coffeebrk_auth_logo_html();
+    $out .= '<div class="cbk-left-content"><div class="cbk-content">' . $left_html . '</div></div>';
+    $out .= '</div></div>';
+    $out .= '<div class="cbk-shell__right">' . coffeebrk_auth_right_panel_html() . '</div>';
+    $out .= '</div>';
+    return $out;
+}
+
 add_shortcode('coffeebrk_login', function(){
     if ( is_user_logged_in() ) return '<div class="cbk-wrap"><div class="cbk-card"><p class="cbk-center">You are already logged in.</p></div></div>';
     coffeebrk_enqueue_auth_styles();
     coffeebrk_enqueue_supabase_assets('login');
     $action = esc_url( get_permalink() );
-    $out = '<div class="cbk-wrap"><div class="cbk-card">';
-    $out .= '<div class="cbk-title">Login to your account</div>';
-    $out .= '<form method="post" action="'.$action.'">';
-    $out .= wp_nonce_field('coffeebrk_login','coffeebrk_login_nonce',true,false);
-    $out .= '<input class="cbk-input" type="email" name="email" placeholder="Email" required />';
-    $out .= '<input class="cbk-input" type="password" name="password" placeholder="Password" required />';
-    $out .= '<button class="cbk-btn" type="submit">Login</button>';
-    $out .= '</form>';
-    $out .= '<div class="cbk-divider"></div>';
-    $out .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google">Sign in with Google</button>';
-    $out .= '<p class="cbk-center" style="margin-top:12px;">Don\'t have an account? <a href="'.esc_url( coffeebrk_core_page_url('coffeebrk-signup') ).'">Sign Up</a></p>';
-    $out .= '</div></div>';
-    return $out;
+    $left = '';
+    $left .= '<div class="cbk-title">Login to your account</div>';
+    $left .= '<form class="cbk-form" method="post" action="'.$action.'">';
+    $left .= wp_nonce_field('coffeebrk_login','coffeebrk_login_nonce',true,false);
+    $left .= '<div class="cbk-fields">';
+    $left .= '<div class="cbk-field"><div class="cbk-label">Email</div><input class="cbk-input" type="email" name="email" required /></div>';
+    $left .= '<div class="cbk-field"><div class="cbk-label">Password</div><input class="cbk-input" type="password" name="password" required /></div>';
+    $left .= '</div>';
+    $left .= '<button class="cbk-btn" type="submit">Login</button>';
+    $left .= '</form>';
+    $left .= '<div class="cbk-or">Or</div>';
+    $left .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google"><span class="cbk-google-icon" aria-hidden="true"></span> Sign in with Google</button>';
+    $left .= '<div class="cbk-help">Don\'t have an account? <a class="cbk-link" href="'.esc_url( coffeebrk_core_page_url('coffeebrk-signup') ).'">Sign Up</a></div>';
+    return coffeebrk_auth_shell_html( $left );
 });
 
 add_shortcode('coffeebrk_signup', function(){
@@ -203,20 +236,21 @@ add_shortcode('coffeebrk_signup', function(){
     coffeebrk_enqueue_auth_styles();
     coffeebrk_enqueue_supabase_assets('signup');
     $action = esc_url( get_permalink() );
-    $out = '<div class="cbk-wrap"><div class="cbk-card">';
-    $out .= '<div class="cbk-title">Create Account</div>';
-    $out .= '<form method="post" action="'.$action.'">';
-    $out .= wp_nonce_field('coffeebrk_signup','coffeebrk_signup_nonce',true,false);
-    $out .= '<input class="cbk-input" type="email" name="email" placeholder="Email" required />';
-    $out .= '<input class="cbk-input" type="password" name="password" placeholder="Password" required />';
-    $out .= '<input class="cbk-input" type="password" name="password2" placeholder="Confirm Password" required />';
-    $out .= '<button class="cbk-btn" type="submit">Sign Up</button>';
-    $out .= '</form>';
-    $out .= '<div class="cbk-divider"></div>';
-    $out .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google">Sign in with Google</button>';
-    $out .= '<p class="cbk-center" style="margin-top:12px;">Already have an account? <a href="'.esc_url( coffeebrk_core_page_url('coffeebrk-login') ).'">Log In</a></p>';
-    $out .= '</div></div>';
-    return $out;
+    $left = '';
+    $left .= '<div class="cbk-title">Create Account</div>';
+    $left .= '<form class="cbk-form" method="post" action="'.$action.'">';
+    $left .= wp_nonce_field('coffeebrk_signup','coffeebrk_signup_nonce',true,false);
+    $left .= '<div class="cbk-fields">';
+    $left .= '<div class="cbk-field"><div class="cbk-label">Email</div><input class="cbk-input" type="email" name="email" required /></div>';
+    $left .= '<div class="cbk-field"><div class="cbk-label">Password</div><input class="cbk-input" type="password" name="password" required /></div>';
+    $left .= '<div class="cbk-field"><div class="cbk-label">Confirm Password</div><input class="cbk-input" type="password" name="password2" required /></div>';
+    $left .= '</div>';
+    $left .= '<button class="cbk-btn" type="submit">Sign Up</button>';
+    $left .= '</form>';
+    $left .= '<div class="cbk-or">Or</div>';
+    $left .= '<button type="button" id="coffeebrk-google-btn" class="cbk-google"><span class="cbk-google-icon" aria-hidden="true"></span> Sign in with Google</button>';
+    $left .= '<div class="cbk-help">Already have an account? <a class="cbk-link" href="'.esc_url( coffeebrk_core_page_url('coffeebrk-login') ).'">Log In</a></div>';
+    return coffeebrk_auth_shell_html( $left );
 });
 
 add_shortcode('coffeebrk_onboarding', function(){
@@ -262,48 +296,50 @@ add_shortcode('coffeebrk_onboarding', function(){
     $selected = (array) get_user_meta($user->ID, 'aspire', true);
     $action = esc_url( get_permalink() );
 
-    $out = '<div class="cbk-wrap"><div class="cbk-card">';
+    $left = '';
     if ( empty($_GET['step']) || $_GET['step']==='name' ){
-        $out .= '<div class="cbk-title">Let\'s get personal – what should we call you?</div>';
-        $out .= '<form method="post" action="'.$action.'">';
-        $out .= wp_nonce_field('coffeebrk_onboard_name','coffeebrk_onboard_name_nonce',true,false);
-        $out .= '<input class="cbk-input" type="text" name="first_name" placeholder="Full Name" value="'.esc_attr($provided_name).'" required />';
-        $out .= '<button class="cbk-btn" type="submit">Let\'s brew your feed →</button>';
-        $out .= '</form>';
+        $left .= '<div class="cbk-kicker">Welcome onboard!</div>';
+        $left .= '<div class="cbk-title">What should we call you?</div>';
+        $left .= '<p class="cbk-hello-sub">We\'ll use your name to personalize your daily CoffeeBrk experience.</p>';
+        $left .= '<form class="cbk-form" method="post" action="'.$action.'">';
+        $left .= wp_nonce_field('coffeebrk_onboard_name','coffeebrk_onboard_name_nonce',true,false);
+        $left .= '<div class="cbk-fields">';
+        $left .= '<div class="cbk-field"><div class="cbk-label">Your name</div><input class="cbk-input" type="text" name="first_name" value="'.esc_attr($provided_name).'" required /></div>';
+        $left .= '</div>';
+        $left .= '<button class="cbk-btn" type="submit">Let\'s brew your feed →</button>';
+        $left .= '</form>';
     } elseif ( $_GET['step']==='aspire' ){
-        $out .= '<div class="cbk-title">What do you do (or aspire to do)?</div>';
-        $out .= '<p class="cbk-hello-sub">We\'ll personalize your daily AI feed around your world.</p>';
-        $out .= '<form method="post" action="'.$action.'?step=aspire">';
-        $out .= wp_nonce_field('coffeebrk_onboard_aspire','coffeebrk_onboard_aspire_nonce',true,false);
-        $out .= '<div class="cbk-pills">';
+        $left .= '<div class="cbk-title">What do you do (or aspire to do)?</div>';
+        $left .= '<p class="cbk-hello-sub">We\'ll personalize your daily AI feed around your world.</p>';
+        $left .= '<form class="cbk-form" method="post" action="'.$action.'?step=aspire">';
+        $left .= wp_nonce_field('coffeebrk_onboard_aspire','coffeebrk_onboard_aspire_nonce',true,false);
+        $left .= '<div class="cbk-pills">';
         foreach ($aspire_options as $label => $icon){
             $is = in_array($label, $selected, true) ? ' active' : '';
             $checked = in_array($label,$selected,true) ? 'checked' : '';
-            $out .= '<label class="cbk-pill'.$is.'" role="checkbox" aria-checked="'.($checked?'true':'false').'" tabindex="0">'
+            $left .= '<label class="cbk-pill'.$is.'" role="checkbox" aria-checked="'.($checked?'true':'false').'" tabindex="0">'
                  . '<input type="checkbox" name="aspire[]" value="'.esc_attr($label).'" '.$checked.' />'
                  . '<span class="cbk-pill-icon">'.esc_html($icon).'</span> '
                  . '<span class="cbk-pill-label">'.esc_html($label).'</span>'
                  . '</label>';
         }
-        $out .= '</div>';
-        $out .= '<div class="cbk-center" style="margin-top:16px;"><button class="cbk-btn" type="submit">Start Your Coffee Break</button></div>';
-        $out .= '<script>(function(){document.addEventListener("click",function(e){var p=e.target.closest(".cbk-pill");if(!p)return;var cb=p.querySelector("input[type=checkbox]");if(!cb)return;cb.checked=!cb.checked;p.classList.toggle("active", cb.checked);p.setAttribute("aria-checked", cb.checked?"true":"false");});document.addEventListener("keydown",function(e){if((e.key===" "||e.key==="Enter")&&e.target.classList&&e.target.classList.contains("cbk-pill")){e.preventDefault();e.target.click();}});}());</script>';
-        $out .= '</form>';
+        $left .= '</div>';
+        $left .= '<button class="cbk-btn" type="submit">Start Your Coffee Break</button>';
+        $left .= '<script>(function(){document.addEventListener("click",function(e){var p=e.target.closest(".cbk-pill");if(!p)return;var cb=p.querySelector("input[type=checkbox]");if(!cb)return;cb.checked=!cb.checked;p.classList.toggle("active", cb.checked);p.setAttribute("aria-checked", cb.checked?"true":"false");});document.addEventListener("keydown",function(e){if((e.key===" "||e.key==="Enter")&&e.target.classList&&e.target.classList.contains("cbk-pill")){e.preventDefault();e.target.click();}});}());</script>';
+        $left .= '</form>';
     }
-    $out .= '</div></div>';
-    return $out;
+    return coffeebrk_auth_shell_html( $left );
 });
 
 // Hello step (welcome screen)
 add_shortcode('coffeebrk_hello', function(){
     coffeebrk_enqueue_auth_styles();
     $login = esc_url( coffeebrk_core_page_url('coffeebrk-login') );
-    $out = '<div class="cbk-wrap"><div class="cbk-card cbk-hello">';
-    $out .= '<div class="cbk-hello-title">👋 Hey there, welcome to CoffeeBrk</div>';
-    $out .= '<p class="cbk-hello-sub">Where curious professionals start their day with 5 minutes of AI — stories, ideas, and tools that matter to you.</p>';
-    $out .= '<div class="cbk-center"><a class="cbk-btn" href="'.$login.'">Continue</a></div>';
-    $out .= '</div></div>';
-    return $out;
+    $left = '';
+    $left .= '<div class="cbk-title">👋 Hey there, welcome to Coffee Break</div>';
+    $left .= '<p class="cbk-hello-sub">Where curious professionals start their day with 5 minutes of AI — stories, ideas, and tools that matter to you.</p>';
+    $left .= '<a class="cbk-btn" href="'.$login.'">Continue</a>';
+    return coffeebrk_auth_shell_html( $left );
 });
 
 // -------- Early POST handlers to avoid header warnings --------
