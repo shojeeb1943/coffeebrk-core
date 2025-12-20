@@ -79,34 +79,53 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
             return null;
         }
 
-        $post_id = 0;
+        $candidates = [];
         if ( isset( $options['post_id'] ) && is_numeric( $options['post_id'] ) ) {
-            $post_id = (int) $options['post_id'];
+            $candidates[] = (int) $options['post_id'];
         }
-        if ( ! $post_id ) {
-            $post_id = (int) get_the_ID();
+        $candidates[] = (int) get_the_ID();
+        $candidates[] = (int) get_queried_object_id();
+        $p = get_post();
+        if ( $p && isset( $p->ID ) ) {
+            $candidates[] = (int) $p->ID;
         }
-        if ( ! $post_id ) {
-            $post_id = (int) get_queried_object_id();
-        }
-        if ( ! $post_id ) {
-            $p = get_post();
-            if ( $p && isset( $p->ID ) ) {
-                $post_id = (int) $p->ID;
+
+        // De-duplicate & remove empties while preserving order.
+        $seen = [];
+        $post_ids = [];
+        foreach ( $candidates as $cid ) {
+            $cid = (int) $cid;
+            if ( $cid <= 0 ) {
+                continue;
             }
+            if ( isset( $seen[ $cid ] ) ) {
+                continue;
+            }
+            $seen[ $cid ] = true;
+            $post_ids[] = $cid;
         }
-        if ( ! $post_id ) {
+
+        if ( empty( $post_ids ) ) {
             return null;
         }
 
-        $image_url = get_post_meta( $post_id, $meta_key, true );
-        $image_url = is_string( $image_url ) ? trim( $image_url ) : '';
+        $image_url = '';
+        foreach ( $post_ids as $post_id ) {
+            $candidate_url = get_post_meta( $post_id, $meta_key, true );
+            $candidate_url = is_string( $candidate_url ) ? trim( $candidate_url ) : '';
 
-        if ( empty( $image_url ) ) {
-            $fallback_key = ltrim( $meta_key, '_' );
-            if ( $fallback_key !== '' ) {
-                $image_url = get_post_meta( $post_id, $fallback_key, true );
-                $image_url = is_string( $image_url ) ? trim( $image_url ) : '';
+            // Fallback: in case legacy data stored without underscore.
+            if ( empty( $candidate_url ) ) {
+                $fallback_key = ltrim( $meta_key, '_' );
+                if ( $fallback_key !== '' ) {
+                    $candidate_url = get_post_meta( $post_id, $fallback_key, true );
+                    $candidate_url = is_string( $candidate_url ) ? trim( $candidate_url ) : '';
+                }
+            }
+
+            if ( ! empty( $candidate_url ) ) {
+                $image_url = $candidate_url;
+                break;
             }
         }
 
