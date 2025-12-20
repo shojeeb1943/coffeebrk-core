@@ -26,6 +26,19 @@ class Coffeebrk_Json_Articles_Importer {
             return new WP_Error( 'cbk_json_empty', 'JSON input is empty.' );
         }
 
+        // Accept "object list" pasted format (objects separated by commas, no surrounding [ ]).
+        // Example:
+        //   { ... },
+        //   { ... }
+        // This is not valid JSON by itself, so we auto-wrap it into an array.
+        $first_non_ws = substr( $raw, 0, 1 );
+        $last_non_ws = substr( $raw, -1 );
+        if ( $first_non_ws === '{' && $last_non_ws !== ']' ) {
+            // Remove a trailing comma if present.
+            $raw = preg_replace( '/,\s*$/', '', $raw );
+            $raw = '[' . $raw . ']';
+        }
+
         // Quick format hints before attempting decode
         $first = substr( $raw, 0, 1 );
         $last = substr( $raw, -1 );

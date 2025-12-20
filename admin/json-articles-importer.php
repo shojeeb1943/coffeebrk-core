@@ -43,6 +43,17 @@ function coffeebrk_core_json_importer_page() {
         $demo_json = "[\n  {\n    \"title\": \"Article title\",\n    \"description\": \"Article description\",\n    \"image\": \"https://external-image-url.jpg\",\n    \"url\": \"https://source-article-url\",\n    \"source\": \"Source Name\",\n    \"date\": \"2025-12-09\",\n    \"tagline\": null,\n    \"type\": null,\n    \"logo\": null\n  }\n]";
     }
 
+    // For the demo textarea, show the common "object list" paste format (no surrounding [ ]).
+    $demo_json_display = $demo_json;
+    $trimmed = trim( $demo_json_display );
+    if ( substr( $trimmed, 0, 1 ) === '[' && substr( $trimmed, -1 ) === ']' ) {
+        $inner = trim( substr( $trimmed, 1, -1 ) );
+        // Remove leading/trailing newlines that come from pretty JSON.
+        $inner = preg_replace( '/^\s*\n/', '', $inner );
+        $inner = preg_replace( '/\n\s*$/', '', $inner );
+        $demo_json_display = $inner;
+    }
+
     echo '<div class="wrap">';
     echo '<h1>JSON Articles Importer</h1>';
 
@@ -341,7 +352,7 @@ function coffeebrk_core_json_importer_page() {
     echo '<p style="margin:0 0 12px;"><a class="button" href="'.esc_url( $demo_url ).'" download>Download demo .json</a></p>';
     echo '<h3 style="margin:14px 0 6px;">Demo JSON (copy/paste)</h3>';
     echo '<p style="margin:0 0 8px;"><button type="button" class="button" id="cbk-copy-demo-json">Copy</button> <span id="cbk-copy-demo-json-status" style="margin-left:8px;color:#555;"></span></p>';
-    echo '<textarea readonly rows="12" id="cbk-demo-json" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;">'.esc_textarea( $demo_json ).'</textarea>';
+    echo '<textarea readonly rows="12" id="cbk-demo-json" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;">'.esc_textarea( $demo_json_display ).'</textarea>';
     echo '<p class="description" style="margin:8px 0 0;">Paste the JSON into the left-side <em>Or Paste JSON</em> field, then click Import.</p>';
     echo '</div>'; // demo
 
