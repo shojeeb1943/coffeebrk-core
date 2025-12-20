@@ -54,7 +54,7 @@ function coffeebrk_core_json_importer_page() {
     echo '<table class="form-table" role="presentation">';
 
     echo '<tr><th scope="row"><label for="cbk_json_file">JSON File</label></th><td>';
-    echo '<input type="file" id="cbk_json_file" name="cbk_json_file" accept="application/json,.json" required />';
+    echo '<input type="file" id="cbk_json_file" name="cbk_json_file" accept="application/json,.json" />';
     echo '<p class="description">Upload a .json file containing an array of items.</p>';
     echo '</td></tr>';
 
@@ -109,6 +109,47 @@ function coffeebrk_core_json_importer_page() {
   const importedEl = document.getElementById("cbk_imported");
   const skippedEl = document.getElementById("cbk_skipped");
   const failedEl = document.getElementById("cbk_failed");
+
+  const fileInput = document.getElementById("cbk_json_file");
+  const jsonTextEl = document.getElementById("cbk_json_text");
+
+  function syncInputs(){
+    const hasText = !!((jsonTextEl && jsonTextEl.value) ? jsonTextEl.value.trim() : "");
+    const hasFile = !!(fileInput && fileInput.files && fileInput.files[0]);
+
+    if (hasText) {
+      if (fileInput) {
+        fileInput.value = "";
+        fileInput.disabled = true;
+      }
+      if (jsonTextEl) {
+        jsonTextEl.disabled = false;
+      }
+      return;
+    }
+
+    if (hasFile) {
+      if (jsonTextEl) {
+        jsonTextEl.value = "";
+        jsonTextEl.disabled = true;
+      }
+      if (fileInput) {
+        fileInput.disabled = false;
+      }
+      return;
+    }
+
+    if (fileInput) fileInput.disabled = false;
+    if (jsonTextEl) jsonTextEl.disabled = false;
+  }
+
+  if (jsonTextEl) {
+    jsonTextEl.addEventListener("input", syncInputs);
+  }
+  if (fileInput) {
+    fileInput.addEventListener("change", syncInputs);
+  }
+  syncInputs();
 
   const ajaxUrl = "'.esc_js( $ajax_url ).'";
   const nonce = "'.esc_js( $nonce ).'";
@@ -173,9 +214,8 @@ function coffeebrk_core_json_importer_page() {
     tbody.innerHTML = "";
     setCounts({ total: 0, imported: 0, skipped: 0, failed: 0 });
 
-    const fileInput = document.getElementById("cbk_json_file");
-    const jsonText = (document.getElementById("cbk_json_text").value || "").trim();
-    const hasFile = !!(fileInput.files && fileInput.files[0]);
+    const jsonText = (jsonTextEl ? jsonTextEl.value : "").trim();
+    const hasFile = !!(fileInput && fileInput.files && fileInput.files[0]);
     if (!hasFile && !jsonText) return;
 
     btn.disabled = true;
