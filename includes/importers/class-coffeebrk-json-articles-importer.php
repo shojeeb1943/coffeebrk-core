@@ -13,6 +13,19 @@ class Coffeebrk_Json_Articles_Importer {
             return new WP_Error( 'cbk_file_read', 'Could not read JSON file.' );
         }
 
+        return self::parse_json_text( $raw );
+    }
+
+    public static function parse_json_text( $raw ) {
+        if ( ! is_string( $raw ) ) {
+            return new WP_Error( 'cbk_json_invalid', 'Invalid JSON input.' );
+        }
+
+        $raw = trim( $raw );
+        if ( $raw === '' ) {
+            return new WP_Error( 'cbk_json_empty', 'JSON input is empty.' );
+        }
+
         $data = json_decode( $raw, true );
         if ( json_last_error() !== JSON_ERROR_NONE ) {
             return new WP_Error( 'cbk_json_invalid', 'Invalid JSON: ' . json_last_error_msg() );

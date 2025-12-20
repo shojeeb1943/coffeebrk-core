@@ -22,9 +22,28 @@ function coffeebrk_core_json_importer_page() {
     $cats = get_categories( [ 'hide_empty' => false ] );
     $ajax_url = admin_url( 'admin-ajax.php' );
     $nonce = wp_create_nonce( 'cbk_json_articles_import' );
+    $demo_url = COFFEEBRK_CORE_URL . 'assets/demo-articles.json';
+
+    $demo_json = '[\n'
+        . '  {\n'
+        . '    "title": "Article title",\n'
+        . '    "description": "Article description",\n'
+        . '    "image": "https://external-image-url.jpg",\n'
+        . '    "url": "https://source-article-url",\n'
+        . '    "source": "Source Name",\n'
+        . '    "date": "2025-12-09",\n'
+        . '    "tagline": null,\n'
+        . '    "type": null,\n'
+        . '    "logo": null\n'
+        . '  }\n'
+        . ']';
 
     echo '<div class="wrap">';
     echo '<h1>JSON Articles Importer</h1>';
+
+    echo '<div class="cbk-json-importer-grid" style="display:grid;grid-template-columns:1fr 420px;gap:16px;align-items:start;">';
+
+    echo '<div class="cbk-json-importer-main">';
 
     echo '<form id="cbk-json-import-form" method="post" enctype="multipart/form-data">';
     echo '<table class="form-table" role="presentation">';
@@ -32,6 +51,11 @@ function coffeebrk_core_json_importer_page() {
     echo '<tr><th scope="row"><label for="cbk_json_file">JSON File</label></th><td>';
     echo '<input type="file" id="cbk_json_file" name="cbk_json_file" accept="application/json,.json" required />';
     echo '<p class="description">Upload a .json file containing an array of items.</p>';
+    echo '</td></tr>';
+
+    echo '<tr><th scope="row"><label for="cbk_json_text">Or Paste JSON</label></th><td>';
+    echo '<textarea id="cbk_json_text" name="cbk_json_text" rows="8" style="width:100%;max-width:860px;" placeholder="Paste JSON array here..."></textarea>';
+    echo '<p class="description">If you paste JSON here, the file upload is optional.</p>';
     echo '</td></tr>';
 
     echo '<tr><th scope="row">Categories</th><td>';
@@ -145,7 +169,9 @@ function coffeebrk_core_json_importer_page() {
     setCounts({ total: 0, imported: 0, skipped: 0, failed: 0 });
 
     const fileInput = document.getElementById("cbk_json_file");
-    if (!fileInput.files || !fileInput.files[0]) return;
+    const jsonText = (document.getElementById("cbk_json_text").value || "").trim();
+    const hasFile = !!(fileInput.files && fileInput.files[0]);
+    if (!hasFile && !jsonText) return;
 
     btn.disabled = true;
     btn.textContent = "Importing...";
@@ -157,7 +183,12 @@ function coffeebrk_core_json_importer_page() {
       const startFd = new FormData();
       startFd.append("action", "cbk_json_articles_import_start");
       startFd.append("nonce", nonce);
-      startFd.append("cbk_json_file", fileInput.files[0]);
+      if (hasFile) {
+        startFd.append("cbk_json_file", fileInput.files[0]);
+      }
+      if (jsonText) {
+        startFd.append("cbk_json_text", jsonText);
+      }
       startFd.append("post_status", status);
       categories.forEach(c => startFd.append("category_ids[]", c));
 
@@ -184,6 +215,19 @@ function coffeebrk_core_json_importer_page() {
 })();
 </script>';
 
+    echo '</div>'; // main
+
+    echo '<div class="cbk-json-importer-demo" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:14px;">';
+    echo '<h2 style="margin-top:0;">Demo</h2>';
+    echo '<p style="margin:0 0 12px;">Use the demo JSON to test the importer quickly.</p>';
+    echo '<p style="margin:0 0 12px;"><a class="button" href="'.esc_url( $demo_url ).'" download>Download demo .json</a></p>';
+    echo '<h3 style="margin:14px 0 6px;">Demo JSON (copy/paste)</h3>';
+    echo '<textarea readonly rows="12" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;">'.esc_textarea( $demo_json ).'</textarea>';
+    echo '<p class="description" style="margin:8px 0 0;">Paste the JSON into the left-side <em>Or Paste JSON</em> field, then click Import.</p>';
+    echo '</div>'; // demo
+
+    echo '</div>'; // grid
+
     echo '</div>';
 }
 
@@ -197,29 +241,36 @@ add_action( 'wp_ajax_cbk_json_articles_import_start', function() {
         wp_send_json_error( [ 'message' => 'Invalid nonce.' ], 400 );
     }
 
-    if ( empty( $_FILES['cbk_json_file'] ) ) {
-        wp_send_json_error( [ 'message' => 'No file uploaded.' ], 400 );
+    $items = null;
+    $json_text = isset( $_POST['cbk_json_text'] ) ? (string) $_POST['cbk_json_text'] : '';
+    $json_text = is_string( $json_text ) ? trim( $json_text ) : '';
+
+    if ( $json_text !== '' ) {
+        $items = Coffeebrk_Json_Articles_Importer::parse_json_text( $json_text );
+    } elseif ( ! empty( $_FILES['cbk_json_file'] ) ) {
+        $file = $_FILES['cbk_json_file'];
+        $name = $file['name'] ?? '';
+        if ( ! is_string( $name ) || strtolower( substr( $name, -5 ) ) !== '.json' ) {
+            wp_send_json_error( [ 'message' => 'Only .json files are allowed.' ], 400 );
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+
+        $overrides = [
+            'test_form' => false,
+            'mimes' => [ 'json' => 'application/json' ],
+        ];
+
+        $uploaded = wp_handle_upload( $file, $overrides );
+        if ( ! is_array( $uploaded ) || ! empty( $uploaded['error'] ) ) {
+            wp_send_json_error( [ 'message' => $uploaded['error'] ?? 'Upload failed.' ], 400 );
+        }
+
+        $items = Coffeebrk_Json_Articles_Importer::parse_json_file( $uploaded['file'] );
+    } else {
+        wp_send_json_error( [ 'message' => 'Upload a JSON file or paste JSON.' ], 400 );
     }
 
-    $file = $_FILES['cbk_json_file'];
-    $name = $file['name'] ?? '';
-    if ( ! is_string( $name ) || strtolower( substr( $name, -5 ) ) !== '.json' ) {
-        wp_send_json_error( [ 'message' => 'Only .json files are allowed.' ], 400 );
-    }
-
-    require_once ABSPATH . 'wp-admin/includes/file.php';
-
-    $overrides = [
-        'test_form' => false,
-        'mimes' => [ 'json' => 'application/json' ],
-    ];
-
-    $uploaded = wp_handle_upload( $file, $overrides );
-    if ( ! is_array( $uploaded ) || ! empty( $uploaded['error'] ) ) {
-        wp_send_json_error( [ 'message' => $uploaded['error'] ?? 'Upload failed.' ], 400 );
-    }
-
-    $items = Coffeebrk_Json_Articles_Importer::parse_json_file( $uploaded['file'] );
     if ( is_wp_error( $items ) ) {
         wp_send_json_error( [ 'message' => $items->get_error_message() ], 400 );
     }

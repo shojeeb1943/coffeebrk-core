@@ -1,0 +1,24 @@
+[
+  {
+    "title": "Google's vibe-coding tool Opal comes to Gemini",
+    "description": "How diffusion models learn what humans call beautiful.",
+    "image": "https://assets.techrepublic.com/uploads/2024/04/coursera-AI-may-24.jpg",
+    "url": "https://example.com/articles/opal-gemini",
+    "source": "TechCrunch RSS",
+    "date": "2025-12-09",
+    "tagline": "Generated from feed",
+    "type": null,
+    "logo": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg"
+  },
+  {
+    "title": "ChatGPT's mobile app hits new milestone of $3B in consumer spending",
+    "description": "A research team investigates authenticity of international student applications.",
+    "image": "https://assets.techrepublic.com/uploads/2024/04/coursera-AI-may-24.jpg",
+    "url": "https://example.com/articles/chatgpt-mobile-milestone",
+    "source": "TechCrunch RSS",
+    "date": "2025-12-10",
+    "tagline": null,
+    "type": null,
+    "logo": null
+  }
+]
