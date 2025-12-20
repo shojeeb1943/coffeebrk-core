@@ -12,6 +12,11 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
     public function __construct( $data = [] ) {
         parent::__construct( $data );
 
+        if ( is_string( $data ) && $data !== '' ) {
+            $this->cbk_tag_name = $data;
+            return;
+        }
+
         if ( is_array( $data ) ) {
             foreach ( [ 'name', 'tag_name', 'id' ] as $k ) {
                 if ( ! empty( $data[ $k ] ) && is_string( $data[ $k ] ) ) {
@@ -71,9 +76,6 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
     public function get_value( array $options = [] ) {
         $meta_key = $this->get_meta_key();
         if ( empty( $meta_key ) ) {
-            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                error_log( '[coffeebrk-core] image_url tag: empty meta_key. tag_name=' . (string) $this->cbk_tag_name );
-            }
             return null;
         }
 
@@ -94,9 +96,6 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
             }
         }
         if ( ! $post_id ) {
-            if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                error_log( '[coffeebrk-core] image_url tag: could not resolve post_id. meta_key=' . (string) $meta_key . ' tag_name=' . (string) $this->cbk_tag_name );
-            }
             return null;
         }
 
@@ -111,10 +110,6 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
             }
         }
 
-        if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-            error_log( '[coffeebrk-core] image_url tag resolved. post_id=' . (string) $post_id . ' meta_key=' . (string) $meta_key . ' url_len=' . (string) strlen( (string) $image_url ) . ' tag_name=' . (string) $this->cbk_tag_name );
-        }
-
         if ( empty( $image_url ) ) {
             $placeholder = $this->get_settings( 'placeholder_url' );
             $placeholder = is_string( $placeholder ) ? trim( $placeholder ) : '';
@@ -124,17 +119,9 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
             $image_url = $placeholder;
         }
 
-        $image_url = esc_url( $image_url );
-        if ( empty( $image_url ) ) {
-            return null;
-        }
-
         return [
             'id'  => 0,
-            'url' => $image_url,
-            'size' => 'full',
-            'alt' => '',
-            'source' => 'external',
+            'url' => esc_url( $image_url ),
         ];
     }
 
