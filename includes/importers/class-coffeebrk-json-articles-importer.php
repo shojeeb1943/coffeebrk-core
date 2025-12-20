@@ -26,9 +26,39 @@ class Coffeebrk_Json_Articles_Importer {
             return new WP_Error( 'cbk_json_empty', 'JSON input is empty.' );
         }
 
+        // Quick format hints before attempting decode
+        $first = substr( $raw, 0, 1 );
+        $last = substr( $raw, -1 );
+        if ( $first !== '[' ) {
+            // We still try decoding to keep compatibility, but provide guidance.
+            // Many users paste a single object instead of an array.
+        }
+
         $data = json_decode( $raw, true );
         if ( json_last_error() !== JSON_ERROR_NONE ) {
-            return new WP_Error( 'cbk_json_invalid', 'Invalid JSON: ' . json_last_error_msg() );
+            $len = strlen( $raw );
+            $prefix = substr( $raw, 0, 120 );
+            $suffix = $len > 120 ? substr( $raw, -120 ) : '';
+
+            $hints = [];
+            $hints[] = 'Expected: a JSON array of items (starts with [ and ends with ]).';
+            $hints[] = 'Length: ' . $len . ' chars.';
+            $hints[] = 'First char: ' . $first . ' | Last char: ' . $last . '.';
+            if ( $first === '{' ) {
+                $hints[] = 'It looks like you pasted a single object. Wrap it in [ ... ] to make an array.';
+            }
+            if ( $last !== ']' && $first === '[' ) {
+                $hints[] = 'It looks like the JSON array is not closed. Make sure it ends with ].';
+            }
+            $hints[] = 'Prefix: ' . $prefix;
+            if ( $suffix !== '' ) {
+                $hints[] = 'Suffix: ' . $suffix;
+            }
+
+            return new WP_Error(
+                'cbk_json_invalid',
+                'Invalid JSON: ' . json_last_error_msg() . ' | ' . implode( ' ', $hints )
+            );
         }
 
         if ( ! is_array( $data ) ) {
@@ -61,16 +91,20 @@ class Coffeebrk_Json_Articles_Importer {
         $source_url = trim( $source_url );
 
         if ( $title === '' ) {
-            return [ 'status' => 'failed', 'reason' => 'Missing title.', 'post_id' => 0 ];
+            return [ 'status' => 'failed', 'reason' => 'Missing required field: title', 'post_id' => 0 ];
         }
 
         if ( $source_url === '' ) {
-            return [ 'status' => 'failed', 'reason' => 'Missing url (source URL).', 'post_id' => 0 ];
+            return [ 'status' => 'failed', 'reason' => 'Missing required field: url (source URL)', 'post_id' => 0 ];
         }
 
         $dup_id = self::find_duplicate_post_id_by_source_url( $source_url );
         if ( $dup_id ) {
-            return [ 'status' => 'skipped', 'reason' => 'Skipped (duplicate)', 'post_id' => (int) $dup_id ];
+            return [
+                'status' => 'skipped',
+                'reason' => 'Skipped (duplicate _source_url): ' . esc_url_raw( $source_url ),
+                'post_id' => (int) $dup_id,
+            ];
         }
 
         $post_date = self::normalize_post_date( $date );
