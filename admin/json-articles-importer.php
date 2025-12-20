@@ -373,6 +373,9 @@ add_action( 'wp_ajax_cbk_json_articles_import_start', function() {
 
     $items = null;
     $json_text = isset( $_POST['cbk_json_text'] ) ? (string) $_POST['cbk_json_text'] : '';
+    if ( function_exists( 'wp_unslash' ) ) {
+        $json_text = wp_unslash( $json_text );
+    }
     $json_text = is_string( $json_text ) ? trim( $json_text ) : '';
 
     if ( $json_text !== '' ) {

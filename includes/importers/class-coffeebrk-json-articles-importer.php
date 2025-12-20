@@ -21,6 +21,10 @@ class Coffeebrk_Json_Articles_Importer {
             return new WP_Error( 'cbk_json_invalid', 'Invalid JSON input.' );
         }
 
+        if ( function_exists( 'wp_unslash' ) ) {
+            $raw = wp_unslash( $raw );
+        }
+
         $raw = trim( $raw );
         if ( $raw === '' ) {
             return new WP_Error( 'cbk_json_empty', 'JSON input is empty.' );
