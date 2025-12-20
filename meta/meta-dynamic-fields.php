@@ -28,6 +28,9 @@ add_action('add_meta_boxes', function(){
                         case 'url':
                             printf('<input type="url" name="coffeebrk_meta[%s]" id="%s" value="%s" class="regular-text" style="width:100%%;"/>', esc_attr($key), esc_attr($key), esc_attr($val));
                             break;
+                        case 'image_url':
+                            printf('<input type="url" name="coffeebrk_meta[%s]" id="%s" value="%s" class="regular-text" style="width:100%%;"/>', esc_attr($key), esc_attr($key), esc_attr($val));
+                            break;
                         case 'number':
                             printf('<input type="number" step="any" name="coffeebrk_meta[%s]" id="%s" value="%s" class="regular-text" style="width:100%%;"/>', esc_attr($key), esc_attr($key), esc_attr($val));
                             break;
@@ -67,6 +70,7 @@ add_action('save_post', function($post_id){
         switch ($type){
             case 'textarea': $val = sanitize_textarea_field($raw); break;
             case 'url': $val = esc_url_raw($raw); break;
+            case 'image_url': $val = esc_url_raw($raw); break;
             case 'number': $val = is_numeric($raw) ? $raw + 0 : ''; break;
             case 'select': $val = sanitize_text_field($raw); break;
             default: $val = sanitize_text_field($raw);

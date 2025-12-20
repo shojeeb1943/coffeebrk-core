@@ -13,7 +13,7 @@ add_action('admin_init', function(){
             foreach ($input as $row){
                 $label = sanitize_text_field($row['label'] ?? '');
                 $key   = ltrim(strtolower(preg_replace('/[^a-z0-9_]/', '_', (string)($row['key'] ?? ''))), '_');
-                $type  = in_array(($row['type'] ?? 'text'), ['text','textarea','url','number','select'], true) ? $row['type'] : 'text';
+                $type  = in_array(($row['type'] ?? 'text'), ['text','textarea','url','image_url','number','select'], true) ? $row['type'] : 'text';
                 $choices = sanitize_text_field($row['choices'] ?? ''); // CSV choices for select
                 if (!$label || !$key) continue;
                 $out[] = [
@@ -43,7 +43,7 @@ add_action('admin_init', function(){
             printf('<tr>' .
                 '<td><input type="text" name="%1$s[%2$d][label]" value="%3$s" class="regular-text"></td>' .
                 '<td><input type="text" name="%1$s[%2$d][key]" value="%4$s" class="regular-text" placeholder="e.g. source_name"></td>' .
-                '<td><select name="%1$s[%2$d][type]"><option value="text" %5$s>text</option><option value="textarea" %6$s>textarea</option><option value="url" %7$s>url</option><option value="number" %8$s>number</option><option value="select" %9$s>select</option></select></td>' .
+                '<td><select name="%1$s[%2$d][type]"><option value="text" %5$s>text</option><option value="textarea" %6$s>textarea</option><option value="url" %7$s>url</option><option value="image_url" %8$s>image_url</option><option value="number" %9$s>number</option><option value="select" %10$s>select</option></select></td>' .
                 '<td><input type="text" name="%1$s[%2$d][choices]" value="%10$s" placeholder="one, two, three" class="regular-text"></td>' .
                 '<td><button type="button" class="button cbk-row-del">Delete</button></td>' .
                 '<input type="hidden" name="%1$s[%2$d][id]" value="%11$s">' .
@@ -55,6 +55,7 @@ add_action('admin_init', function(){
                 selected(($r['type'] ?? '')==='text', true, false),
                 selected(($r['type'] ?? '')==='textarea', true, false),
                 selected(($r['type'] ?? '')==='url', true, false),
+                selected(($r['type'] ?? '')==='image_url', true, false),
                 selected(($r['type'] ?? '')==='number', true, false),
                 selected(($r['type'] ?? '')==='select', true, false),
                 esc_attr($r['choices'] ?? ''),
@@ -66,7 +67,7 @@ add_action('admin_init', function(){
         echo '<script>(function(){const tbl=document.getElementById("cbk-dyn-table").getElementsByTagName("tbody")[0];document.getElementById("cbk-add-row").addEventListener("click",()=>{const idx=tbl.children.length;const tr=document.createElement("tr");tr.innerHTML=`'
             .'<td><input type=\"text\" name=\"'.esc_js(COFFEEBRK_DYNAMIC_FIELDS_OPT).'[${idx}][label]\" value=\"\" class=\"regular-text\"></td>'
             .'<td><input type=\"text\" name=\"'.esc_js(COFFEEBRK_DYNAMIC_FIELDS_OPT).'[${idx}][key]\" value=\"\" class=\"regular-text\" placeholder=\"e.g. source_name\"></td>'
-            .'<td><select name=\"'.esc_js(COFFEEBRK_DYNAMIC_FIELDS_OPT).'[${idx}][type]\"><option value=\"text\">text</option><option value=\"textarea\">textarea</option><option value=\"url\">url</option><option value=\"number\">number</option><option value=\"select\">select</option></select></td>'
+            .'<td><select name=\"'.esc_js(COFFEEBRK_DYNAMIC_FIELDS_OPT).'[${idx}][type]\"><option value=\"text\">text</option><option value=\"textarea\">textarea</option><option value=\"url\">url</option><option value=\"image_url\">image_url</option><option value=\"number\">number</option><option value=\"select\">select</option></select></td>'
             .'<td><input type=\"text\" name=\"'.esc_js(COFFEEBRK_DYNAMIC_FIELDS_OPT).'[${idx}][choices]\" value=\"\" class=\"regular-text\" placeholder=\"one, two, three\"></td>'
             .'<td><button type=\"button\" class=\"button cbk-row-del\">Delete</button></td>'
             .'<input type=\"hidden\" name=\"'.esc_js(COFFEEBRK_DYNAMIC_FIELDS_OPT).'[${idx}][id]\" value=\"new${Date.now()}\">`;

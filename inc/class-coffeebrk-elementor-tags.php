@@ -15,6 +15,7 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
     // Include our legacy tag classes
     require_once __DIR__ . '/class-coffeebrk-source-name-tag.php';
     require_once __DIR__ . '/class-coffeebrk-source-url-tag.php';
+    require_once __DIR__ . '/class-coffeebrk-dynamic-image-url-tag.php';
 
     // Register legacy tags
     $dynamic_tags_manager->register( new \Coffeebrk_Source_Name_Tag() );
@@ -25,10 +26,18 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
     foreach ($fields as $f){
         $key = $f['key'] ?? '';
         $label = $f['label'] ?? '';
+        $type = $f['type'] ?? 'text';
         if (!$key || !$label) continue;
         // Avoid duplicates with legacy tags
         if ($key === '_source_name' || $key === '_source_url') { continue; }
-        // Use anonymous class to avoid eval and support older Elementor versions
+
+        if ( $type === 'image_url' && class_exists( '\\Coffeebrk_Dynamic_Image_Url_Tag' ) ) {
+            $tag = new \Coffeebrk_Dynamic_Image_Url_Tag();
+            $tag->set_tag_name( 'cbk_img_' . ltrim( (string) $key, '_' ) );
+            $dynamic_tags_manager->register( $tag );
+            continue;
+        }
+
         $tag = new class($key, $label) extends \Elementor\Core\DynamicTags\Tag {
             private $cbk_key; private $cbk_label;
             public function __construct($k, $l){ $this->cbk_key = $k; $this->cbk_label = $l; }
