@@ -154,6 +154,11 @@ class Coffeebrk_Json_Articles_Importer {
         update_post_meta( $post_id, '_source_url', esc_url_raw( $source_url ) );
         update_post_meta( $post_id, '_source_name', sanitize_text_field( $source_name ) );
 
+        $date = trim( (string) $date );
+        if ( $date !== '' ) {
+            update_post_meta( $post_id, '_date', sanitize_text_field( $date ) );
+        }
+
         if ( $image_url !== '' ) {
             update_post_meta( $post_id, '_image', esc_url_raw( $image_url ) );
         }
@@ -203,11 +208,21 @@ class Coffeebrk_Json_Articles_Importer {
             return '';
         }
 
-        $ts = strtotime( $date );
-        if ( ! $ts ) {
-            return '';
-        }
+        // Prefer explicit YYYY-MM-DD parsing and use the site's timezone.
+        // We store it as midnight local time to match the date-only input.
+        $date_only = preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) === 1;
+        $value = $date_only ? ( $date . ' 00:00:00' ) : $date;
 
-        return gmdate( 'Y-m-d H:i:s', $ts );
+        try {
+            $tz = function_exists( 'wp_timezone' ) ? wp_timezone() : new DateTimeZone( 'UTC' );
+            $dt = new DateTimeImmutable( $value, $tz );
+            return $dt->format( 'Y-m-d H:i:s' );
+        } catch ( Exception $e ) {
+            $ts = strtotime( $value );
+            if ( ! $ts ) {
+                return '';
+            }
+            return date( 'Y-m-d H:i:s', $ts );
+        }
     }
 }
