@@ -220,7 +220,78 @@ function coffeebrk_core_json_importer_page() {
 })();
 </script>';
 
-    echo '<script>(function(){function setStatus(st,t){if(!st)return;st.textContent=t;setTimeout(function(){st.textContent="";},1500);}function legacyCopy(text){var tmp=document.createElement("textarea");tmp.value=text;tmp.setAttribute("readonly","");tmp.style.position="fixed";tmp.style.left="-9999px";tmp.style.top="-9999px";document.body.appendChild(tmp);tmp.select();tmp.setSelectionRange(0,tmp.value.length);var ok=false;try{ok=document.execCommand("copy");}catch(e){ok=false;}document.body.removeChild(tmp);return ok;}document.addEventListener("DOMContentLoaded",function(){var btn=document.getElementById("cbk-copy-demo-json");var ta=document.getElementById("cbk-demo-json");var st=document.getElementById("cbk-copy-demo-json-status");if(!btn||!ta)return;btn.addEventListener("click",async function(){try{var text=ta.value||"";if(!text){setStatus(st,"Nothing to copy");return;}if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);setStatus(st,"Copied");return;}if(legacyCopy(text)){setStatus(st,"Copied");return;}setStatus(st,"Copy failed");}catch(e){setStatus(st,"Copy failed");}});});})();</script>';
+    echo '<script>(function(){
+      function setStatus(st,t){if(!st)return;st.textContent=t;setTimeout(function(){st.textContent="";},1800);}
+      function legacyCopy(text){
+        var tmp=document.createElement("textarea");
+        tmp.value=text;
+        tmp.setAttribute("readonly","");
+        tmp.style.position="fixed";
+        tmp.style.left="-9999px";
+        tmp.style.top="-9999px";
+        document.body.appendChild(tmp);
+        tmp.select();
+        tmp.setSelectionRange(0,tmp.value.length);
+        var ok=false;
+        try{ok=document.execCommand("copy");}catch(e){ok=false;}
+        document.body.removeChild(tmp);
+        return ok;
+      }
+
+      function bind(){
+        var btn=document.getElementById("cbk-copy-demo-json");
+        var ta=document.getElementById("cbk-demo-json");
+        var st=document.getElementById("cbk-copy-demo-json-status");
+        var paste=document.getElementById("cbk_json_text");
+        if(!btn||!ta){
+          // Elements may not exist yet (script rendered before demo panel). Retry a few times.
+          return false;
+        }
+
+        if(btn.dataset.cbkBound==="1"){
+          return true;
+        }
+        btn.dataset.cbkBound="1";
+
+        btn.addEventListener("click",function(){
+          var text=ta.value||"";
+          if(!text){setStatus(st,"Nothing to copy");return;}
+
+          // Always fill the left-side paste field for guaranteed UX.
+          if(paste){
+            paste.value=text;
+            paste.focus();
+            paste.select();
+          }
+
+          // Try modern clipboard API first, then fallback.
+          try{
+            if(navigator.clipboard&&navigator.clipboard.writeText){
+              navigator.clipboard.writeText(text).then(function(){
+                setStatus(st, paste ? "Copied + pasted" : "Copied");
+              }).catch(function(){
+                var ok=legacyCopy(text);
+                setStatus(st, ok ? (paste ? "Copied + pasted" : "Copied") : (paste ? "Pasted" : "Copy failed"));
+              });
+              return;
+            }
+          }catch(e){}
+
+          var ok2=legacyCopy(text);
+          setStatus(st, ok2 ? (paste ? "Copied + pasted" : "Copied") : (paste ? "Pasted" : "Copy failed"));
+        });
+
+        return true;
+      }
+
+      var tries=0;
+      (function retry(){
+        if(bind()) return;
+        tries++;
+        if(tries>20) return;
+        setTimeout(retry, 150);
+      })();
+    })();</script>';
 
     echo '</div>'; // main
 
