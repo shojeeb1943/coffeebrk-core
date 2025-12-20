@@ -24,19 +24,24 @@ function coffeebrk_core_json_importer_page() {
     $nonce = wp_create_nonce( 'cbk_json_articles_import' );
     $demo_url = COFFEEBRK_CORE_URL . 'assets/demo-articles.json';
 
-    $demo_json = '[\n'
-        . '  {\n'
-        . '    "title": "Article title",\n'
-        . '    "description": "Article description",\n'
-        . '    "image": "https://external-image-url.jpg",\n'
-        . '    "url": "https://source-article-url",\n'
-        . '    "source": "Source Name",\n'
-        . '    "date": "2025-12-09",\n'
-        . '    "tagline": null,\n'
-        . '    "type": null,\n'
-        . '    "logo": null\n'
-        . '  }\n'
-        . ']';
+    $demo_path = COFFEEBRK_CORE_PATH . 'assets/demo-articles.json';
+    $demo_json = '';
+    if ( file_exists( $demo_path ) ) {
+        $raw_demo = file_get_contents( $demo_path );
+        if ( is_string( $raw_demo ) && $raw_demo !== '' ) {
+            $decoded = json_decode( $raw_demo, true );
+            if ( json_last_error() === JSON_ERROR_NONE ) {
+                $pretty = json_encode( $decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+                if ( is_string( $pretty ) ) {
+                    $demo_json = $pretty;
+                }
+            }
+        }
+    }
+
+    if ( $demo_json === '' ) {
+        $demo_json = "[\n  {\n    \"title\": \"Article title\",\n    \"description\": \"Article description\",\n    \"image\": \"https://external-image-url.jpg\",\n    \"url\": \"https://source-article-url\",\n    \"source\": \"Source Name\",\n    \"date\": \"2025-12-09\",\n    \"tagline\": null,\n    \"type\": null,\n    \"logo\": null\n  }\n]";
+    }
 
     echo '<div class="wrap">';
     echo '<h1>JSON Articles Importer</h1>';
@@ -215,6 +220,8 @@ function coffeebrk_core_json_importer_page() {
 })();
 </script>';
 
+    echo '<script>(function(){var btn=document.getElementById("cbk-copy-demo-json");var ta=document.getElementById("cbk-demo-json");var st=document.getElementById("cbk-copy-demo-json-status");if(!btn||!ta)return;function setStatus(t){if(!st)return;st.textContent=t;setTimeout(function(){st.textContent="";},1500);}btn.addEventListener("click",async function(){try{ta.focus();ta.select();if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(ta.value);}else{document.execCommand("copy");}setStatus("Copied");}catch(e){setStatus("Copy failed");}});})();</script>';
+
     echo '</div>'; // main
 
     echo '<div class="cbk-json-importer-demo" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:14px;">';
@@ -222,7 +229,8 @@ function coffeebrk_core_json_importer_page() {
     echo '<p style="margin:0 0 12px;">Use the demo JSON to test the importer quickly.</p>';
     echo '<p style="margin:0 0 12px;"><a class="button" href="'.esc_url( $demo_url ).'" download>Download demo .json</a></p>';
     echo '<h3 style="margin:14px 0 6px;">Demo JSON (copy/paste)</h3>';
-    echo '<textarea readonly rows="12" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;">'.esc_textarea( $demo_json ).'</textarea>';
+    echo '<p style="margin:0 0 8px;"><button type="button" class="button" id="cbk-copy-demo-json">Copy</button> <span id="cbk-copy-demo-json-status" style="margin-left:8px;color:#555;"></span></p>';
+    echo '<textarea readonly rows="12" id="cbk-demo-json" style="width:100%;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;">'.esc_textarea( $demo_json ).'</textarea>';
     echo '<p class="description" style="margin:8px 0 0;">Paste the JSON into the left-side <em>Or Paste JSON</em> field, then click Import.</p>';
     echo '</div>'; // demo
 
