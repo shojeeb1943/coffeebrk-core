@@ -79,13 +79,35 @@ function coffeebrk_rss_extract_first_img_src( $html ) : string {
         return '';
     }
 
-    if ( preg_match( '/<img\s[^>]*src\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))/i', $html, $m ) === 1 ) {
+    $decoded = html_entity_decode( $html, ENT_QUOTES | ENT_HTML5 );
+
+    if ( preg_match( '/<img\s[^>]*(?:src|data-src|data-lazy-src|data-original)\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))/i', $decoded, $m ) === 1 ) {
         $src = '';
         if ( isset( $m[2] ) && $m[2] !== '' ) $src = $m[2];
         elseif ( isset( $m[3] ) && $m[3] !== '' ) $src = $m[3];
         elseif ( isset( $m[4] ) && $m[4] !== '' ) $src = $m[4];
 
         return coffeebrk_rss_normalize_image_url( html_entity_decode( (string) $src, ENT_QUOTES ) );
+    }
+
+    if ( preg_match( '/<img\s[^>]*srcset\s*=\s*("([^"]+)"|\'([^\']+)\')/i', $decoded, $m ) === 1 ) {
+        $srcset = '';
+        if ( isset( $m[2] ) && $m[2] !== '' ) $srcset = $m[2];
+        elseif ( isset( $m[3] ) && $m[3] !== '' ) $srcset = $m[3];
+
+        $srcset = trim( (string) $srcset );
+        if ( $srcset !== '' ) {
+            $first = trim( explode( ',', $srcset, 2 )[0] );
+            $first = trim( preg_split( '/\s+/', $first )[0] );
+            $first = coffeebrk_rss_normalize_image_url( html_entity_decode( (string) $first, ENT_QUOTES ) );
+            if ( $first !== '' ) {
+                return $first;
+            }
+        }
+    }
+
+    if ( preg_match( '/https?:\/\/[\w\-._~:\/?#\[\]@!$&\'()*+,;=%]+\.(?:jpg|jpeg|png|gif|webp)(?:\?[^\s"\']*)?/i', $decoded, $m ) === 1 ) {
+        return coffeebrk_rss_normalize_image_url( (string) $m[0] );
     }
 
     return '';
@@ -437,13 +459,14 @@ function coffeebrk_rss_import_feed( int $feed_id, string $context = 'manual' ) :
             $title = '(Untitled)';
         }
 
-        $content = $item->get_content();
-        if ( ! $content ) {
-            $content = $item->get_description();
+        $raw_content = $item->get_content();
+        if ( ! $raw_content ) {
+            $raw_content = $item->get_description();
         }
-        $content = $content ? wp_kses_post( $content ) : '';
+        $raw_content = $raw_content ? (string) $raw_content : '';
+        $content = $raw_content !== '' ? wp_kses_post( $raw_content ) : '';
 
-        $image_url = coffeebrk_rss_extract_image_url_from_item( $item, (string) $content );
+        $image_url = coffeebrk_rss_extract_image_url_from_item( $item, $raw_content );
 
         $post_id = wp_insert_post([
             'post_type' => 'post',
