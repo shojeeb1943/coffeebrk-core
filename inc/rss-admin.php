@@ -5,6 +5,34 @@ if ( ! class_exists( 'WP_List_Table' ) ) {
     require_once ABSPATH . 'wp-admin/includes/class-wp-list-table.php';
 }
 
+function coffeebrk_rss_handle_enable_all() : void {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        coffeebrk_rss_admin_redirect( [ 'msg' => 'error' ] );
+    }
+    if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( (string) $_GET['_wpnonce'], 'coffeebrk_rss_enable_all' ) ) {
+        coffeebrk_rss_admin_redirect( [ 'msg' => 'error' ] );
+    }
+
+    global $wpdb;
+    $table = coffeebrk_rss_table_name();
+    $wpdb->query( "UPDATE {$table} SET enabled = 1" );
+    coffeebrk_rss_admin_redirect( [ 'msg' => 'enabled_all' ] );
+}
+
+function coffeebrk_rss_handle_disable_all() : void {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        coffeebrk_rss_admin_redirect( [ 'msg' => 'error' ] );
+    }
+    if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( (string) $_GET['_wpnonce'], 'coffeebrk_rss_disable_all' ) ) {
+        coffeebrk_rss_admin_redirect( [ 'msg' => 'error' ] );
+    }
+
+    global $wpdb;
+    $table = coffeebrk_rss_table_name();
+    $wpdb->query( "UPDATE {$table} SET enabled = 0" );
+    coffeebrk_rss_admin_redirect( [ 'msg' => 'disabled_all' ] );
+}
+
 add_action( 'admin_menu', function() {
     add_submenu_page(
         'coffeebrk-core',
@@ -21,6 +49,8 @@ add_action( 'admin_post_coffeebrk_rss_delete_feed', 'coffeebrk_rss_handle_delete
 add_action( 'admin_post_coffeebrk_rss_toggle_feed', 'coffeebrk_rss_handle_toggle_feed' );
 add_action( 'admin_post_coffeebrk_rss_run_feed', 'coffeebrk_rss_handle_run_feed' );
 add_action( 'admin_post_coffeebrk_rss_run_all', 'coffeebrk_rss_handle_run_all' );
+add_action( 'admin_post_coffeebrk_rss_enable_all', 'coffeebrk_rss_handle_enable_all' );
+add_action( 'admin_post_coffeebrk_rss_disable_all', 'coffeebrk_rss_handle_disable_all' );
 
 function coffeebrk_rss_admin_url( array $args = [] ) : string {
     return add_query_arg( $args, admin_url( 'admin.php?page=coffeebrk-core-rss' ) );
@@ -42,6 +72,44 @@ class Coffeebrk_RSS_Feeds_Table extends WP_List_Table {
             'last_import' => 'Last Import',
             'last_run' => 'Last Run',
         ];
+    }
+
+    protected function get_views() {
+        global $wpdb;
+        $table = coffeebrk_rss_table_name();
+
+        $total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+        $enabled = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE enabled = 1" );
+        $disabled = max( 0, $total - $enabled );
+
+        $status = isset( $_GET['status'] ) ? sanitize_key( (string) $_GET['status'] ) : 'all';
+        if ( $status !== 'active' && $status !== 'inactive' ) {
+            $status = 'all';
+        }
+
+        $base = remove_query_arg( [ 'status', 'paged' ], coffeebrk_rss_admin_url() );
+
+        $views = [];
+        $views['all'] = sprintf(
+            '<a href="%s" class="%s">All <span class="count">(%d)</span></a>',
+            esc_url( $base ),
+            $status === 'all' ? 'current' : '',
+            (int) $total
+        );
+        $views['active'] = sprintf(
+            '<a href="%s" class="%s">Active <span class="count">(%d)</span></a>',
+            esc_url( add_query_arg( 'status', 'active', $base ) ),
+            $status === 'active' ? 'current' : '',
+            (int) $enabled
+        );
+        $views['inactive'] = sprintf(
+            '<a href="%s" class="%s">Inactive <span class="count">(%d)</span></a>',
+            esc_url( add_query_arg( 'status', 'inactive', $base ) ),
+            $status === 'inactive' ? 'current' : '',
+            (int) $disabled
+        );
+
+        return $views;
     }
 
     protected function get_sortable_columns() {
@@ -96,7 +164,14 @@ class Coffeebrk_RSS_Feeds_Table extends WP_List_Table {
     }
 
     public function column_enabled( $item ) {
-        return ( (int) $item['enabled'] === 1 ) ? 'Yes' : 'No';
+        $id = (int) $item['id'];
+        $enabled = ( (int) $item['enabled'] === 1 );
+        $toggle_nonce = wp_create_nonce( 'coffeebrk_rss_toggle_' . $id );
+        $toggle_label = $enabled ? 'Disable' : 'Enable';
+        $url = admin_url( 'admin-post.php?action=coffeebrk_rss_toggle_feed&feed_id=' . $id . '&_wpnonce=' . $toggle_nonce );
+
+        return '<span style="margin-right:8px;">' . ( $enabled ? 'Yes' : 'No' ) . '</span>'
+            . '<a class="button button-small" href="' . esc_url( $url ) . '">' . esc_html( $toggle_label ) . '</a>';
     }
 
     public function column_import_limit( $item ) {
@@ -123,8 +198,14 @@ class Coffeebrk_RSS_Feeds_Table extends WP_List_Table {
         if ( $which !== 'top' ) return;
 
         $run_all_nonce = wp_create_nonce( 'coffeebrk_rss_run_all' );
+        $enable_all_nonce = wp_create_nonce( 'coffeebrk_rss_enable_all' );
+        $disable_all_nonce = wp_create_nonce( 'coffeebrk_rss_disable_all' );
         echo '<div class="alignleft actions">';
         echo '<a class="button button-secondary" href="' . esc_url( admin_url( 'admin-post.php?action=coffeebrk_rss_run_all&_wpnonce=' . $run_all_nonce ) ) . '">Run All Feeds Now</a>';
+        echo '&nbsp;';
+        echo '<a class="button" href="' . esc_url( admin_url( 'admin-post.php?action=coffeebrk_rss_enable_all&_wpnonce=' . $enable_all_nonce ) ) . '">Enable All</a>';
+        echo '&nbsp;';
+        echo '<a class="button" href="' . esc_url( admin_url( 'admin-post.php?action=coffeebrk_rss_disable_all&_wpnonce=' . $disable_all_nonce ) ) . '">Disable All</a>';
         echo '&nbsp;';
         echo '<a class="button button-primary" href="' . esc_url( coffeebrk_rss_admin_url( [ 'action' => 'add' ] ) ) . '">Add New Feed</a>';
         echo '</div>';
@@ -134,6 +215,18 @@ class Coffeebrk_RSS_Feeds_Table extends WP_List_Table {
         global $wpdb;
 
         $table = coffeebrk_rss_table_name();
+
+        $status = isset( $_GET['status'] ) ? sanitize_key( (string) $_GET['status'] ) : 'all';
+        if ( $status !== 'active' && $status !== 'inactive' ) {
+            $status = 'all';
+        }
+
+        $where = '1=1';
+        if ( $status === 'active' ) {
+            $where = 'enabled = 1';
+        } elseif ( $status === 'inactive' ) {
+            $where = 'enabled = 0';
+        }
 
         $per_page = 20;
         $paged = isset($_GET['paged']) ? max( 1, (int) $_GET['paged'] ) : 1;
@@ -150,10 +243,10 @@ class Coffeebrk_RSS_Feeds_Table extends WP_List_Table {
             $order = 'DESC';
         }
 
-        $total_items = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+        $total_items = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE {$where}" );
 
         $items = $wpdb->get_results(
-            $wpdb->prepare( "SELECT * FROM {$table} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d", $per_page, $offset ),
+            $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d", $per_page, $offset ),
             ARRAY_A
         );
 
@@ -215,6 +308,8 @@ function coffeebrk_rss_admin_page() : void {
             }
         }
         if ( $msg === 'error' ) $text = 'Action failed.';
+        if ( $msg === 'enabled_all' ) $text = 'All feeds enabled.';
+        if ( $msg === 'disabled_all' ) $text = 'All feeds disabled.';
 
         if ( $text ) {
             echo '<div class="notice notice-' . esc_attr( $type ) . ' is-dismissible"><p>' . esc_html( $text ) . '</p></div>';
