@@ -205,10 +205,74 @@ function coffeebrk_rss_admin_page() : void {
     $table = new Coffeebrk_RSS_Feeds_Table();
     $table->prepare_items();
 
+    $next = wp_next_scheduled( 'coffeebrk_rss_import_all' );
+    $next_str = $next ? wp_date( 'Y-m-d H:i:s', (int) $next ) : 'Not scheduled';
+    echo '<p style="margin:8px 0 16px;color:#555;"><strong>Next auto-run (hourly):</strong> ' . esc_html( $next_str ) . '</p>';
+
     echo '<form method="get">';
     echo '<input type="hidden" name="page" value="coffeebrk-core-rss" />';
     $table->display();
     echo '</form>';
+
+    if ( function_exists( 'coffeebrk_rss_log_get_last_24h' ) ) {
+        $log = coffeebrk_rss_log_get_last_24h();
+        if ( is_array( $log ) ) {
+            $log = array_reverse( $log );
+        } else {
+            $log = [];
+        }
+
+        echo '<h2 style="margin-top:24px;">Last 24 hours (cron/import history)</h2>';
+        echo '<table class="widefat striped">'
+            .'<thead><tr>'
+            .'<th style="width:170px;">Time</th>'
+            .'<th style="width:80px;">Context</th>'
+            .'<th style="width:110px;">Event</th>'
+            .'<th>Feed</th>'
+            .'<th style="width:90px;">Status</th>'
+            .'<th style="width:90px;">Imported</th>'
+            .'<th style="width:90px;">Skipped</th>'
+            .'<th style="width:80px;">Post</th>'
+            .'<th>Title / Message</th>'
+            .'</tr></thead><tbody>';
+
+        if ( ! empty( $log ) ) {
+            foreach ( $log as $row ) {
+                if ( ! is_array( $row ) ) continue;
+                $t = isset( $row['time'] ) ? (int) $row['time'] : 0;
+                $time_str = $t > 0 ? wp_date( 'Y-m-d H:i:s', $t ) : '';
+                $context = isset( $row['context'] ) ? (string) $row['context'] : '';
+                $event = isset( $row['event'] ) ? (string) $row['event'] : '';
+                $feed_name = isset( $row['feed_name'] ) ? (string) $row['feed_name'] : '';
+                $status = isset( $row['status'] ) ? (string) $row['status'] : '';
+                $imported = isset( $row['imported'] ) ? (int) $row['imported'] : 0;
+                $skipped = isset( $row['skipped'] ) ? (int) $row['skipped'] : 0;
+                $post_id = isset( $row['post_id'] ) ? (int) $row['post_id'] : 0;
+                $title = isset( $row['title'] ) ? (string) $row['title'] : '';
+                $message = isset( $row['message'] ) ? (string) $row['message'] : '';
+
+                $cls = ( $status === 'ok' ) ? 'cbk-ok' : ( $status === 'error' ? 'cbk-fail' : '' );
+                $tail = $title !== '' ? $title : $message;
+
+                echo '<tr>';
+                echo '<td>' . esc_html( $time_str ) . '</td>';
+                echo '<td>' . esc_html( $context ) . '</td>';
+                echo '<td>' . esc_html( $event ) . '</td>';
+                echo '<td>' . esc_html( $feed_name ) . '</td>';
+                echo '<td class="' . esc_attr( $cls ) . '">' . esc_html( $status ) . '</td>';
+                echo '<td>' . esc_html( (string) $imported ) . '</td>';
+                echo '<td>' . esc_html( (string) $skipped ) . '</td>';
+                echo '<td>' . esc_html( $post_id > 0 ? (string) $post_id : '—' ) . '</td>';
+                echo '<td>' . esc_html( $tail ) . '</td>';
+                echo '</tr>';
+            }
+        } else {
+            echo '<tr><td colspan="9" style="color:#666;">No log entries in the last 24 hours.</td></tr>';
+        }
+
+        echo '</tbody></table>';
+        echo '<style>.cbk-ok{color:#0a7b34;font-weight:600;} .cbk-fail{color:#b32d2e;font-weight:600;}</style>';
+    }
 
     echo '</div>';
 }
@@ -348,7 +412,7 @@ function coffeebrk_rss_handle_run_feed() : void {
 
     check_admin_referer( 'coffeebrk_rss_run_' . $feed_id );
 
-    $res = coffeebrk_rss_import_feed( $feed_id );
+    $res = coffeebrk_rss_import_feed( $feed_id, 'manual' );
     coffeebrk_rss_admin_redirect( [ 'msg' => ! empty( $res['ok'] ) ? 'ran' : 'error' ] );
 }
 
@@ -359,6 +423,6 @@ function coffeebrk_rss_handle_run_all() : void {
 
     check_admin_referer( 'coffeebrk_rss_run_all' );
 
-    $res = coffeebrk_rss_import_all_enabled_feeds();
+    $res = coffeebrk_rss_import_all_enabled_feeds( 'manual' );
     coffeebrk_rss_admin_redirect( [ 'msg' => ! empty( $res['ok'] ) ? 'ran' : 'error' ] );
 }

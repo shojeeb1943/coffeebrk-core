@@ -1,6 +1,64 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+function coffeebrk_rss_log_option_key() : string {
+    return 'coffeebrk_rss_import_log';
+}
+
+function coffeebrk_rss_log_append( array $entry ) : void {
+    $key = coffeebrk_rss_log_option_key();
+    $log = get_option( $key, [] );
+    if ( ! is_array( $log ) ) {
+        $log = [];
+    }
+
+    $entry['time'] = isset( $entry['time'] ) ? (int) $entry['time'] : time();
+    $log[] = $entry;
+
+    $since = time() - DAY_IN_SECONDS;
+    $log = array_values( array_filter( $log, function( $row ) use ( $since ) {
+        if ( ! is_array( $row ) ) return false;
+        $t = isset( $row['time'] ) ? (int) $row['time'] : 0;
+        return $t >= $since;
+    } ) );
+
+    if ( count( $log ) > 800 ) {
+        $log = array_slice( $log, -800 );
+    }
+
+    update_option( $key, $log, false );
+}
+
+function coffeebrk_rss_log_get_last_24h() : array {
+    $log = get_option( coffeebrk_rss_log_option_key(), [] );
+    if ( ! is_array( $log ) ) {
+        return [];
+    }
+
+    $since = time() - DAY_IN_SECONDS;
+    $log = array_values( array_filter( $log, function( $row ) use ( $since ) {
+        if ( ! is_array( $row ) ) return false;
+        $t = isset( $row['time'] ) ? (int) $row['time'] : 0;
+        return $t >= $since;
+    } ) );
+
+    return $log;
+}
+
+function coffeebrk_rss_force_refresh_feed_cache( string $url ) : void {
+    $url = trim( $url );
+    if ( $url === '' ) return;
+
+    $hash = md5( $url );
+    delete_transient( 'feed_' . $hash );
+    delete_transient( 'feed_mod_' . $hash );
+
+    if ( function_exists( 'wp_cache_delete' ) ) {
+        wp_cache_delete( 'feed_' . $hash, 'transient' );
+        wp_cache_delete( 'feed_mod_' . $hash, 'transient' );
+    }
+}
+
 function coffeebrk_rss_get_feed( int $id ) : ?array {
     global $wpdb;
     $table = coffeebrk_rss_table_name();
@@ -176,7 +234,7 @@ function coffeebrk_rss_post_exists_for_source_url( string $source_url ) : bool {
     return ! empty( $q->posts );
 }
 
-function coffeebrk_rss_import_feed( int $feed_id ) : array {
+function coffeebrk_rss_import_feed( int $feed_id, string $context = 'manual' ) : array {
     $feed = coffeebrk_rss_get_feed( $feed_id );
     if ( ! $feed ) return [ 'ok' => false, 'error' => 'feed_not_found' ];
 
@@ -194,7 +252,14 @@ function coffeebrk_rss_import_feed( int $feed_id ) : array {
     if ( $limit < 1 ) $limit = 1;
     if ( $limit > 50 ) $limit = 50;
 
+    coffeebrk_rss_force_refresh_feed_cache( $url );
+
+    $cbk_rss_cache_lifetime_filter = function() {
+        return 0;
+    };
+    add_filter( 'wp_feed_cache_transient_lifetime', $cbk_rss_cache_lifetime_filter, 999 );
     $rss = fetch_feed( $url );
+    remove_filter( 'wp_feed_cache_transient_lifetime', $cbk_rss_cache_lifetime_filter, 999 );
 
     if ( is_wp_error( $rss ) ) {
         $msg = $rss->get_error_message();
@@ -202,6 +267,17 @@ function coffeebrk_rss_import_feed( int $feed_id ) : array {
         if ( function_exists( 'coffeebrk_log_error' ) ) {
             coffeebrk_log_error( 'rss import fetch_feed error', [ 'feed_id' => $feed_id, 'url' => $url, 'err' => $msg ] );
         }
+        coffeebrk_rss_log_append([
+            'event' => 'feed_run',
+            'status' => 'error',
+            'context' => $context,
+            'feed_id' => $feed_id,
+            'feed_name' => (string) ( $feed['feed_name'] ?? '' ),
+            'feed_url' => $url,
+            'imported' => 0,
+            'skipped' => 0,
+            'message' => $msg,
+        ]);
         return [ 'ok' => false, 'error' => 'fetch_failed', 'message' => $msg ];
     }
 
@@ -257,6 +333,18 @@ function coffeebrk_rss_import_feed( int $feed_id ) : array {
         update_post_meta( (int) $post_id, '_source_name', (string) $feed['feed_name'] );
         update_post_meta( (int) $post_id, '_source_url', $key );
 
+        coffeebrk_rss_log_append([
+            'event' => 'drafted',
+            'status' => 'ok',
+            'context' => $context,
+            'feed_id' => $feed_id,
+            'feed_name' => (string) ( $feed['feed_name'] ?? '' ),
+            'feed_url' => $url,
+            'post_id' => (int) $post_id,
+            'title' => $title,
+            'source_url' => $key,
+        ]);
+
         $ts = $item->get_date( 'U' );
         if ( $ts ) {
             $ts = (int) $ts;
@@ -274,10 +362,21 @@ function coffeebrk_rss_import_feed( int $feed_id ) : array {
         coffeebrk_rss_update_run_state( $feed_id, [ 'last_import' => $local ] );
     }
 
+    coffeebrk_rss_log_append([
+        'event' => 'feed_run',
+        'status' => 'ok',
+        'context' => $context,
+        'feed_id' => $feed_id,
+        'feed_name' => (string) ( $feed['feed_name'] ?? '' ),
+        'feed_url' => $url,
+        'imported' => $imported,
+        'skipped' => $skipped,
+    ]);
+
     return [ 'ok' => true, 'imported' => $imported, 'skipped' => $skipped ];
 }
 
-function coffeebrk_rss_import_all_enabled_feeds() : array {
+function coffeebrk_rss_import_all_enabled_feeds( string $context = 'cron' ) : array {
     $feeds = coffeebrk_rss_get_feeds([ 'enabled' => 1, 'orderby' => 'id', 'order' => 'ASC' ]);
 
     $total_imported = 0;
@@ -285,7 +384,7 @@ function coffeebrk_rss_import_all_enabled_feeds() : array {
     $errors = 0;
 
     foreach ( $feeds as $f ) {
-        $res = coffeebrk_rss_import_feed( (int) $f['id'] );
+        $res = coffeebrk_rss_import_feed( (int) $f['id'], $context );
         if ( empty( $res['ok'] ) ) {
             $errors++;
             continue;
@@ -293,6 +392,16 @@ function coffeebrk_rss_import_all_enabled_feeds() : array {
         $total_imported += (int) ( $res['imported'] ?? 0 );
         $total_skipped += (int) ( $res['skipped'] ?? 0 );
     }
+
+    coffeebrk_rss_log_append([
+        'event' => 'import_all',
+        'status' => 'ok',
+        'context' => $context,
+        'feeds' => count( $feeds ),
+        'imported' => $total_imported,
+        'skipped' => $total_skipped,
+        'errors' => $errors,
+    ]);
 
     return [
         'ok' => true,
