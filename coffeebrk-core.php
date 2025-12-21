@@ -57,6 +57,19 @@ register_deactivation_hook( __FILE__, function() {
     flush_rewrite_rules();
 });
 
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function( $links ) {
+    if ( ! is_array( $links ) ) {
+        $links = [];
+    }
+
+    $dashboard = admin_url( 'admin.php?page=coffeebrk-core' );
+    $settings = admin_url( 'admin.php?page=coffeebrk-core-auth' );
+    $links[] = '<a href="' . esc_url( $dashboard ) . '">Dashboard</a>';
+    $links[] = '<a href="' . esc_url( $settings ) . '">Settings</a>';
+
+    return $links;
+} );
+
 /**
  * --------------------------------------------------------------
  * SECTION 1: Register Global Meta Fields

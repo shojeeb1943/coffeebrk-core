@@ -177,6 +177,19 @@ function coffeebrk_rss_admin_page() : void {
     echo '<div class="wrap">';
     echo '<h1>RSS Aggregator</h1>';
 
+    $feeds_total = 0;
+    $feeds_enabled = 0;
+    if ( function_exists( 'coffeebrk_rss_table_name' ) ) {
+        global $wpdb;
+        $table_name = coffeebrk_rss_table_name();
+        if ( is_string( $table_name ) && $table_name !== '' ) {
+            $feeds_total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name}" );
+            $feeds_enabled = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table_name} WHERE enabled = 1" );
+        }
+    }
+
+    echo '<p style="margin:4px 0 14px;color:#555;"><strong>Feeds:</strong> ' . esc_html( (string) $feeds_total ) . ' total, ' . esc_html( (string) $feeds_enabled ) . ' enabled</p>';
+
     if ( isset($_GET['msg']) ) {
         $msg = sanitize_key( (string) $_GET['msg'] );
         $type = ( $msg === 'error' ) ? 'error' : 'updated';
