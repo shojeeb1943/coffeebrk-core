@@ -59,6 +59,97 @@ function coffeebrk_rss_force_refresh_feed_cache( string $url ) : void {
     }
 }
 
+function coffeebrk_rss_normalize_image_url( $url ) : string {
+    $url = is_string( $url ) ? trim( $url ) : '';
+    if ( $url === '' ) {
+        return '';
+    }
+
+    if ( strpos( $url, '//' ) === 0 ) {
+        $url = 'https:' . $url;
+    }
+
+    $url = esc_url_raw( $url );
+    return is_string( $url ) ? $url : '';
+}
+
+function coffeebrk_rss_extract_first_img_src( $html ) : string {
+    $html = is_string( $html ) ? $html : '';
+    if ( $html === '' ) {
+        return '';
+    }
+
+    if ( preg_match( '/<img\s[^>]*src\s*=\s*("([^"]+)"|\'([^\']+)\'|([^\s>]+))/i', $html, $m ) === 1 ) {
+        $src = '';
+        if ( isset( $m[2] ) && $m[2] !== '' ) $src = $m[2];
+        elseif ( isset( $m[3] ) && $m[3] !== '' ) $src = $m[3];
+        elseif ( isset( $m[4] ) && $m[4] !== '' ) $src = $m[4];
+
+        return coffeebrk_rss_normalize_image_url( html_entity_decode( (string) $src, ENT_QUOTES ) );
+    }
+
+    return '';
+}
+
+function coffeebrk_rss_extract_image_url_from_item( $item, string $content_html = '' ) : string {
+    if ( ! $item ) {
+        return '';
+    }
+
+    if ( method_exists( $item, 'get_enclosure' ) ) {
+        $enc = $item->get_enclosure();
+        if ( $enc && method_exists( $enc, 'get_link' ) ) {
+            $enc_url = coffeebrk_rss_normalize_image_url( $enc->get_link() );
+            if ( $enc_url !== '' ) {
+                return $enc_url;
+            }
+        }
+    }
+
+    if ( method_exists( $item, 'get_item_tags' ) ) {
+        $candidates = [];
+        $media = $item->get_item_tags( 'http://search.yahoo.com/mrss/', 'content' );
+        if ( is_array( $media ) ) {
+            foreach ( $media as $t ) {
+                $attrs = $t['attribs'][''] ?? [];
+                if ( ! empty( $attrs['url'] ) ) {
+                    $candidates[] = $attrs['url'];
+                }
+            }
+        }
+        $thumb = $item->get_item_tags( 'http://search.yahoo.com/mrss/', 'thumbnail' );
+        if ( is_array( $thumb ) ) {
+            foreach ( $thumb as $t ) {
+                $attrs = $t['attribs'][''] ?? [];
+                if ( ! empty( $attrs['url'] ) ) {
+                    $candidates[] = $attrs['url'];
+                }
+            }
+        }
+
+        foreach ( $candidates as $c ) {
+            $c = coffeebrk_rss_normalize_image_url( $c );
+            if ( $c !== '' ) {
+                return $c;
+            }
+        }
+    }
+
+    $from_content = coffeebrk_rss_extract_first_img_src( $content_html );
+    if ( $from_content !== '' ) {
+        return $from_content;
+    }
+
+    if ( method_exists( $item, 'get_description' ) ) {
+        $from_desc = coffeebrk_rss_extract_first_img_src( (string) $item->get_description() );
+        if ( $from_desc !== '' ) {
+            return $from_desc;
+        }
+    }
+
+    return '';
+}
+
 function coffeebrk_rss_get_feed( int $id ) : ?array {
     global $wpdb;
     $table = coffeebrk_rss_table_name();
@@ -352,6 +443,8 @@ function coffeebrk_rss_import_feed( int $feed_id, string $context = 'manual' ) :
         }
         $content = $content ? wp_kses_post( $content ) : '';
 
+        $image_url = coffeebrk_rss_extract_image_url_from_item( $item, (string) $content );
+
         $post_id = wp_insert_post([
             'post_type' => 'post',
             'post_status' => 'draft',
@@ -388,6 +481,10 @@ function coffeebrk_rss_import_feed( int $feed_id, string $context = 'manual' ) :
 
         update_post_meta( (int) $post_id, '_source_name', (string) $feed['feed_name'] );
         update_post_meta( (int) $post_id, '_source_url', $key );
+
+        if ( $image_url !== '' ) {
+            update_post_meta( (int) $post_id, '_image', esc_url_raw( $image_url ) );
+        }
 
         coffeebrk_rss_log_append([
             'event' => 'drafted',
