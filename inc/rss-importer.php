@@ -215,7 +215,7 @@ function coffeebrk_rss_item_dedupe_key( $item ) : ?string {
     return null;
 }
 
-function coffeebrk_rss_post_exists_for_source_url( string $source_url ) : bool {
+function coffeebrk_rss_get_existing_post_id_by_source_url( string $source_url ) : int {
     $q = new WP_Query([
         'post_type' => 'post',
         'post_status' => 'any',
@@ -231,7 +231,15 @@ function coffeebrk_rss_post_exists_for_source_url( string $source_url ) : bool {
         ],
     ]);
 
-    return ! empty( $q->posts );
+    if ( ! empty( $q->posts[0] ) ) {
+        return (int) $q->posts[0];
+    }
+
+    return 0;
+}
+
+function coffeebrk_rss_post_exists_for_source_url( string $source_url ) : bool {
+    return coffeebrk_rss_get_existing_post_id_by_source_url( $source_url ) > 0;
 }
 
 function coffeebrk_rss_import_feed( int $feed_id, string $context = 'manual' ) : array {
@@ -287,16 +295,49 @@ function coffeebrk_rss_import_feed( int $feed_id, string $context = 'manual' ) :
     $imported = 0;
     $skipped = 0;
     $newest_import_ts = null;
+    $skip_logs_added = 0;
+    $skip_logs_limit = 50;
 
     foreach ( (array) $items as $item ) {
         $key = coffeebrk_rss_item_dedupe_key( $item );
         if ( ! $key ) {
             $skipped++;
+            if ( $skip_logs_added < $skip_logs_limit ) {
+                $skip_logs_added++;
+                $title = sanitize_text_field( (string) $item->get_title() );
+                coffeebrk_rss_log_append([
+                    'event' => 'skipped_item',
+                    'status' => 'skip',
+                    'context' => $context,
+                    'feed_id' => $feed_id,
+                    'feed_name' => (string) ( $feed['feed_name'] ?? '' ),
+                    'feed_url' => $url,
+                    'title' => $title,
+                    'reason' => 'missing_dedupe_key',
+                ]);
+            }
             continue;
         }
 
-        if ( coffeebrk_rss_post_exists_for_source_url( $key ) ) {
+        $existing_post_id = coffeebrk_rss_get_existing_post_id_by_source_url( $key );
+        if ( $existing_post_id > 0 ) {
             $skipped++;
+            if ( $skip_logs_added < $skip_logs_limit ) {
+                $skip_logs_added++;
+                $title = sanitize_text_field( (string) $item->get_title() );
+                coffeebrk_rss_log_append([
+                    'event' => 'skipped_item',
+                    'status' => 'skip',
+                    'context' => $context,
+                    'feed_id' => $feed_id,
+                    'feed_name' => (string) ( $feed['feed_name'] ?? '' ),
+                    'feed_url' => $url,
+                    'post_id' => (int) $existing_post_id,
+                    'title' => $title,
+                    'source_url' => $key,
+                    'reason' => 'duplicate_source_url',
+                ]);
+            }
             continue;
         }
 
@@ -320,6 +361,21 @@ function coffeebrk_rss_import_feed( int $feed_id, string $context = 'manual' ) :
 
         if ( is_wp_error( $post_id ) ) {
             $skipped++;
+            if ( $skip_logs_added < $skip_logs_limit ) {
+                $skip_logs_added++;
+                coffeebrk_rss_log_append([
+                    'event' => 'skipped_item',
+                    'status' => 'error',
+                    'context' => $context,
+                    'feed_id' => $feed_id,
+                    'feed_name' => (string) ( $feed['feed_name'] ?? '' ),
+                    'feed_url' => $url,
+                    'title' => $title,
+                    'source_url' => $key,
+                    'reason' => 'wp_insert_post_error',
+                    'message' => $post_id->get_error_message(),
+                ]);
+            }
             continue;
         }
 

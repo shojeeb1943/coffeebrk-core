@@ -185,7 +185,22 @@ function coffeebrk_rss_admin_page() : void {
         if ( $msg === 'saved' ) $text = 'Feed saved.';
         if ( $msg === 'deleted' ) $text = 'Feed deleted.';
         if ( $msg === 'toggled' ) $text = 'Feed updated.';
-        if ( $msg === 'ran' ) $text = 'Import completed.';
+        if ( $msg === 'ran' ) {
+            $imported = isset( $_GET['imported'] ) ? (int) $_GET['imported'] : null;
+            $skipped = isset( $_GET['skipped'] ) ? (int) $_GET['skipped'] : null;
+            $errors = isset( $_GET['errors'] ) ? (int) $_GET['errors'] : null;
+
+            $text = 'Import completed.';
+            if ( $imported !== null || $skipped !== null || $errors !== null ) {
+                $parts = [];
+                if ( $imported !== null ) $parts[] = 'Imported: ' . $imported;
+                if ( $skipped !== null ) $parts[] = 'Skipped: ' . $skipped;
+                if ( $errors !== null ) $parts[] = 'Errors: ' . $errors;
+                if ( $parts ) {
+                    $text .= ' ' . implode( ' | ', $parts );
+                }
+            }
+        }
         if ( $msg === 'error' ) $text = 'Action failed.';
 
         if ( $text ) {
@@ -250,9 +265,13 @@ function coffeebrk_rss_admin_page() : void {
                 $post_id = isset( $row['post_id'] ) ? (int) $row['post_id'] : 0;
                 $title = isset( $row['title'] ) ? (string) $row['title'] : '';
                 $message = isset( $row['message'] ) ? (string) $row['message'] : '';
+                $reason = isset( $row['reason'] ) ? (string) $row['reason'] : '';
 
-                $cls = ( $status === 'ok' ) ? 'cbk-ok' : ( $status === 'error' ? 'cbk-fail' : '' );
+                $cls = ( $status === 'ok' ) ? 'cbk-ok' : ( $status === 'error' ? 'cbk-fail' : ( $status === 'skip' ? 'cbk-skip' : '' ) );
                 $tail = $title !== '' ? $title : $message;
+                if ( $reason !== '' ) {
+                    $tail = ( $tail !== '' ? $tail . ' | ' : '' ) . 'Reason: ' . $reason;
+                }
 
                 echo '<tr>';
                 echo '<td>' . esc_html( $time_str ) . '</td>';
@@ -271,7 +290,7 @@ function coffeebrk_rss_admin_page() : void {
         }
 
         echo '</tbody></table>';
-        echo '<style>.cbk-ok{color:#0a7b34;font-weight:600;} .cbk-fail{color:#b32d2e;font-weight:600;}</style>';
+        echo '<style>.cbk-ok{color:#0a7b34;font-weight:600;} .cbk-skip{color:#8a6d3b;font-weight:600;} .cbk-fail{color:#b32d2e;font-weight:600;}</style>';
     }
 
     echo '</div>';
@@ -413,7 +432,14 @@ function coffeebrk_rss_handle_run_feed() : void {
     check_admin_referer( 'coffeebrk_rss_run_' . $feed_id );
 
     $res = coffeebrk_rss_import_feed( $feed_id, 'manual' );
-    coffeebrk_rss_admin_redirect( [ 'msg' => ! empty( $res['ok'] ) ? 'ran' : 'error' ] );
+    if ( ! empty( $res['ok'] ) ) {
+        coffeebrk_rss_admin_redirect( [
+            'msg' => 'ran',
+            'imported' => (int) ( $res['imported'] ?? 0 ),
+            'skipped' => (int) ( $res['skipped'] ?? 0 ),
+        ] );
+    }
+    coffeebrk_rss_admin_redirect( [ 'msg' => 'error' ] );
 }
 
 function coffeebrk_rss_handle_run_all() : void {
@@ -424,5 +450,13 @@ function coffeebrk_rss_handle_run_all() : void {
     check_admin_referer( 'coffeebrk_rss_run_all' );
 
     $res = coffeebrk_rss_import_all_enabled_feeds( 'manual' );
-    coffeebrk_rss_admin_redirect( [ 'msg' => ! empty( $res['ok'] ) ? 'ran' : 'error' ] );
+    if ( ! empty( $res['ok'] ) ) {
+        coffeebrk_rss_admin_redirect( [
+            'msg' => 'ran',
+            'imported' => (int) ( $res['imported'] ?? 0 ),
+            'skipped' => (int) ( $res['skipped'] ?? 0 ),
+            'errors' => (int) ( $res['errors'] ?? 0 ),
+        ] );
+    }
+    coffeebrk_rss_admin_redirect( [ 'msg' => 'error' ] );
 }
