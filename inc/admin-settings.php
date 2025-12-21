@@ -204,12 +204,60 @@ function coffeebrk_core_dashboard_page(){
     echo '<tr><td>AJAX</td><td><code>wp-admin/admin-ajax.php?action=cbk_json_articles_import_process</code></td><td>Logged-in admin, nonce: <code>cbk_json_articles_import</code></td></tr>';
     echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/feed</code></td><td>Requires logged-in user (<code>is_user_logged_in()</code>)</td></tr>';
     echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/site</code></td><td>Public endpoint</td></tr>';
-    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/submit</code></td><td>Requires logged-in user with <code>edit_posts</code></td></tr>';
+    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/submit</code></td><td>Bearer token or logged-in user with <code>edit_posts</code></td></tr>';
     echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/supabase/login</code></td><td>Public endpoint; validates Supabase token server-side</td></tr>';
     echo '<tr><td>RSS Feed</td><td><code>/feed/coffeebrk/</code> or <code>/?feed=coffeebrk</code></td><td>Public site RSS feed</td></tr>';
     echo '<tr><td>Cron Hook</td><td><code>coffeebrk_rss_import_all</code></td><td>Schedule: hourly; drafts posts from enabled feeds</td></tr>';
     echo '</tbody></table>';
 }
+
+add_action( 'admin_post_coffeebrk_core_api_token_generate', function(){
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'Unauthorized', 403 );
+    }
+    if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'coffeebrk_core_api_token_generate' ) ) {
+        wp_die( 'Invalid nonce', 400 );
+    }
+
+    $raw = random_bytes( 32 );
+    $token = rtrim( strtr( base64_encode( $raw ), '+/', '-_' ), '=' );
+    $hash = password_hash( $token, PASSWORD_DEFAULT );
+
+    update_option( 'coffeebrk_core_api_token_hash', $hash, false );
+    update_option( 'coffeebrk_core_api_token_last4', substr( $token, -4 ), false );
+    update_option( 'coffeebrk_core_api_token_updated', time(), false );
+    update_option( 'coffeebrk_core_api_token_user_id', (int) get_current_user_id(), false );
+
+    $uid = get_current_user_id();
+    if ( $uid > 0 ) {
+        set_transient( 'coffeebrk_core_api_token_plain_' . $uid, $token, 10 * MINUTE_IN_SECONDS );
+    }
+
+    wp_safe_redirect( admin_url( 'admin.php?page=coffeebrk-core-api&msg=token_generated' ) );
+    exit;
+} );
+
+add_action( 'admin_post_coffeebrk_core_api_token_revoke', function(){
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'Unauthorized', 403 );
+    }
+    if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'coffeebrk_core_api_token_revoke' ) ) {
+        wp_die( 'Invalid nonce', 400 );
+    }
+
+    delete_option( 'coffeebrk_core_api_token_hash' );
+    delete_option( 'coffeebrk_core_api_token_last4' );
+    delete_option( 'coffeebrk_core_api_token_updated' );
+    delete_option( 'coffeebrk_core_api_token_user_id' );
+
+    $uid = get_current_user_id();
+    if ( $uid > 0 ) {
+        delete_transient( 'coffeebrk_core_api_token_plain_' . $uid );
+    }
+
+    wp_safe_redirect( admin_url( 'admin.php?page=coffeebrk-core-api&msg=token_revoked' ) );
+    exit;
+} );
 
 function coffeebrk_core_api_page(){
     if ( ! current_user_can( 'manage_options' ) ) return;
@@ -220,23 +268,100 @@ function coffeebrk_core_api_page(){
     $rss_query = home_url( '/?feed=coffeebrk' );
     $nonce = wp_create_nonce( 'wp_rest' );
 
+    $uid = get_current_user_id();
+    $plain_token = $uid > 0 ? (string) get_transient( 'coffeebrk_core_api_token_plain_' . $uid ) : '';
+    $token_hash = (string) get_option( 'coffeebrk_core_api_token_hash', '' );
+    $token_last4 = (string) get_option( 'coffeebrk_core_api_token_last4', '' );
+    $token_updated = (int) get_option( 'coffeebrk_core_api_token_updated', 0 );
+    $token_user_id = (int) get_option( 'coffeebrk_core_api_token_user_id', 0 );
+
+    $dyn = (array) get_option( 'coffeebrk_dynamic_fields', [] );
+    $allowed_meta_keys = [];
+    foreach ( $dyn as $f ) {
+        if ( ! is_array( $f ) ) continue;
+        $k = (string) ( $f['key'] ?? '' );
+        if ( $k === '' ) continue;
+        $allowed_meta_keys[] = $k;
+    }
+    $allowed_meta_keys = array_values( array_unique( $allowed_meta_keys ) );
+
+    if ( isset( $_GET['msg'] ) ) {
+        $msg = sanitize_key( (string) $_GET['msg'] );
+        if ( $msg === 'token_generated' ) {
+            echo '<div class="notice notice-success"><p>API token generated. Copy it now (it will only be shown once).</p></div>';
+        }
+        if ( $msg === 'token_revoked' ) {
+            echo '<div class="notice notice-success"><p>API token revoked.</p></div>';
+        }
+    }
+
     echo '<div class="wrap">';
     echo '<h1>API</h1>';
     echo '<p style="max-width:980px;color:#555;">Use these endpoints to integrate CoffeeBrk with your site. All URLs below are relative to <code>' . esc_html( $site ) . '</code>.</p>';
 
     echo '<h2>REST API</h2>';
+    echo '<h3 style="margin-top:16px;">API Token</h3>';
+    echo '<p style="max-width:980px;color:#555;">For server-to-server integrations, use a token in the request header: <code>Authorization: Bearer &lt;token&gt;</code>.</p>';
+    echo '<div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:14px;max-width:980px;">';
+    if ( $token_hash !== '' ) {
+        $when = $token_updated > 0 ? wp_date( 'Y-m-d H:i:s', $token_updated ) : '';
+        $owner = $token_user_id > 0 ? get_user_by( 'id', $token_user_id ) : false;
+        $owner_label = $owner instanceof WP_User ? $owner->user_login : '';
+        echo '<p style="margin:0 0 10px;"><strong>Status:</strong> Active'
+            . ( $token_last4 !== '' ? ' (ends with ' . esc_html( $token_last4 ) . ')' : '' )
+            . ( $owner_label !== '' ? ' • Owner: ' . esc_html( $owner_label ) : '' )
+            . ( $when !== '' ? ' • Updated: ' . esc_html( $when ) : '' )
+            . '</p>';
+    } else {
+        echo '<p style="margin:0 0 10px;"><strong>Status:</strong> No active token</p>';
+    }
+
+    if ( $plain_token !== '' ) {
+        echo '<p style="margin:0 0 8px;color:#b32d2e;"><strong>Copy this token now.</strong> It will not be shown again after you leave this page.</p>';
+        echo '<input type="text" readonly value="' . esc_attr( $plain_token ) . '" style="width:100%;font-family:monospace;" onclick="this.select();" />';
+        if ( $uid > 0 ) {
+            delete_transient( 'coffeebrk_core_api_token_plain_' . $uid );
+        }
+    }
+
+    echo '<div style="display:flex;gap:10px;margin-top:12px;">';
+    echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+    echo '<input type="hidden" name="action" value="coffeebrk_core_api_token_generate" />';
+    wp_nonce_field( 'coffeebrk_core_api_token_generate' );
+    echo '<button type="submit" class="button button-primary">Generate New Token</button>';
+    echo '</form>';
+
+    echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+    echo '<input type="hidden" name="action" value="coffeebrk_core_api_token_revoke" />';
+    wp_nonce_field( 'coffeebrk_core_api_token_revoke' );
+    echo '<button type="submit" class="button">Revoke Token</button>';
+    echo '</form>';
+    echo '</div>';
+    echo '</div>';
+
     echo '<table class="widefat striped"><thead><tr><th style="width:180px;">Method</th><th>Endpoint</th><th style="width:360px;">Auth</th></tr></thead><tbody>';
     echo '<tr><td>GET</td><td><code>' . esc_html( $rest_base . '/site' ) . '</code></td><td>Public</td></tr>';
     echo '<tr><td>GET</td><td><code>' . esc_html( $rest_base . '/feed' ) . '</code></td><td>Requires logged-in user (cookie auth)</td></tr>';
-    echo '<tr><td>POST</td><td><code>' . esc_html( $rest_base . '/submit' ) . '</code></td><td>Requires logged-in user with <code>edit_posts</code></td></tr>';
+    echo '<tr><td>POST</td><td><code>' . esc_html( $rest_base . '/submit' ) . '</code></td><td>Bearer token or logged-in user with <code>edit_posts</code></td></tr>';
     echo '<tr><td>POST</td><td><code>' . esc_html( $rest_base . '/supabase/login' ) . '</code></td><td>Public (Supabase token validation)</td></tr>';
     echo '</tbody></table>';
+
+    echo '<h3 style="margin-top:18px;">Posting Articles with Custom Fields</h3>';
+    echo '<p style="max-width:980px;color:#555;">Use <code>POST ' . esc_html( $rest_base . '/submit' ) . '</code> and pass custom fields in a <code>meta</code> object. For safety, only keys configured in <strong>Dynamic Fields</strong> are accepted.</p>';
+    if ( ! empty( $allowed_meta_keys ) ) {
+        echo '<p style="max-width:980px;color:#555;margin:0 0 6px;"><strong>Allowed meta keys:</strong></p>';
+        echo '<div style="max-width:980px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:10px;">';
+        echo '<code style="display:block;white-space:pre-wrap;">' . esc_html( implode( ', ', $allowed_meta_keys ) ) . '</code>';
+        echo '</div>';
+    } else {
+        echo '<p style="max-width:980px;color:#555;">No Dynamic Fields are configured yet. Add them in <strong>Coffeebrk Core → Dynamic Fields</strong> to allow meta keys via API.</p>';
+    }
 
     echo '<h3 style="margin-top:18px;">Authentication</h3>';
     echo '<p style="max-width:980px;color:#555;">For protected endpoints, use either:</p>';
     echo '<ul style="max-width:980px;color:#555;list-style:disc;padding-left:20px;">'
         .'<li>Cookie auth (same browser session) + header <code>X-WP-Nonce</code></li>'
-        .'<li>Application Password (Basic Auth) for server-to-server calls</li>'
+        .'<li>Bearer token (recommended) for server-to-server calls</li>'
         .'</ul>';
 
     echo '<p style="max-width:980px;color:#555;">Current admin REST nonce (for testing in your browser session): <code>' . esc_html( $nonce ) . '</code></p>';
@@ -246,10 +371,10 @@ function coffeebrk_core_api_page(){
         . esc_html(
             "# Public\n" .
             "curl -s \"{$rest_base}/site\"\n\n" .
-            "# Create a draft post (Application Password)\n" .
-            "curl -s -u USERNAME:APP_PASSWORD -H \"Content-Type: application/json\" \\\n+  -d '{\"title\":\"Hello\",\"content\":\"My content\",\"source_url\":\"https://example.com\"}' \\\n+  \"{$rest_base}/submit\"\n\n" .
+            "# Create a draft post (Bearer token)\n" .
+            "curl -s -H \"Authorization: Bearer YOUR_TOKEN\" -H \"Content-Type: application/json\" \\\n+  -d '{\"title\":\"Hello\",\"content\":\"My content\",\"meta\":{\"_source_name\":\"My Feed\",\"_source_url\":\"https://example.com\"}}' \\\n+  \"{$rest_base}/submit\"\n\n" .
             "# Create a draft post (cookie auth + nonce)\n" .
-            "curl -s -H \"X-WP-Nonce: {$nonce}\" -H \"Content-Type: application/json\" \\\n+  -d '{\"title\":\"Hello\",\"content\":\"My content\"}' \\\n+  \"{$rest_base}/submit\"\n"
+            "curl -s -H \"X-WP-Nonce: {$nonce}\" -H \"Content-Type: application/json\" \\\n   -d '{\"title\":\"Hello\",\"content\":\"My content\"}' \\\n   \"{$rest_base}/submit\"\n"
         )
         . '</pre>';
 

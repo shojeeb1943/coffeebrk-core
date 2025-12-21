@@ -72,8 +72,12 @@ add_action('rest_api_init', function(){
 
     register_rest_route('coffeebrk/v1', '/submit', [
         'methods'  => 'POST',
-        'permission_callback' => function(){
-            return is_user_logged_in() && current_user_can( 'edit_posts' );
+        'permission_callback' => function( WP_REST_Request $req ){
+            if ( is_user_logged_in() && current_user_can( 'edit_posts' ) ) {
+                return true;
+            }
+            $token = coffeebrk_core_get_bearer_token_from_rest_request( $req );
+            return $token !== '' && coffeebrk_core_api_token_is_valid( $token );
         },
         'callback' => function( WP_REST_Request $req ){
             $params = $req->get_json_params();
@@ -122,6 +126,57 @@ add_action('rest_api_init', function(){
                 wp_set_post_categories( (int) $post_id, [ $cat_id ], false );
             }
 
+            $dyn = (array) get_option( 'coffeebrk_dynamic_fields', [] );
+            $dyn_index = [];
+            foreach ( $dyn as $f ) {
+                if ( ! is_array( $f ) ) continue;
+                $k = (string) ( $f['key'] ?? '' );
+                if ( $k === '' ) continue;
+                $dyn_index[ $k ] = [
+                    'type' => (string) ( $f['type'] ?? 'text' ),
+                    'choices' => (string) ( $f['choices'] ?? '' ),
+                ];
+            }
+
+            $incoming_meta = $params['meta'] ?? [];
+            if ( is_array( $incoming_meta ) ) {
+                foreach ( $incoming_meta as $meta_key => $raw ) {
+                    $meta_key = (string) $meta_key;
+                    if ( $meta_key === '' ) continue;
+                    if ( $meta_key[0] !== '_' ) {
+                        $meta_key = '_' . ltrim( $meta_key, '_' );
+                    }
+                    if ( ! isset( $dyn_index[ $meta_key ] ) ) {
+                        continue;
+                    }
+
+                    $type = $dyn_index[ $meta_key ]['type'];
+                    switch ( $type ) {
+                        case 'textarea':
+                            $val = sanitize_textarea_field( (string) $raw );
+                            break;
+                        case 'url':
+                        case 'image_url':
+                            $val = esc_url_raw( (string) $raw );
+                            break;
+                        case 'number':
+                            $val = is_numeric( $raw ) ? ( $raw + 0 ) : '';
+                            break;
+                        case 'select':
+                            $val = sanitize_text_field( (string) $raw );
+                            break;
+                        default:
+                            $val = sanitize_text_field( (string) $raw );
+                    }
+
+                    if ( $val === '' || $val === null ) {
+                        delete_post_meta( (int) $post_id, $meta_key );
+                    } else {
+                        update_post_meta( (int) $post_id, $meta_key, $val );
+                    }
+                }
+            }
+
             return new WP_REST_Response([
                 'success' => true,
                 'id' => (int) $post_id,
@@ -132,6 +187,36 @@ add_action('rest_api_init', function(){
         },
     ]);
 });
+
+function coffeebrk_core_get_bearer_token_from_rest_request( WP_REST_Request $req ) : string {
+    $auth = (string) $req->get_header( 'authorization' );
+    if ( $auth === '' ) {
+        $auth = (string) $req->get_header( 'Authorization' );
+    }
+    if ( $auth === '' ) {
+        $auth = (string) $req->get_header( 'x-coffeebrk-token' );
+    }
+
+    if ( $auth === '' ) {
+        return '';
+    }
+
+    if ( stripos( $auth, 'Bearer ' ) === 0 ) {
+        return trim( substr( $auth, 7 ) );
+    }
+
+    return trim( $auth );
+}
+
+function coffeebrk_core_api_token_is_valid( string $token ) : bool {
+    $token = trim( $token );
+    if ( $token === '' ) return false;
+
+    $hash = (string) get_option( 'coffeebrk_core_api_token_hash', '' );
+    if ( $hash === '' ) return false;
+
+    return password_verify( $token, $hash );
+}
 
 add_action( 'init', function(){
     add_feed( 'coffeebrk', 'coffeebrk_core_do_feed' );
