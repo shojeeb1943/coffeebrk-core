@@ -58,6 +58,15 @@ add_action('admin_menu', function() {
         'coffeebrk-core-logs',
         'coffeebrk_core_logs_page'
     );
+
+    add_submenu_page(
+        'coffeebrk-core',
+        'API',
+        'API',
+        'manage_options',
+        'coffeebrk-core-api',
+        'coffeebrk_core_api_page'
+    );
 });
 
 function coffeebrk_core_dashboard_page(){
@@ -68,6 +77,7 @@ function coffeebrk_core_dashboard_page(){
     $logs = admin_url('admin.php?page=coffeebrk-core-logs');
     $rss  = admin_url('admin.php?page=coffeebrk-core-rss');
     $json = admin_url('admin.php?page=coffeebrk-core-json-importer');
+    $api  = admin_url('admin.php?page=coffeebrk-core-api');
 
     $core_settings = (array) get_option( 'coffeebrk_core_settings', [] );
     $supabase_url_set = ! empty( $core_settings['supabase_url'] );
@@ -113,6 +123,7 @@ function coffeebrk_core_dashboard_page(){
         .'<a class="button" href="'.$logs.'">View Logs</a>'
         .'<a class="button" href="'.$rss.'">RSS Aggregator</a>'
         .'<a class="button" href="'.$json.'">JSON Articles Importer</a>'
+        .'<a class="button" href="'.$api.'">API</a>'
         .'</div></div>';
     echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">Status</h2>'
         .'<ul style="margin:0;padding-left:18px;">'
@@ -181,6 +192,7 @@ function coffeebrk_core_dashboard_page(){
     echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-dynfields</code></td><td>Capability: <code>manage_options</code></td></tr>';
     echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-aspires</code></td><td>Capability: <code>manage_options</code></td></tr>';
     echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-logs</code></td><td>Capability: <code>manage_options</code></td></tr>';
+    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-api</code></td><td>Capability: <code>manage_options</code></td></tr>';
     echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-rss</code></td><td>Capability: <code>manage_options</code>, actions via <code>admin-post.php</code> + nonces</td></tr>';
     echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-json-importer</code></td><td>Capability: <code>manage_options</code>, AJAX actions + nonce</td></tr>';
     echo '<tr><td>Admin Action</td><td><code>admin-post.php?action=coffeebrk_rss_save_feed</code></td><td>Capability: <code>manage_options</code>, nonce: <code>coffeebrk_rss_save_feed</code></td></tr>';
@@ -191,9 +203,65 @@ function coffeebrk_core_dashboard_page(){
     echo '<tr><td>AJAX</td><td><code>wp-admin/admin-ajax.php?action=cbk_json_articles_import_start</code></td><td>Logged-in admin, nonce: <code>cbk_json_articles_import</code></td></tr>';
     echo '<tr><td>AJAX</td><td><code>wp-admin/admin-ajax.php?action=cbk_json_articles_import_process</code></td><td>Logged-in admin, nonce: <code>cbk_json_articles_import</code></td></tr>';
     echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/feed</code></td><td>Requires logged-in user (<code>is_user_logged_in()</code>)</td></tr>';
+    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/site</code></td><td>Public endpoint</td></tr>';
+    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/submit</code></td><td>Requires logged-in user with <code>edit_posts</code></td></tr>';
     echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/supabase/login</code></td><td>Public endpoint; validates Supabase token server-side</td></tr>';
+    echo '<tr><td>RSS Feed</td><td><code>/feed/coffeebrk/</code> or <code>/?feed=coffeebrk</code></td><td>Public site RSS feed</td></tr>';
     echo '<tr><td>Cron Hook</td><td><code>coffeebrk_rss_import_all</code></td><td>Schedule: hourly; drafts posts from enabled feeds</td></tr>';
     echo '</tbody></table>';
+}
+
+function coffeebrk_core_api_page(){
+    if ( ! current_user_can( 'manage_options' ) ) return;
+
+    $site = home_url( '/' );
+    $rest_base = rest_url( 'coffeebrk/v1' );
+    $rss_pretty = home_url( '/feed/coffeebrk/' );
+    $rss_query = home_url( '/?feed=coffeebrk' );
+    $nonce = wp_create_nonce( 'wp_rest' );
+
+    echo '<div class="wrap">';
+    echo '<h1>API</h1>';
+    echo '<p style="max-width:980px;color:#555;">Use these endpoints to integrate CoffeeBrk with your site. All URLs below are relative to <code>' . esc_html( $site ) . '</code>.</p>';
+
+    echo '<h2>REST API</h2>';
+    echo '<table class="widefat striped"><thead><tr><th style="width:180px;">Method</th><th>Endpoint</th><th style="width:360px;">Auth</th></tr></thead><tbody>';
+    echo '<tr><td>GET</td><td><code>' . esc_html( $rest_base . '/site' ) . '</code></td><td>Public</td></tr>';
+    echo '<tr><td>GET</td><td><code>' . esc_html( $rest_base . '/feed' ) . '</code></td><td>Requires logged-in user (cookie auth)</td></tr>';
+    echo '<tr><td>POST</td><td><code>' . esc_html( $rest_base . '/submit' ) . '</code></td><td>Requires logged-in user with <code>edit_posts</code></td></tr>';
+    echo '<tr><td>POST</td><td><code>' . esc_html( $rest_base . '/supabase/login' ) . '</code></td><td>Public (Supabase token validation)</td></tr>';
+    echo '</tbody></table>';
+
+    echo '<h3 style="margin-top:18px;">Authentication</h3>';
+    echo '<p style="max-width:980px;color:#555;">For protected endpoints, use either:</p>';
+    echo '<ul style="max-width:980px;color:#555;list-style:disc;padding-left:20px;">'
+        .'<li>Cookie auth (same browser session) + header <code>X-WP-Nonce</code></li>'
+        .'<li>Application Password (Basic Auth) for server-to-server calls</li>'
+        .'</ul>';
+
+    echo '<p style="max-width:980px;color:#555;">Current admin REST nonce (for testing in your browser session): <code>' . esc_html( $nonce ) . '</code></p>';
+
+    echo '<h3 style="margin-top:18px;">Examples</h3>';
+    echo '<pre style="background:#111;color:#eee;padding:12px;border-radius:6px;overflow:auto;max-width:980px;">'
+        . esc_html(
+            "# Public\n" .
+            "curl -s \"{$rest_base}/site\"\n\n" .
+            "# Create a draft post (Application Password)\n" .
+            "curl -s -u USERNAME:APP_PASSWORD -H \"Content-Type: application/json\" \\\n+  -d '{\"title\":\"Hello\",\"content\":\"My content\",\"source_url\":\"https://example.com\"}' \\\n+  \"{$rest_base}/submit\"\n\n" .
+            "# Create a draft post (cookie auth + nonce)\n" .
+            "curl -s -H \"X-WP-Nonce: {$nonce}\" -H \"Content-Type: application/json\" \\\n+  -d '{\"title\":\"Hello\",\"content\":\"My content\"}' \\\n+  \"{$rest_base}/submit\"\n"
+        )
+        . '</pre>';
+
+    echo '<h2 style="margin-top:26px;">Site RSS Feed</h2>';
+    echo '<p style="max-width:980px;color:#555;">Public RSS feed of your latest published posts:</p>';
+    echo '<ul style="max-width:980px;color:#555;list-style:disc;padding-left:20px;">'
+        .'<li><code>' . esc_html( $rss_pretty ) . '</code></li>'
+        .'<li><code>' . esc_html( $rss_query ) . '</code></li>'
+        .'</ul>';
+    echo '<p style="max-width:980px;color:#555;">If you see a 404, go to <strong>Settings → Permalinks</strong> and click <strong>Save Changes</strong> once.</p>';
+
+    echo '</div>';
 }
 
 function coffeebrk_auth_settings_page(){
