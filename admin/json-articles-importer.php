@@ -3,6 +3,64 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 require_once COFFEEBRK_CORE_PATH . 'includes/importers/class-coffeebrk-json-articles-importer.php';
 
+function cbk_json_articles_importer_log_option_key() {
+    return 'cbk_json_articles_importer_log_history';
+}
+
+function cbk_json_articles_importer_get_history( $limit = 100 ) {
+    $limit = (int) $limit;
+    if ( $limit <= 0 ) {
+        $limit = 100;
+    }
+
+    $log = get_option( cbk_json_articles_importer_log_option_key(), [] );
+    if ( ! is_array( $log ) ) {
+        $log = [];
+    }
+
+    if ( count( $log ) > $limit ) {
+        $log = array_slice( $log, -1 * $limit );
+    }
+
+    return $log;
+}
+
+function cbk_json_articles_importer_append_history_rows( array $rows, $user_id ) {
+    $user_id = (int) $user_id;
+
+    $key = cbk_json_articles_importer_log_option_key();
+    if ( get_option( $key, null ) === null ) {
+        add_option( $key, [], '', 'no' );
+    }
+
+    $log = get_option( $key, [] );
+    if ( ! is_array( $log ) ) {
+        $log = [];
+    }
+
+    $now = time();
+    foreach ( $rows as $row ) {
+        if ( ! is_array( $row ) ) {
+            continue;
+        }
+
+        $log[] = [
+            'time' => $now,
+            'user_id' => $user_id,
+            'title' => isset( $row['title'] ) ? (string) $row['title'] : '',
+            'status' => isset( $row['status'] ) ? (string) $row['status'] : 'failed',
+            'reason' => isset( $row['reason'] ) ? (string) $row['reason'] : '',
+            'post_id' => isset( $row['post_id'] ) ? (int) $row['post_id'] : 0,
+        ];
+    }
+
+    if ( count( $log ) > 100 ) {
+        $log = array_slice( $log, -100 );
+    }
+
+    update_option( $key, $log, false );
+}
+
 add_action( 'admin_menu', function() {
     add_submenu_page(
         'coffeebrk-core',
@@ -109,7 +167,39 @@ function coffeebrk_core_json_importer_page() {
         .'<tbody></tbody>'
         .'</table>';
 
-    echo '<style>#cbk-import-log td{vertical-align:top;} #cbk-import-log .cbk-ok{color:#0a7b34;font-weight:600;} #cbk-import-log .cbk-skip{color:#8a6d3b;font-weight:600;} #cbk-import-log .cbk-fail{color:#b32d2e;font-weight:600;}</style>';
+    $history = cbk_json_articles_importer_get_history( 100 );
+    $history = array_reverse( $history );
+
+    echo '<h2 style="margin-top:28px;">Previous Logs (last 100)</h2>';
+    echo '<table class="widefat striped" id="cbk-import-history">'
+        .'<thead><tr><th style="width:170px;">Time</th><th>Title</th><th style="width:120px;">Status</th><th>Reason</th><th style="width:120px;">Post ID</th></tr></thead>'
+        .'<tbody>';
+
+    if ( ! empty( $history ) ) {
+        foreach ( $history as $h ) {
+            if ( ! is_array( $h ) ) {
+                continue;
+            }
+            $status = isset( $h['status'] ) ? (string) $h['status'] : 'failed';
+            $cls = $status === 'imported' ? 'cbk-ok' : ( $status === 'skipped' ? 'cbk-skip' : 'cbk-fail' );
+            $t = isset( $h['time'] ) ? (int) $h['time'] : 0;
+            $time_str = $t > 0 ? wp_date( 'Y-m-d H:i:s', $t ) : '';
+
+            echo '<tr>';
+            echo '<td>' . esc_html( $time_str ) . '</td>';
+            echo '<td>' . esc_html( isset( $h['title'] ) ? (string) $h['title'] : '' ) . '</td>';
+            echo '<td class="' . esc_attr( $cls ) . '">' . esc_html( $status ) . '</td>';
+            echo '<td>' . esc_html( isset( $h['reason'] ) ? (string) $h['reason'] : '' ) . '</td>';
+            echo '<td>' . esc_html( (string) ( isset( $h['post_id'] ) ? (int) $h['post_id'] : 0 ) ) . '</td>';
+            echo '</tr>';
+        }
+    } else {
+        echo '<tr><td colspan="5" style="color:#666;">No previous logs yet.</td></tr>';
+    }
+
+    echo '</tbody></table>';
+
+    echo '<style>#cbk-import-log td,#cbk-import-history td{vertical-align:top;} #cbk-import-log .cbk-ok,#cbk-import-history .cbk-ok{color:#0a7b34;font-weight:600;} #cbk-import-log .cbk-skip,#cbk-import-history .cbk-skip{color:#8a6d3b;font-weight:600;} #cbk-import-log .cbk-fail,#cbk-import-history .cbk-fail{color:#b32d2e;font-weight:600;}</style>';
 
     echo '<script>
 (function(){
@@ -503,6 +593,10 @@ add_action( 'wp_ajax_cbk_json_articles_import_process', function() {
             'reason' => $result['reason'] ?? '',
             'post_id' => (int) ( $result['post_id'] ?? 0 ),
         ];
+    }
+
+    if ( ! empty( $rows ) ) {
+        cbk_json_articles_importer_append_history_rows( $rows, get_current_user_id() );
     }
 
     $done = $end >= count( $items );
