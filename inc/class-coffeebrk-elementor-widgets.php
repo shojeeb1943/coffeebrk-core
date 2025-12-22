@@ -20,6 +20,15 @@ add_action( 'elementor/widgets/register', function( $widgets_manager ) {
     if ( class_exists( '\\Coffeebrk_News_Card_Widget' ) ) {
         $widgets_manager->register( new \Coffeebrk_News_Card_Widget() );
     }
+
+    $user_greeting = __DIR__ . '/widgets/class-coffeebrk-user-greeting-widget.php';
+    if ( file_exists( $user_greeting ) ) {
+        require_once $user_greeting;
+    }
+
+    if ( class_exists( '\\Coffeebrk_User_Greeting_Widget' ) ) {
+        $widgets_manager->register( new \Coffeebrk_User_Greeting_Widget() );
+    }
 } );
 
 // Backward compatibility for older Elementor versions
@@ -38,6 +47,11 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         require_once $news_card;
     }
 
+    $user_greeting = __DIR__ . '/widgets/class-coffeebrk-user-greeting-widget.php';
+    if ( file_exists( $user_greeting ) ) {
+        require_once $user_greeting;
+    }
+
     $plugin = \Elementor\Plugin::instance();
     if ( isset( $plugin->widgets_manager ) && method_exists( $plugin->widgets_manager, 'register_widget_type' ) ) {
         if ( class_exists( '\\Coffeebrk_External_Image_Widget' ) ) {
@@ -45,6 +59,9 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         }
         if ( class_exists( '\\Coffeebrk_News_Card_Widget' ) ) {
             $plugin->widgets_manager->register_widget_type( new \Coffeebrk_News_Card_Widget() );
+        }
+        if ( class_exists( '\\Coffeebrk_User_Greeting_Widget' ) ) {
+            $plugin->widgets_manager->register_widget_type( new \Coffeebrk_User_Greeting_Widget() );
         }
     }
 } );
