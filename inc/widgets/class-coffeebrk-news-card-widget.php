@@ -748,7 +748,7 @@ class Coffeebrk_News_Card_Widget extends Widget_Base {
         $link_target = $settings['link_target'] === 'yes' ? '_blank' : '_self';
 
         // Get content
-        $title = $this->get_title( $settings, $post_id );
+        $title = $this->get_card_title( $settings, $post_id );
         $description = $this->get_description( $settings, $post_id );
         $source_name = $this->get_source_name( $settings, $post_id );
         $date = $this->get_date( $settings, $post_id );
@@ -832,7 +832,7 @@ class Coffeebrk_News_Card_Widget extends Widget_Base {
         return $url ? esc_url( $url ) : '';
     }
 
-    private function get_title( $settings, $post_id ) {
+    private function get_card_title( $settings, $post_id ) {
         $source = $settings['title_source'] ?? 'post_title';
         $title = '';
 
