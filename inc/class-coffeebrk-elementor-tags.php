@@ -38,22 +38,36 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
             continue;
         }
 
-        $tag = new class($key, $label) extends \Elementor\Core\DynamicTags\Tag {
-            private $cbk_key; private $cbk_label;
-            public function __construct($k, $l){ $this->cbk_key = $k; $this->cbk_label = $l; }
-            public function get_name(){ return 'cbk_'. ltrim($this->cbk_key, '_'); }
-            public function get_title(){ return $this->cbk_label; }
-            public function get_group(){ return 'coffeebrk-meta'; }
-            public function get_categories(){
-                if ( class_exists('Elementor\\Modules\\DynamicTags\\Module') ) {
-                    return [ DynModule::TEXT_CATEGORY ];
+        // Create a unique class name for this dynamic field
+        $class_name = 'Coffeebrk_Dynamic_Field_Tag_' . str_replace('-', '_', sanitize_key($key));
+        
+        // Only define the class if it doesn't exist yet
+        if ( ! class_exists( $class_name ) ) {
+            eval("
+                class {$class_name} extends \\Elementor\\Core\\DynamicTags\\Tag {
+                    public function get_name() { 
+                        return 'cbk_" . ltrim($key, '_') . "'; 
+                    }
+                    public function get_title() { 
+                        return '" . addslashes($label) . "'; 
+                    }
+                    public function get_group() { 
+                        return 'coffeebrk-meta'; 
+                    }
+                    public function get_categories() {
+                        if ( class_exists('Elementor\\\\Modules\\\\DynamicTags\\\\Module') ) {
+                            return [ \\Elementor\\Modules\\DynamicTags\\Module::TEXT_CATEGORY ];
+                        }
+                        return [ 'text' ];
+                    }
+                    protected function register_controls() {}
+                    public function render() { 
+                        echo esc_html( get_post_meta( get_the_ID(), '" . addslashes($key) . "', true ) ); 
+                    }
                 }
-                // Fallback: return plain text category string if constant not available
-                return [ 'text' ];
-            }
-            protected function register_controls(){}
-            public function render(){ echo esc_html( get_post_meta( get_the_ID(), $this->cbk_key, true ) ); }
-        };
-        $dynamic_tags_manager->register( $tag );
+            ");
+        }
+        
+        $dynamic_tags_manager->register( new $class_name() );
     }
 });
