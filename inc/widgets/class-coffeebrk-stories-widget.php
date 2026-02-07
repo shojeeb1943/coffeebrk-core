@@ -1,0 +1,556 @@
+<?php
+/**
+ * Stories Widget for Elementor
+ * 
+ * Displays Instagram-style story cards with video playback
+ * 
+ * @package Coffeebrk_Core
+ */
+
+use Elementor\Widget_Base;
+use Elementor\Controls_Manager;
+use Elementor\Repeater;
+use Elementor\Group_Control_Typography;
+use Elementor\Group_Control_Box_Shadow;
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+class Coffeebrk_Stories_Widget extends Widget_Base {
+
+    public function get_name() {
+        return 'coffeebrk_stories';
+    }
+
+    public function get_title() {
+        return __( 'Coffeebrk Stories', 'coffeebrk-core' );
+    }
+
+    public function get_icon() {
+        return 'eicon-video-playlist';
+    }
+
+    public function get_categories() {
+        return [ 'coffeebrk' ];
+    }
+
+    public function get_keywords() {
+        return [ 'stories', 'video', 'instagram', 'youtube', 'vimeo', 'coffeebrk' ];
+    }
+
+    public function get_script_depends() {
+        return [ 'coffeebrk-stories' ];
+    }
+
+    public function get_style_depends() {
+        return [ 'coffeebrk-stories' ];
+    }
+
+    protected function register_controls() {
+        
+        // ============================================
+        // CONTENT TAB: Stories
+        // ============================================
+        $this->start_controls_section(
+            'section_stories',
+            [
+                'label' => __( 'Stories', 'coffeebrk-core' ),
+                'tab' => Controls_Manager::TAB_CONTENT,
+            ]
+        );
+
+        $repeater = new Repeater();
+
+        $repeater->add_control(
+            'story_title',
+            [
+                'label' => __( 'Title', 'coffeebrk-core' ),
+                'type' => Controls_Manager::TEXT,
+                'default' => __( 'Story Title', 'coffeebrk-core' ),
+                'placeholder' => __( 'Enter story title', 'coffeebrk-core' ),
+                'label_block' => true,
+            ]
+        );
+
+        $repeater->add_control(
+            'video_url',
+            [
+                'label' => __( 'Video URL', 'coffeebrk-core' ),
+                'type' => Controls_Manager::TEXT,
+                'placeholder' => __( 'https://youtube.com/watch?v=... or https://vimeo.com/...', 'coffeebrk-core' ),
+                'description' => __( 'YouTube, Vimeo, or direct video URL', 'coffeebrk-core' ),
+                'label_block' => true,
+            ]
+        );
+
+        $repeater->add_control(
+            'thumbnail',
+            [
+                'label' => __( 'Thumbnail Image', 'coffeebrk-core' ),
+                'type' => Controls_Manager::MEDIA,
+                'default' => [
+                    'url' => '',
+                ],
+            ]
+        );
+
+        $repeater->add_control(
+            'gradient_color',
+            [
+                'label' => __( 'Gradient Color', 'coffeebrk-core' ),
+                'type' => Controls_Manager::COLOR,
+                'default' => '#F5F5FF',
+                'description' => __( 'Bottom gradient and text shadow color', 'coffeebrk-core' ),
+            ]
+        );
+
+        $this->add_control(
+            'stories',
+            [
+                'label' => __( 'Stories', 'coffeebrk-core' ),
+                'type' => Controls_Manager::REPEATER,
+                'fields' => $repeater->get_controls(),
+                'default' => [
+                    [
+                        'story_title' => __( 'AI mania tanks CoreWeave\'s Core Scientific acquisition — it buys Python notebook Marimo', 'coffeebrk-core' ),
+                        'video_url' => 'https://youtu.be/ZT8690E-r6U',
+                        'gradient_color' => '#F5F5FF',
+                    ],
+                    [
+                        'story_title' => __( 'OpenAI launches GPT-5 with advanced reasoning capabilities', 'coffeebrk-core' ),
+                        'video_url' => 'https://youtu.be/ZT8690E-r6U',
+                        'gradient_color' => '#E7EDFF',
+                    ],
+                    [
+                        'story_title' => __( 'Microsoft announces $10B investment in cloud infrastructure', 'coffeebrk-core' ),
+                        'video_url' => 'https://youtu.be/ZT8690E-r6U',
+                        'gradient_color' => '#F1FDFF',
+                    ],
+                ],
+                'title_field' => '{{{ story_title }}}',
+            ]
+        );
+
+        $this->end_controls_section();
+
+        // ============================================
+        // CONTENT TAB: Container Settings
+        // ============================================
+        $this->start_controls_section(
+            'section_container',
+            [
+                'label' => __( 'Container Settings', 'coffeebrk-core' ),
+                'tab' => Controls_Manager::TAB_CONTENT,
+            ]
+        );
+
+        $this->add_responsive_control(
+            'cards_gap',
+            [
+                'label' => __( 'Gap Between Cards', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SLIDER,
+                'size_units' => [ 'px' ],
+                'range' => [
+                    'px' => [ 'min' => 0, 'max' => 50, 'step' => 1 ],
+                ],
+                'default' => [
+                    'unit' => 'px',
+                    'size' => 8,
+                ],
+                'selectors' => [
+                    '{{WRAPPER}} .cbk-stories' => 'gap: {{SIZE}}{{UNIT}};',
+                ],
+            ]
+        );
+
+        $this->add_control(
+            'enable_scroll',
+            [
+                'label' => __( 'Enable Horizontal Scroll', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SWITCHER,
+                'label_on' => __( 'Yes', 'coffeebrk-core' ),
+                'label_off' => __( 'No', 'coffeebrk-core' ),
+                'return_value' => 'yes',
+                'default' => 'yes',
+            ]
+        );
+
+        $this->end_controls_section();
+
+        // ============================================
+        // CONTENT TAB: Playback Settings
+        // ============================================
+        $this->start_controls_section(
+            'section_playback',
+            [
+                'label' => __( 'Playback Settings', 'coffeebrk-core' ),
+                'tab' => Controls_Manager::TAB_CONTENT,
+            ]
+        );
+
+        $this->add_control(
+            'autoplay',
+            [
+                'label' => __( 'Autoplay Videos', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SWITCHER,
+                'label_on' => __( 'Yes', 'coffeebrk-core' ),
+                'label_off' => __( 'No', 'coffeebrk-core' ),
+                'return_value' => 'yes',
+                'default' => 'yes',
+            ]
+        );
+
+        $this->add_control(
+            'loop',
+            [
+                'label' => __( 'Loop Videos', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SWITCHER,
+                'label_on' => __( 'Yes', 'coffeebrk-core' ),
+                'label_off' => __( 'No', 'coffeebrk-core' ),
+                'return_value' => 'yes',
+                'default' => '',
+            ]
+        );
+
+        $this->end_controls_section();
+
+        // ============================================
+        // STYLE TAB: Card
+        // ============================================
+        $this->start_controls_section(
+            'section_card_style',
+            [
+                'label' => __( 'Card', 'coffeebrk-core' ),
+                'tab' => Controls_Manager::TAB_STYLE,
+            ]
+        );
+
+        $this->add_responsive_control(
+            'card_width',
+            [
+                'label' => __( 'Width', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SLIDER,
+                'size_units' => [ 'px' ],
+                'range' => [
+                    'px' => [ 'min' => 100, 'max' => 300, 'step' => 1 ],
+                ],
+                'default' => [
+                    'unit' => 'px',
+                    'size' => 166,
+                ],
+                'selectors' => [
+                    '{{WRAPPER}} .cbk-stories__card' => 'width: {{SIZE}}{{UNIT}}; min-width: {{SIZE}}{{UNIT}};',
+                ],
+            ]
+        );
+
+        $this->add_responsive_control(
+            'card_height',
+            [
+                'label' => __( 'Height', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SLIDER,
+                'size_units' => [ 'px' ],
+                'range' => [
+                    'px' => [ 'min' => 150, 'max' => 500, 'step' => 1 ],
+                ],
+                'default' => [
+                    'unit' => 'px',
+                    'size' => 300,
+                ],
+                'selectors' => [
+                    '{{WRAPPER}} .cbk-stories__card' => 'height: {{SIZE}}{{UNIT}};',
+                ],
+            ]
+        );
+
+        $this->add_control(
+            'card_border_radius',
+            [
+                'label' => __( 'Border Radius', 'coffeebrk-core' ),
+                'type' => Controls_Manager::DIMENSIONS,
+                'size_units' => [ 'px', '%' ],
+                'default' => [
+                    'top' => 12,
+                    'right' => 12,
+                    'bottom' => 12,
+                    'left' => 12,
+                    'unit' => 'px',
+                ],
+                'selectors' => [
+                    '{{WRAPPER}} .cbk-stories__card' => 'border-radius: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+                ],
+            ]
+        );
+
+        $this->add_group_control(
+            Group_Control_Box_Shadow::get_type(),
+            [
+                'name' => 'card_box_shadow',
+                'selector' => '{{WRAPPER}} .cbk-stories__card',
+                'fields_options' => [
+                    'box_shadow_type' => [
+                        'default' => 'yes',
+                    ],
+                    'box_shadow' => [
+                        'default' => [
+                            'horizontal' => 4,
+                            'vertical' => 4,
+                            'blur' => 24,
+                            'spread' => 0,
+                            'color' => 'rgba(0, 0, 0, 0.02)',
+                        ],
+                    ],
+                ],
+            ]
+        );
+
+        $this->add_control(
+            'card_border_color',
+            [
+                'label' => __( 'Border Color', 'coffeebrk-core' ),
+                'type' => Controls_Manager::COLOR,
+                'default' => '#DEDEDE',
+                'selectors' => [
+                    '{{WRAPPER}} .cbk-stories__card' => 'border: 1px solid {{VALUE}};',
+                ],
+            ]
+        );
+
+        $this->end_controls_section();
+
+        // ============================================
+        // STYLE TAB: Title
+        // ============================================
+        $this->start_controls_section(
+            'section_title_style',
+            [
+                'label' => __( 'Title', 'coffeebrk-core' ),
+                'tab' => Controls_Manager::TAB_STYLE,
+            ]
+        );
+
+        $this->add_group_control(
+            Group_Control_Typography::get_type(),
+            [
+                'name' => 'title_typography',
+                'selector' => '{{WRAPPER}} .cbk-stories__title',
+                'fields_options' => [
+                    'typography' => [
+                        'default' => 'yes',
+                    ],
+                    'font_family' => [
+                        'default' => 'Poppins',
+                    ],
+                    'font_size' => [
+                        'default' => [
+                            'unit' => 'px',
+                            'size' => 12,
+                        ],
+                    ],
+                    'font_weight' => [
+                        'default' => '500',
+                    ],
+                    'line_height' => [
+                        'default' => [
+                            'unit' => 'px',
+                            'size' => 16,
+                        ],
+                    ],
+                ],
+            ]
+        );
+
+        $this->add_control(
+            'title_color',
+            [
+                'label' => __( 'Color', 'coffeebrk-core' ),
+                'type' => Controls_Manager::COLOR,
+                'default' => '#323232',
+                'selectors' => [
+                    '{{WRAPPER}} .cbk-stories__title' => 'color: {{VALUE}};',
+                ],
+            ]
+        );
+
+        $this->add_responsive_control(
+            'content_padding',
+            [
+                'label' => __( 'Content Padding', 'coffeebrk-core' ),
+                'type' => Controls_Manager::DIMENSIONS,
+                'size_units' => [ 'px', 'em' ],
+                'default' => [
+                    'top' => 16,
+                    'right' => 12,
+                    'bottom' => 16,
+                    'left' => 12,
+                    'unit' => 'px',
+                ],
+                'selectors' => [
+                    '{{WRAPPER}} .cbk-stories__content' => 'padding: {{TOP}}{{UNIT}} {{RIGHT}}{{UNIT}} {{BOTTOM}}{{UNIT}} {{LEFT}}{{UNIT}};',
+                ],
+            ]
+        );
+
+        $this->end_controls_section();
+    }
+
+    protected function render() {
+        $settings = $this->get_settings_for_display();
+        $stories = $settings['stories'] ?? [];
+        
+        if ( empty( $stories ) ) {
+            return;
+        }
+
+        $autoplay = $settings['autoplay'] === 'yes' ? 'true' : 'false';
+        $loop = $settings['loop'] === 'yes' ? 'true' : 'false';
+        $scroll_class = $settings['enable_scroll'] === 'yes' ? 'cbk-stories--scrollable' : '';
+        
+        ?>
+        <div class="cbk-stories <?php echo esc_attr( $scroll_class ); ?>" 
+             data-autoplay="<?php echo esc_attr( $autoplay ); ?>"
+             data-loop="<?php echo esc_attr( $loop ); ?>">
+            <?php foreach ( $stories as $index => $story ) : 
+                $thumbnail_url = ! empty( $story['thumbnail']['url'] ) ? $story['thumbnail']['url'] : '';
+                $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '#F5F5FF';
+                $video_url = ! empty( $story['video_url'] ) ? $story['video_url'] : '';
+                $title = ! empty( $story['story_title'] ) ? $story['story_title'] : '';
+                
+                // Generate gradient with the selected color
+                $gradient_rgba_50 = $this->hex_to_rgba( $gradient_color, 0.5 );
+                $gradient_rgba_90 = $this->hex_to_rgba( $gradient_color, 0.9 );
+                
+                // Calculate shadow color (slightly darker version of gradient)
+                $shadow_color = $this->darken_color( $gradient_color, 20 );
+            ?>
+            <div class="cbk-stories__card" 
+                 data-story-index="<?php echo esc_attr( $index ); ?>"
+                 data-video-url="<?php echo esc_attr( $video_url ); ?>"
+                 style="--gradient-color: <?php echo esc_attr( $gradient_color ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>;">
+                
+                <?php if ( $thumbnail_url ) : ?>
+                <div class="cbk-stories__thumbnail" 
+                     data-src="<?php echo esc_url( $thumbnail_url ); ?>"
+                     style="background-image: url('<?php echo esc_url( $thumbnail_url ); ?>');"></div>
+                <?php else : ?>
+                <div class="cbk-stories__thumbnail cbk-stories__thumbnail--placeholder"></div>
+                <?php endif; ?>
+                
+                <div class="cbk-stories__gradient" 
+                     style="background: linear-gradient(180deg, 
+                        rgba(245, 245, 255, 0) 34.08%, 
+                        <?php echo esc_attr( $gradient_rgba_50 ); ?> 52.25%, 
+                        <?php echo esc_attr( $gradient_rgba_90 ); ?> 54.85%, 
+                        <?php echo esc_attr( $gradient_color ); ?> 81.44%);"></div>
+                
+                <div class="cbk-stories__content">
+                    <?php if ( $title ) : ?>
+                    <div class="cbk-stories__title"><?php echo esc_html( $title ); ?></div>
+                    <?php endif; ?>
+                </div>
+                
+                <div class="cbk-stories__play-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="2" fill="rgba(255,255,255,0.9)"/>
+                        <path d="M10 8L16 12L10 16V8Z" fill="currentColor"/>
+                    </svg>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        
+        <!-- Story Viewer Modal (rendered once, controlled via JS) -->
+        <div class="cbk-stories-viewer" id="cbk-stories-viewer-<?php echo esc_attr( $this->get_id() ); ?>" style="display: none;">
+            <div class="cbk-stories-viewer__overlay"></div>
+            <button class="cbk-stories-viewer__close" aria-label="<?php esc_attr_e( 'Close', 'coffeebrk-core' ); ?>">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </button>
+            <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--prev" aria-label="<?php esc_attr_e( 'Previous', 'coffeebrk-core' ); ?>">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <div class="cbk-stories-viewer__content">
+                <div class="cbk-stories-viewer__video-container"></div>
+            </div>
+            <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--next" aria-label="<?php esc_attr_e( 'Next', 'coffeebrk-core' ); ?>">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        <?php
+    }
+
+    /**
+     * Convert hex color to rgba
+     */
+    private function hex_to_rgba( $hex, $alpha = 1 ) {
+        $hex = str_replace( '#', '', $hex );
+        
+        if ( strlen( $hex ) === 3 ) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+        }
+        
+        $r = hexdec( substr( $hex, 0, 2 ) );
+        $g = hexdec( substr( $hex, 2, 2 ) );
+        $b = hexdec( substr( $hex, 4, 2 ) );
+        
+        return "rgba({$r}, {$g}, {$b}, {$alpha})";
+    }
+
+    /**
+     * Darken a hex color by a percentage
+     */
+    private function darken_color( $hex, $percent ) {
+        $hex = str_replace( '#', '', $hex );
+        
+        if ( strlen( $hex ) === 3 ) {
+            $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+        }
+        
+        $r = max( 0, hexdec( substr( $hex, 0, 2 ) ) - ( 255 * $percent / 100 ) );
+        $g = max( 0, hexdec( substr( $hex, 2, 2 ) ) - ( 255 * $percent / 100 ) );
+        $b = max( 0, hexdec( substr( $hex, 4, 2 ) ) - ( 255 * $percent / 100 ) );
+        
+        return "rgba(" . round($r) . ", " . round($g) . ", " . round($b) . ", 0.5)";
+    }
+
+    protected function content_template() {
+        ?>
+        <#
+        var scrollClass = settings.enable_scroll === 'yes' ? 'cbk-stories--scrollable' : '';
+        #>
+        <div class="cbk-stories {{{ scrollClass }}}">
+            <# _.each( settings.stories, function( story, index ) { 
+                var thumbnailUrl = story.thumbnail && story.thumbnail.url ? story.thumbnail.url : '';
+                var gradientColor = story.gradient_color || '#F5F5FF';
+            #>
+            <div class="cbk-stories__card" style="--gradient-color: {{{ gradientColor }}};">
+                <# if ( thumbnailUrl ) { #>
+                <div class="cbk-stories__thumbnail" style="background-image: url('{{{ thumbnailUrl }}}');"></div>
+                <# } else { #>
+                <div class="cbk-stories__thumbnail cbk-stories__thumbnail--placeholder"></div>
+                <# } #>
+                
+                <div class="cbk-stories__gradient"></div>
+                
+                <div class="cbk-stories__content">
+                    <# if ( story.story_title ) { #>
+                    <div class="cbk-stories__title">{{{ story.story_title }}}</div>
+                    <# } #>
+                </div>
+                
+                <div class="cbk-stories__play-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="2" fill="rgba(255,255,255,0.9)"/>
+                        <path d="M10 8L16 12L10 16V8Z" fill="currentColor"/>
+                    </svg>
+                </div>
+            </div>
+            <# }); #>
+        </div>
+        <?php
+    }
+}

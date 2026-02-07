@@ -1,0 +1,329 @@
+/**
+ * Coffeebrk Stories Widget Styles
+ * 
+ * Instagram-style story cards with gradient overlays
+ */
+
+/* ============================================
+   Stories Container
+   ============================================ */
+.cbk-stories {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0;
+    width: 100%;
+}
+
+.cbk-stories--scrollable {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.cbk-stories--scrollable::-webkit-scrollbar {
+    height: 6px;
+}
+
+.cbk-stories--scrollable::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.cbk-stories--scrollable::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.cbk-stories--scrollable::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Story Card
+   ============================================ */
+.cbk-stories__card {
+    position: relative;
+    box-sizing: border-box;
+    flex: none;
+    overflow: hidden;
+    background: #ffffff;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.cbk-stories__card:hover {
+    transform: translateY(-4px);
+    box-shadow: 4px 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================
+   Thumbnail
+   ============================================ */
+.cbk-stories__thumbnail {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: 1;
+}
+
+.cbk-stories__thumbnail--placeholder {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* ============================================
+   Gradient Overlay
+   ============================================ */
+.cbk-stories__gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+    /* Default gradient - will be overridden inline */
+    background: linear-gradient(180deg,
+            rgba(245, 245, 255, 0) 34.08%,
+            rgba(245, 245, 255, 0.637463) 52.25%,
+            rgba(245, 245, 255, 0.9) 54.85%,
+            #F5F5FF 81.44%);
+}
+
+/* ============================================
+   Content Area
+   ============================================ */
+.cbk-stories__content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.cbk-stories__title {
+    margin: 0;
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-style: normal;
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 16px;
+    color: #323232;
+    /* Dynamic text shadow based on gradient color */
+    text-shadow: 0 1px 3px var(--shadow-color, rgba(0, 0, 0, 0.1));
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    line-clamp: 5;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ============================================
+   Play Icon
+   ============================================ */
+.cbk-stories__play-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    color: #323232;
+}
+
+.cbk-stories__card:hover .cbk-stories__play-icon {
+    opacity: 1;
+}
+
+/* ============================================
+   Story Viewer Modal
+   ============================================ */
+.cbk-stories-viewer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cbk-stories-viewer__overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 1;
+}
+
+.cbk-stories-viewer__content {
+    position: relative;
+    z-index: 2;
+    max-width: 90vw;
+    max-height: 90vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cbk-stories-viewer__video-container {
+    width: 100%;
+    max-width: 800px;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.cbk-stories-viewer__video-container iframe,
+.cbk-stories-viewer__video-container video {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+
+/* Close Button */
+.cbk-stories-viewer__close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+    width: 48px;
+    height: 48px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.cbk-stories-viewer__close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+/* Navigation Buttons */
+.cbk-stories-viewer__nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    width: 48px;
+    height: 48px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    transition: background 0.3s ease, opacity 0.3s ease;
+}
+
+.cbk-stories-viewer__nav:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.cbk-stories-viewer__nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.cbk-stories-viewer__nav--prev {
+    left: 20px;
+}
+
+.cbk-stories-viewer__nav--next {
+    right: 20px;
+}
+
+/* ============================================
+   Responsive Styles
+   ============================================ */
+@media (max-width: 768px) {
+    .cbk-stories__card {
+        width: 140px !important;
+        min-width: 140px !important;
+        height: 250px !important;
+    }
+
+    .cbk-stories__title {
+        font-size: 11px;
+        line-height: 14px;
+        -webkit-line-clamp: 4;
+        line-clamp: 4;
+    }
+
+    .cbk-stories-viewer__nav {
+        width: 40px;
+        height: 40px;
+    }
+
+    .cbk-stories-viewer__nav--prev {
+        left: 10px;
+    }
+
+    .cbk-stories-viewer__nav--next {
+        right: 10px;
+    }
+
+    .cbk-stories-viewer__close {
+        top: 10px;
+        right: 10px;
+        width: 40px;
+        height: 40px;
+    }
+
+    .cbk-stories-viewer__video-container {
+        max-width: 95vw;
+    }
+}
+
+@media (max-width: 480px) {
+    .cbk-stories__card {
+        width: 120px !important;
+        min-width: 120px !important;
+        height: 200px !important;
+    }
+
+    .cbk-stories__title {
+        font-size: 10px;
+        line-height: 13px;
+        -webkit-line-clamp: 3;
+        line-clamp: 3;
+    }
+
+    .cbk-stories__content {
+        padding: 10px 8px;
+    }
+}
+
+/* ============================================
+   Elementor Editor Preview Styles
+   ============================================ */
+.elementor-editor-active .cbk-stories__play-icon {
+    opacity: 0.5;
+}

@@ -29,6 +29,15 @@ add_action( 'elementor/widgets/register', function( $widgets_manager ) {
     if ( class_exists( '\\Coffeebrk_User_Greeting_Widget' ) ) {
         $widgets_manager->register( new \Coffeebrk_User_Greeting_Widget() );
     }
+
+    $stories = __DIR__ . '/widgets/class-coffeebrk-stories-widget.php';
+    if ( file_exists( $stories ) ) {
+        require_once $stories;
+    }
+
+    if ( class_exists( '\\Coffeebrk_Stories_Widget' ) ) {
+        $widgets_manager->register( new \Coffeebrk_Stories_Widget() );
+    }
 } );
 
 // Backward compatibility for older Elementor versions
@@ -52,6 +61,11 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         require_once $user_greeting;
     }
 
+    $stories = __DIR__ . '/widgets/class-coffeebrk-stories-widget.php';
+    if ( file_exists( $stories ) ) {
+        require_once $stories;
+    }
+
     $plugin = \Elementor\Plugin::instance();
     if ( isset( $plugin->widgets_manager ) && method_exists( $plugin->widgets_manager, 'register_widget_type' ) ) {
         if ( class_exists( '\\Coffeebrk_External_Image_Widget' ) ) {
@@ -63,6 +77,9 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         if ( class_exists( '\\Coffeebrk_User_Greeting_Widget' ) ) {
             $plugin->widgets_manager->register_widget_type( new \Coffeebrk_User_Greeting_Widget() );
         }
+        if ( class_exists( '\\Coffeebrk_Stories_Widget' ) ) {
+            $plugin->widgets_manager->register_widget_type( new \Coffeebrk_Stories_Widget() );
+        }
     }
 } );
 
@@ -73,6 +90,24 @@ add_action( 'elementor/frontend/after_enqueue_styles', function() {
         COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-news-card.css',
         [],
         '1.0.0'
+    );
+    
+    wp_enqueue_style(
+        'coffeebrk-stories',
+        COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-stories.css',
+        [],
+        '1.0.0'
+    );
+} );
+
+// Enqueue widget scripts
+add_action( 'elementor/frontend/after_enqueue_scripts', function() {
+    wp_enqueue_script(
+        'coffeebrk-stories',
+        COFFEEBRK_CORE_URL . 'assets/js/coffeebrk-stories.js',
+        [],
+        '1.0.0',
+        true
     );
 } );
 
