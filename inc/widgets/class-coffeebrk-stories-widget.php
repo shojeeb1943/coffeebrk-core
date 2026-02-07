@@ -12,6 +12,7 @@ use Elementor\Controls_Manager;
 use Elementor\Repeater;
 use Elementor\Group_Control_Typography;
 use Elementor\Group_Control_Box_Shadow;
+use Elementor\Group_Control_Text_Shadow;
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
@@ -415,6 +416,14 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
             ]
         );
 
+        $this->add_group_control(
+            Group_Control_Text_Shadow::get_type(),
+            [
+                'name' => 'title_text_shadow',
+                'selector' => '{{WRAPPER}} .cbk-stories__title',
+            ]
+        );
+
         $this->add_responsive_control(
             'content_padding',
             [
@@ -462,12 +471,14 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                     
                     $video_url = get_post_meta( $post->ID, '_cbk_story_video_url', true );
                     $gradient = get_post_meta( $post->ID, '_cbk_story_gradient', true );
+                    $text_color = get_post_meta( $post->ID, '_cbk_story_text_color', true );
                     
                     $stories[] = [
                         'story_title' => $post->post_title,
                         'video_url' => $video_url,
                         'thumbnail' => [ 'url' => $thumb_url ],
                         'gradient_color' => $gradient,
+                        'text_color' => $text_color,
                     ];
                 }
             }
@@ -492,6 +503,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '#F5F5FF';
                 $video_url = ! empty( $story['video_url'] ) ? $story['video_url'] : '';
                 $title = ! empty( $story['story_title'] ) ? $story['story_title'] : '';
+                $text_color = ! empty( $story['text_color'] ) ? $story['text_color'] : '';
+                $text_color_style = $text_color ? 'color: ' . esc_attr( $text_color ) . ';' : '';
                 
                 // Generate gradient with the selected color
                 $gradient_rgba_50 = $this->hex_to_rgba( $gradient_color, 0.5 );
@@ -522,7 +535,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 
                 <div class="cbk-stories__content">
                     <?php if ( $title ) : ?>
-                    <div class="cbk-stories__title"><?php echo esc_html( $title ); ?></div>
+                    <div class="cbk-stories__title" style="<?php echo $text_color_style; ?>"><?php echo esc_html( $title ); ?></div>
                     <?php endif; ?>
                 </div>
                 
@@ -550,7 +563,12 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 </svg>
             </button>
             <div class="cbk-stories-viewer__content">
-                <div class="cbk-stories-viewer__video-container"></div>
+                <div class="cbk-stories-viewer__item cbk-stories-viewer__item--prev"></div>
+                <div class="cbk-stories-viewer__item cbk-stories-viewer__item--current">
+                    <div class="cbk-stories-viewer__video-container"></div>
+                    <div class="cbk-stories-viewer__info"></div>
+                </div>
+                <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next"></div>
             </div>
             <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--next" aria-label="<?php esc_attr_e( 'Next', 'coffeebrk-core' ); ?>">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

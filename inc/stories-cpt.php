@@ -58,10 +58,15 @@ function cbk_story_details_callback( $post ) {
     // Get current values
     $video_url = get_post_meta( $post->ID, '_cbk_story_video_url', true );
     $gradient  = get_post_meta( $post->ID, '_cbk_story_gradient', true );
+    $text_color = get_post_meta( $post->ID, '_cbk_story_text_color', true );
     
     // Default gradient if empty
     if ( empty( $gradient ) ) {
         $gradient = '#F5F5FF';
+    }
+    // Default text color if empty
+    if ( empty( $text_color ) ) {
+        $text_color = '#323232';
     }
     ?>
     <p>
@@ -74,6 +79,12 @@ function cbk_story_details_callback( $post ) {
         <label for="cbk_story_gradient"><strong><?php _e( 'Gradient Overlay Color', 'coffeebrk-core' ); ?></strong></label><br>
         <input type="color" id="cbk_story_gradient" name="cbk_story_gradient" value="<?php echo esc_attr( $gradient ); ?>">
         <span class="description"><?php _e( 'Select the base color for the gradient overlay.', 'coffeebrk-core' ); ?></span>
+    </p>
+
+    <p>
+        <label for="cbk_story_text_color"><strong><?php _e( 'Text Color', 'coffeebrk-core' ); ?></strong></label><br>
+        <input type="color" id="cbk_story_text_color" name="cbk_story_text_color" value="<?php echo esc_attr( $text_color ); ?>">
+        <span class="description"><?php _e( 'Override the text color for this story title.', 'coffeebrk-core' ); ?></span>
     </p>
     <?php
 }
@@ -105,6 +116,11 @@ add_action( 'save_post', function( $post_id ) {
     // Save Gradient
     if ( isset( $_POST['cbk_story_gradient'] ) ) {
         update_post_meta( $post_id, '_cbk_story_gradient', sanitize_hex_color( $_POST['cbk_story_gradient'] ) );
+    }
+
+    // Save Text Color
+    if ( isset( $_POST['cbk_story_text_color'] ) ) {
+        update_post_meta( $post_id, '_cbk_story_text_color', sanitize_hex_color( $_POST['cbk_story_text_color'] ) );
     }
 });
 
