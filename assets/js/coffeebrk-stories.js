@@ -153,6 +153,18 @@
             this.currentIndex = index;
             this.stories = Array.from(container.querySelectorAll('.cbk-stories__card'));
 
+            // Re-read settings from this specific container (important for multiple widgets)
+            this.autoplay = container.dataset.autoplay === 'true';
+            this.loop = container.dataset.loop === 'true';
+            this.startMuted = container.dataset.muted === 'yes';
+
+            console.log('[Stories] Opening viewer with settings:', {
+                autoplay: this.autoplay,
+                loop: this.loop,
+                startMuted: this.startMuted,
+                dataMuted: container.dataset.muted
+            });
+
             const widgetId = container.closest('[data-id]')?.dataset.id || 'default';
             this.viewer = document.getElementById(`cbk-stories-viewer-${widgetId}`);
 
@@ -319,7 +331,8 @@
                         videoId: videoId,
                         width: '100%', height: '100%',
                         playerVars: {
-                            'autoplay': 0,
+                            'autoplay': this.autoplay ? 1 : 0,
+                            'mute': this.startMuted ? 1 : 0,
                             'controls': 1,
                             'rel': 0,
                             'playsinline': 1,
