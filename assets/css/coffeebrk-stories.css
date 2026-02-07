@@ -193,13 +193,14 @@
     background: #111;
 }
 
-/* Side Previews */
+/* Side Previews - Instagram Style */
 .cbk-stories-viewer__item--prev,
 .cbk-stories-viewer__item--next {
-    width: 250px;
-    height: 60vh;
-    opacity: 0.4;
-    transform: scale(0.9);
+    width: 140px;
+    height: 45vh;
+    max-height: 380px;
+    opacity: 0.5;
+    transform: scale(0.85);
     flex-shrink: 0;
     pointer-events: auto;
     background-size: cover;
@@ -207,12 +208,14 @@
     background-repeat: no-repeat;
     display: none;
     /* Hidden by default on mobile */
+    transition: all 0.3s ease;
+    border-radius: 16px;
 }
 
 .cbk-stories-viewer__item--prev:hover,
 .cbk-stories-viewer__item--next:hover {
-    opacity: 0.6;
-    transform: scale(0.92);
+    opacity: 0.7;
+    transform: scale(0.88);
 }
 
 @media (min-width: 1024px) {
@@ -223,16 +226,17 @@
     }
 }
 
-/* Current Story (Center) */
+/* Current Story (Center) - Full Height Like Shorts/Reels */
 .cbk-stories-viewer__item--current {
     width: 100%;
-    max-width: 450px;
-    /* Mobile width constraint */
-    height: 85vh;
-    max-height: 800px;
+    max-width: 420px;
+    /* Phone-like aspect ratio */
+    height: 92vh;
+    max-height: 900px;
     flex-shrink: 0;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 15px 60px rgba(0, 0, 0, 0.6);
     background: #000;
+    border-radius: 16px;
 }
 
 .cbk-stories-viewer__video-container {
@@ -350,7 +354,7 @@
     }
 
     .cbk-stories-viewer__video-container {
-        /* Mobile adjustment handled by max-width */
+        border-radius: 16px;
     }
 }
 

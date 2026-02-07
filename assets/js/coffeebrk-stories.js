@@ -57,7 +57,99 @@
                 card.addEventListener('click', () => {
                     this.openViewer(container, index);
                 });
+
+                // Auto-detect gradient color if not set
+                if (card.classList.contains('cbk-stories__card--auto-gradient')) {
+                    this.applyAutoGradient(card);
+                }
             });
+        }
+
+        applyAutoGradient(card) {
+            const thumbUrl = card.dataset.thumbUrl;
+            const intensity = parseInt(card.dataset.intensity) || 50;
+            const gradientEl = card.querySelector('.cbk-stories__gradient--auto');
+
+            if (!thumbUrl || !gradientEl) return;
+
+            const img = new Image();
+            img.crossOrigin = 'Anonymous';
+            img.onload = () => {
+                const color = this.extractDominantColor(img);
+                if (color) {
+                    card.style.setProperty('--gradient-color', color);
+                    // Calculate gradient stops based on intensity
+                    const startPercent = 100 - intensity;
+                    const midPercent = 100 - (intensity * 0.5);
+                    const highPercent = 100 - (intensity * 0.2);
+                    const intensityFactor = intensity / 100;
+
+                    gradientEl.style.background = `linear-gradient(180deg, 
+                        rgba(245, 245, 255, 0) ${startPercent}%, 
+                        ${this.hexToRgba(color, 0.5 * intensityFactor)} ${midPercent}%, 
+                        ${this.hexToRgba(color, 0.9 * intensityFactor)} ${highPercent}%, 
+                        ${color} 100%)`;
+                }
+            };
+            img.onerror = () => {
+                // Fallback to a neutral gradient
+                gradientEl.style.background = 'linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)';
+            };
+            img.src = thumbUrl;
+        }
+
+        extractDominantColor(img) {
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Sample from the bottom third of the image (where gradient appears)
+                const sampleHeight = Math.floor(img.height / 3);
+                canvas.width = 50; // Small sample for performance
+                canvas.height = sampleHeight;
+
+                ctx.drawImage(img, 0, img.height - sampleHeight, img.width, sampleHeight, 0, 0, 50, sampleHeight);
+
+                const imageData = ctx.getImageData(0, 0, 50, sampleHeight);
+                const data = imageData.data;
+
+                let r = 0, g = 0, b = 0, count = 0;
+
+                // Sample every 4th pixel for performance
+                for (let i = 0; i < data.length; i += 16) {
+                    r += data[i];
+                    g += data[i + 1];
+                    b += data[i + 2];
+                    count++;
+                }
+
+                r = Math.round(r / count);
+                g = Math.round(g / count);
+                b = Math.round(b / count);
+
+                return this.rgbToHex(r, g, b);
+            } catch (e) {
+                console.warn('Could not extract color from image:', e);
+                return null;
+            }
+        }
+
+        rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        hexToRgba(hex, alpha) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            if (result) {
+                const r = parseInt(result[1], 16);
+                const g = parseInt(result[2], 16);
+                const b = parseInt(result[3], 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            }
+            return `rgba(128, 128, 128, ${alpha})`;
         }
 
         openViewer(container, index) {

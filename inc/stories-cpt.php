@@ -68,17 +68,34 @@ function cbk_story_details_callback( $post ) {
     if ( empty( $text_color ) ) {
         $text_color = '#323232';
     }
+
+    // Get gradient intensity
+    $gradient_intensity = get_post_meta( $post->ID, '_cbk_story_gradient_intensity', true );
+    if ( $gradient_intensity === '' ) {
+        $gradient_intensity = 50; // Default 50%
+    }
     ?>
     <p>
         <label for="cbk_story_video_url"><strong><?php _e( 'Video URL', 'coffeebrk-core' ); ?></strong></label><br>
-        <input type="url" id="cbk_story_video_url" name="cbk_story_video_url" value="<?php echo esc_attr( $video_url ); ?>" class="widefat" placeholder="https://youtube.com/watch?v=...">
-        <span class="description"><?php _e( 'Enter YouTube, Vimeo, or direct MP4 URL.', 'coffeebrk-core' ); ?></span>
+        <input type="url" id="cbk_story_video_url" name="cbk_story_video_url" value="<?php echo esc_attr( $video_url ); ?>" class="widefat" placeholder="https://www.youtube.com/watch?v=...">
+        <span class="description"><?php _e( 'Enter YouTube, Vimeo, or direct video URL.', 'coffeebrk-core' ); ?></span>
     </p>
 
     <p>
         <label for="cbk_story_gradient"><strong><?php _e( 'Gradient Overlay Color', 'coffeebrk-core' ); ?></strong></label><br>
         <input type="color" id="cbk_story_gradient" name="cbk_story_gradient" value="<?php echo esc_attr( $gradient ); ?>">
-        <span class="description"><?php _e( 'Select the base color for the gradient overlay.', 'coffeebrk-core' ); ?></span>
+        <span class="description"><?php _e( 'Leave default for auto-detect from thumbnail.', 'coffeebrk-core' ); ?></span>
+    </p>
+
+    <p>
+        <label for="cbk_story_gradient_intensity"><strong><?php _e( 'Gradient Intensity', 'coffeebrk-core' ); ?></strong></label><br>
+        <input type="range" id="cbk_story_gradient_intensity" name="cbk_story_gradient_intensity" min="0" max="100" value="<?php echo esc_attr( $gradient_intensity ); ?>" style="width: 200px;">
+        <span id="cbk_gradient_intensity_value"><?php echo esc_html( $gradient_intensity ); ?>%</span>
+        <script>
+            document.getElementById('cbk_story_gradient_intensity').addEventListener('input', function() {
+                document.getElementById('cbk_gradient_intensity_value').textContent = this.value + '%';
+            });
+        </script>
     </p>
 
     <p>
@@ -121,6 +138,13 @@ add_action( 'save_post', function( $post_id ) {
     // Save Text Color
     if ( isset( $_POST['cbk_story_text_color'] ) ) {
         update_post_meta( $post_id, '_cbk_story_text_color', sanitize_hex_color( $_POST['cbk_story_text_color'] ) );
+    }
+
+    // Save Gradient Intensity
+    if ( isset( $_POST['cbk_story_gradient_intensity'] ) ) {
+        $intensity = intval( $_POST['cbk_story_gradient_intensity'] );
+        $intensity = max( 0, min( 100, $intensity ) ); // Clamp 0-100
+        update_post_meta( $post_id, '_cbk_story_gradient_intensity', $intensity );
     }
 });
 

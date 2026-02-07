@@ -143,8 +143,29 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
             [
                 'label' => __( 'Gradient Color', 'coffeebrk-core' ),
                 'type' => Controls_Manager::COLOR,
-                'default' => '#F5F5FF',
-                'description' => __( 'Bottom gradient and text shadow color', 'coffeebrk-core' ),
+                'default' => '',
+                'description' => __( 'Leave empty for auto-detect from thumbnail', 'coffeebrk-core' ),
+            ]
+        );
+
+        $repeater->add_control(
+            'gradient_intensity',
+            [
+                'label' => __( 'Gradient Intensity', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SLIDER,
+                'size_units' => [ '%' ],
+                'range' => [
+                    '%' => [
+                        'min' => 0,
+                        'max' => 100,
+                        'step' => 5,
+                    ],
+                ],
+                'default' => [
+                    'unit' => '%',
+                    'size' => 50,
+                ],
+                'description' => __( 'How much gradient coverage (0-100%)', 'coffeebrk-core' ),
             ]
         );
 
@@ -472,6 +493,10 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                     $video_url = get_post_meta( $post->ID, '_cbk_story_video_url', true );
                     $gradient = get_post_meta( $post->ID, '_cbk_story_gradient', true );
                     $text_color = get_post_meta( $post->ID, '_cbk_story_text_color', true );
+                    $gradient_intensity = get_post_meta( $post->ID, '_cbk_story_gradient_intensity', true );
+                    if ( $gradient_intensity === '' ) {
+                        $gradient_intensity = 50;
+                    }
                     
                     $stories[] = [
                         'story_title' => $post->post_title,
@@ -479,6 +504,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                         'thumbnail' => [ 'url' => $thumb_url ],
                         'gradient_color' => $gradient,
                         'text_color' => $text_color,
+                        'gradient_intensity' => (int) $gradient_intensity,
                     ];
                 }
             }
@@ -500,38 +526,59 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
              data-loop="<?php echo esc_attr( $loop ); ?>">
             <?php foreach ( $stories as $index => $story ) : 
                 $thumbnail_url = ! empty( $story['thumbnail']['url'] ) ? $story['thumbnail']['url'] : '';
-                $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '#F5F5FF';
+                $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '';
                 $video_url = ! empty( $story['video_url'] ) ? $story['video_url'] : '';
                 $title = ! empty( $story['story_title'] ) ? $story['story_title'] : '';
                 $text_color = ! empty( $story['text_color'] ) ? $story['text_color'] : '';
                 $text_color_style = $text_color ? 'color: ' . esc_attr( $text_color ) . ';' : '';
                 
-                // Generate gradient with the selected color
-                $gradient_rgba_50 = $this->hex_to_rgba( $gradient_color, 0.5 );
-                $gradient_rgba_90 = $this->hex_to_rgba( $gradient_color, 0.9 );
+                // Handle gradient intensity - can be integer (CPT) or array with 'size' key (Elementor slider)
+                $gradient_intensity = 50; // Default
+                if ( isset( $story['gradient_intensity'] ) ) {
+                    if ( is_array( $story['gradient_intensity'] ) && isset( $story['gradient_intensity']['size'] ) ) {
+                        $gradient_intensity = (int) $story['gradient_intensity']['size'];
+                    } else {
+                        $gradient_intensity = (int) $story['gradient_intensity'];
+                    }
+                }
+                
+                // Calculate opacity based on intensity (0-100 -> 0-1)
+                $intensity_base = $gradient_intensity / 100;
+                $gradient_rgba_mid = $gradient_color ? $this->hex_to_rgba( $gradient_color, 0.5 * $intensity_base ) : '';
+                $gradient_rgba_high = $gradient_color ? $this->hex_to_rgba( $gradient_color, 0.9 * $intensity_base ) : '';
                 
                 // Calculate shadow color (slightly darker version of gradient)
-                $shadow_color = $this->darken_color( $gradient_color, 20 );
+                $shadow_color = $gradient_color ? $this->darken_color( $gradient_color, 20 ) : 'rgba(0,0,0,0.3)';
+                
+                // Auto-detect class if no gradient color selected
+                $auto_gradient_class = empty( $gradient_color ) ? 'cbk-stories__card--auto-gradient' : '';
             ?>
-            <div class="cbk-stories__card" 
+            <div class="cbk-stories__card <?php echo esc_attr( $auto_gradient_class ); ?>" 
                  data-story-index="<?php echo esc_attr( $index ); ?>"
                  data-video-url="<?php echo esc_attr( $video_url ); ?>"
-                 style="--gradient-color: <?php echo esc_attr( $gradient_color ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>;">
+                 data-thumb-url="<?php echo esc_attr( $thumbnail_url ); ?>"
+                 data-intensity="<?php echo esc_attr( $gradient_intensity ); ?>"
+                 style="--gradient-color: <?php echo esc_attr( $gradient_color ?: '#888888' ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>;">
                 
                 <?php if ( $thumbnail_url ) : ?>
                 <div class="cbk-stories__thumbnail" 
                      data-src="<?php echo esc_url( $thumbnail_url ); ?>"
-                     style="background-image: url('<?php echo esc_url( $thumbnail_url ); ?>');"></div>
+                     style="background-image: url('<?php echo esc_url( $thumbnail_url ); ?>');">
+                </div>
                 <?php else : ?>
                 <div class="cbk-stories__thumbnail cbk-stories__thumbnail--placeholder"></div>
                 <?php endif; ?>
                 
+                <?php if ( $gradient_color ) : ?>
                 <div class="cbk-stories__gradient" 
                      style="background: linear-gradient(180deg, 
-                        rgba(245, 245, 255, 0) 34.08%, 
-                        <?php echo esc_attr( $gradient_rgba_50 ); ?> 52.25%, 
-                        <?php echo esc_attr( $gradient_rgba_90 ); ?> 54.85%, 
-                        <?php echo esc_attr( $gradient_color ); ?> 81.44%);"></div>
+                        rgba(245, 245, 255, 0) <?php echo esc_attr( 100 - $gradient_intensity ); ?>%, 
+                        <?php echo esc_attr( $gradient_rgba_mid ); ?> <?php echo esc_attr( 100 - ($gradient_intensity * 0.5) ); ?>%, 
+                        <?php echo esc_attr( $gradient_rgba_high ); ?> <?php echo esc_attr( 100 - ($gradient_intensity * 0.2) ); ?>%, 
+                        <?php echo esc_attr( $gradient_color ); ?> 100%);"></div>
+                <?php else : ?>
+                <div class="cbk-stories__gradient cbk-stories__gradient--auto"></div>
+                <?php endif; ?>
                 
                 <div class="cbk-stories__content">
                     <?php if ( $title ) : ?>
