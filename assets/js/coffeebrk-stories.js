@@ -266,17 +266,25 @@
         }
 
         pauseAllPlayers() {
+            const hidePlayer = (el) => {
+                if (el) {
+                    el.style.visibility = 'hidden';
+                    el.style.opacity = '0';
+                    el.style.zIndex = '-1';
+                }
+            };
+
             if (this.ytPlayer && typeof this.ytPlayer.stopVideo === 'function') {
-                this.ytPlayer.stopVideo();
-                if (this.ytPlayer.getIframe()) this.ytPlayer.getIframe().style.display = 'none';
+                this.ytPlayer.pauseVideo(); // Pause instead of stop to keep buffer if possible, or stop if needed
+                if (this.ytPlayer.getIframe()) hidePlayer(this.ytPlayer.getIframe());
             }
             if (this.vimeoPlayer) {
                 this.vimeoPlayer.pause().catch(() => { });
-                if (this.vimeoPlayer.element) this.vimeoPlayer.element.style.display = 'none';
+                if (this.vimeoPlayer.element) hidePlayer(this.vimeoPlayer.element);
             }
             if (this.htmlVideoInfo) {
-                this.htmlVideoInfo.pause(); // Pause video
-                this.htmlVideoInfo.style.display = 'none';
+                this.htmlVideoInfo.pause();
+                hidePlayer(this.htmlVideoInfo);
             }
         }
 
@@ -286,11 +294,21 @@
             if (!ytContainer) {
                 ytContainer = document.createElement('div');
                 ytContainer.id = 'cbk-yt-player-instance';
+                // Force absolute positioning for stacking
+                ytContainer.style.position = 'absolute';
+                ytContainer.style.top = '0';
+                ytContainer.style.left = '0';
+                ytContainer.style.width = '100%';
+                ytContainer.style.height = '100%';
                 container.appendChild(ytContainer);
             } else if (ytContainer.parentNode !== container) {
                 container.appendChild(ytContainer);
             }
-            ytContainer.style.display = 'block';
+
+            // Show Player
+            ytContainer.style.visibility = 'visible';
+            ytContainer.style.opacity = '1';
+            ytContainer.style.zIndex = '1';
 
             if (this.ytPlayer) {
                 this.ytPlayer.loadVideoById(videoId);
@@ -301,7 +319,7 @@
                         videoId: videoId,
                         width: '100%', height: '100%',
                         playerVars: {
-                            'autoplay': 0, // We control playback manually
+                            'autoplay': 0,
                             'controls': 1,
                             'rel': 0,
                             'playsinline': 1,
@@ -311,7 +329,23 @@
                         events: {
                             'onReady': (event) => this.handleYouTubeMuteAndPlay(),
                             'onStateChange': (event) => {
+                                // Loop Logic
                                 if (event.data === YT.PlayerState.ENDED) this.nextStory();
+
+                                // Enforcement Logic: If playing and supposed to be unmuted, force it
+                                if (event.data === YT.PlayerState.PLAYING) {
+                                    if (!this.startMuted) {
+                                        if (event.target.isMuted()) {
+                                            console.log('Force unmute enforcement');
+                                            event.target.unMute();
+                                        }
+                                        event.target.setVolume(100);
+                                    } else {
+                                        if (!event.target.isMuted()) {
+                                            event.target.mute();
+                                        }
+                                    }
+                                }
                             }
                         }
                     });
@@ -324,16 +358,22 @@
         handleYouTubeMuteAndPlay() {
             if (!this.ytPlayer) return;
             // Force display again to be sure
-            if (this.ytPlayer.getIframe()) {
-                this.ytPlayer.getIframe().style.display = 'block';
-                this.ytPlayer.getIframe().style.width = '100%';
-                this.ytPlayer.getIframe().style.height = '100%';
+            const iframe = this.ytPlayer.getIframe();
+            if (iframe) {
+                iframe.style.visibility = 'visible';
+                iframe.style.opacity = '1';
+                iframe.style.zIndex = '1';
+                iframe.style.position = 'absolute';
+                iframe.style.top = '0';
+                iframe.style.left = '0';
             }
 
+            // Explicitly Mute/Unmute BEFORE play
             if (this.startMuted) {
                 this.ytPlayer.mute();
             } else {
                 this.ytPlayer.unMute();
+                this.ytPlayer.setVolume(100);
             }
 
             if (this.autoplay) {
@@ -346,17 +386,32 @@
             if (!vimeoContainer) {
                 vimeoContainer = document.createElement('div');
                 vimeoContainer.id = 'cbk-vimeo-player-instance';
+                // Force absolute positioning
+                vimeoContainer.style.position = 'absolute';
+                vimeoContainer.style.top = '0';
+                vimeoContainer.style.left = '0';
+                vimeoContainer.style.width = '100%';
+                vimeoContainer.style.height = '100%';
                 container.appendChild(vimeoContainer);
             } else if (vimeoContainer.parentNode !== container) {
                 container.appendChild(vimeoContainer);
             }
-            vimeoContainer.style.display = 'block';
+
+            // Show Player
+            vimeoContainer.style.visibility = 'visible';
+            vimeoContainer.style.opacity = '1';
+            vimeoContainer.style.zIndex = '1';
 
             if (this.vimeoPlayer) {
                 this.vimeoPlayer.loadVideo(videoId).then(() => {
                     this.handleVimeoMuteAndPlay();
                 });
-                this.vimeoPlayer.element.style.display = 'block';
+                // Ensure element is visible
+                if (this.vimeoPlayer.element) {
+                    this.vimeoPlayer.element.style.visibility = 'visible';
+                    this.vimeoPlayer.element.style.opacity = '1';
+                    this.vimeoPlayer.element.style.zIndex = '1';
+                }
             } else {
                 if (window.Vimeo && window.Vimeo.Player) {
                     this.vimeoPlayer = new Vimeo.Player(vimeoContainer, {
@@ -368,6 +423,15 @@
                     });
 
                     this.vimeoPlayer.on('ended', () => this.nextStory());
+
+                    // Enforcement Logic
+                    this.vimeoPlayer.on('play', () => {
+                        if (!this.startMuted) {
+                            this.vimeoPlayer.setMuted(false).catch(() => { });
+                            this.vimeoPlayer.setVolume(1).catch(() => { });
+                        }
+                    });
+
                     // Initial load
                     this.handleVimeoMuteAndPlay();
                 } else {
@@ -379,7 +443,23 @@
         handleVimeoMuteAndPlay() {
             if (!this.vimeoPlayer) return;
 
+            // Force display properties
+            if (this.vimeoPlayer.element) {
+                this.vimeoPlayer.element.style.visibility = 'visible';
+                this.vimeoPlayer.element.style.opacity = '1';
+                this.vimeoPlayer.element.style.zIndex = '1';
+                this.vimeoPlayer.element.style.position = 'absolute';
+                this.vimeoPlayer.element.style.top = '0';
+                this.vimeoPlayer.element.style.left = '0';
+                this.vimeoPlayer.element.style.width = '100%';
+                this.vimeoPlayer.element.style.height = '100%';
+            }
+
             this.vimeoPlayer.setMuted(this.startMuted).catch(() => { });
+
+            if (!this.startMuted) {
+                this.vimeoPlayer.setVolume(1).catch(() => { });
+            }
 
             if (this.autoplay) {
                 this.vimeoPlayer.play().catch(() => { });
@@ -394,15 +474,23 @@
                 video.controls = true;
                 video.playsInline = true;
                 video.addEventListener('ended', () => this.nextStory());
+                // Force absolute positioning
+                video.style.position = 'absolute';
+                video.style.top = '0';
+                video.style.left = '0';
+                video.style.width = '100%';
+                video.style.height = '100%';
                 container.appendChild(video);
             } else if (video.parentNode !== container) {
                 container.appendChild(video);
             }
 
             this.htmlVideoInfo = video;
-            video.style.display = 'block';
-            video.style.width = '100%';
-            video.style.height = '100%';
+
+            // Show Player
+            video.style.visibility = 'visible';
+            video.style.opacity = '1';
+            video.style.zIndex = '1';
 
             if (video.src !== url) {
                 video.src = url;
@@ -410,7 +498,10 @@
 
             video.muted = this.startMuted;
             if (this.autoplay) {
-                video.play().catch(() => { });
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => { });
+                }
             }
         }
 
