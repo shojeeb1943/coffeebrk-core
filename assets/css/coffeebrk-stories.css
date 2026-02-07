@@ -20,25 +20,68 @@
     overflow-y: hidden;
     scroll-behavior: smooth;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    scrollbar-width: none;
+    /* Hide scrollbar Firefox */
+    -ms-overflow-style: none;
+    /* Hide scrollbar IE/Edge */
+    gap: 20px;
+    /* Consistent gap */
 }
 
 .cbk-stories--scrollable::-webkit-scrollbar {
-    height: 6px;
+    display: none;
+    /* Hide scrollbar WebKit */
 }
 
-.cbk-stories--scrollable::-webkit-scrollbar-track {
-    background: transparent;
+/* Wrapper and Navigation */
+.cbk-stories-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
 }
 
-.cbk-stories--scrollable::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
+.cbk-stories-nav {
+    background: #ffffff;
+    border: none;
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease;
+    color: #333;
+    flex-shrink: 0;
 }
 
-.cbk-stories--scrollable::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.3);
+.cbk-stories-nav:hover {
+    background: #f0f0f0;
+    transform: scale(1.05);
+}
+
+.cbk-stories-nav--prev {
+    margin-right: 16px;
+}
+
+.cbk-stories-nav--next {
+    margin-left: 16px;
+}
+
+/* Ensure container scrolls correctly inside flex wrapper */
+.cbk-stories-wrapper .cbk-stories {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    /* Allow flex to control width */
+}
+
+/* Ensure cards don't shrink */
+.cbk-stories__card {
+    flex: 0 0 auto;
 }
 
 /* ============================================
@@ -52,6 +95,9 @@
     background: #ffffff;
     cursor: pointer;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    width: 160px;
+    height: 284px;
+    border-radius: 12px;
 }
 
 .cbk-stories__card:hover {
@@ -154,12 +200,19 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     z-index: 999999;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: rgba(0, 0, 0, 0.95);
+}
+
+/* Hidden state - uses visibility to preserve layout but hide */
+.cbk-stories-viewer[style*="display: none"] {
+    visibility: hidden;
+    pointer-events: none;
 }
 
 .cbk-stories-viewer__overlay {
@@ -168,7 +221,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.95);
+    background: transparent;
     z-index: 1;
 }
 
@@ -176,84 +229,80 @@
     position: relative;
     z-index: 2;
     width: 100%;
+    max-width: 1200px;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 20px;
-    padding: 0 40px;
+    gap: 16px;
+    padding: 40px 80px;
+    box-sizing: border-box;
 }
 
+/* Side Story Previews - Like Instagram */
 .cbk-stories-viewer__item {
-    transition: all 0.3s ease;
     border-radius: 12px;
     overflow: hidden;
     position: relative;
     cursor: pointer;
-    background: #111;
-}
-
-/* Side Previews - Instagram Style */
-.cbk-stories-viewer__item--prev,
-.cbk-stories-viewer__item--next {
-    width: 140px;
-    height: 45vh;
-    max-height: 380px;
-    opacity: 0.5;
-    transform: scale(0.85);
-    flex-shrink: 0;
-    pointer-events: auto;
+    background: #1a1a1a;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    display: none;
-    /* Hidden by default on mobile */
     transition: all 0.3s ease;
-    border-radius: 16px;
+    flex-shrink: 0;
+}
+
+.cbk-stories-viewer__item--prev,
+.cbk-stories-viewer__item--next {
+    width: 150px;
+    height: 270px;
+    opacity: 0.7;
+}
+
+.cbk-stories-viewer__item--prev-2,
+.cbk-stories-viewer__item--next-2 {
+    width: 120px;
+    height: 215px;
+    opacity: 0.5;
 }
 
 .cbk-stories-viewer__item--prev:hover,
 .cbk-stories-viewer__item--next:hover {
-    opacity: 0.7;
-    transform: scale(0.88);
+    opacity: 0.9;
+    transform: scale(1.02);
 }
 
-@media (min-width: 1024px) {
-
-    .cbk-stories-viewer__item--prev,
-    .cbk-stories-viewer__item--next {
-        display: block;
-    }
-}
-
-/* Current Story (Center) - Full Height Like Shorts/Reels */
+/* Current Story (Center) - Full Height Like Instagram */
 .cbk-stories-viewer__item--current {
-    width: 100%;
-    max-width: 420px;
-    /* Phone-like aspect ratio */
-    height: 92vh;
-    max-height: 900px;
-    flex-shrink: 0;
-    box-shadow: 0 15px 60px rgba(0, 0, 0, 0.6);
-    background: #000;
-    border-radius: 16px;
+    width: 380px !important;
+    min-width: 380px !important;
+    height: 680px !important;
+    min-height: 680px !important;
+    box-shadow: 0 25px 100px rgba(0, 0, 0, 0.9);
+    background: #000 !important;
 }
 
 .cbk-stories-viewer__video-container {
-    width: 100%;
-    height: 100%;
-    background: #000;
-    position: relative;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 680px !important;
+    background: #000 !important;
+    position: relative !important;
+    border-radius: 12px;
+    overflow: hidden !important;
 }
 
 .cbk-stories-viewer__video-container iframe,
 .cbk-stories-viewer__video-container video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    /* Keep aspect ratio */
-    border: none;
-    display: block;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 680px !important;
+    object-fit: cover !important;
+    border: none !important;
 }
 
 /* Close Button */

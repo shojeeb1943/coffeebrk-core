@@ -50,6 +50,26 @@
 
         setupContainer(container) {
             const cards = container.querySelectorAll('.cbk-stories__card');
+
+            // Setup Carousel Navigation
+            const wrapper = container.closest('.cbk-stories-wrapper');
+            if (wrapper) {
+                const prevBtn = wrapper.querySelector('.cbk-stories-nav--prev');
+                const nextBtn = wrapper.querySelector('.cbk-stories-nav--next');
+
+                if (prevBtn) {
+                    prevBtn.addEventListener('click', () => {
+                        container.scrollBy({ left: -300, behavior: 'smooth' });
+                    });
+                }
+
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', () => {
+                        container.scrollBy({ left: 300, behavior: 'smooth' });
+                    });
+                }
+            }
+
             this.autoplay = container.dataset.autoplay === 'true';
             this.loop = container.dataset.loop === 'true';
 
@@ -188,11 +208,13 @@
                     </svg>
                 </button>
                 <div class="cbk-stories-viewer__content">
+                    <div class="cbk-stories-viewer__item cbk-stories-viewer__item--prev-2"></div>
                     <div class="cbk-stories-viewer__item cbk-stories-viewer__item--prev"></div>
                     <div class="cbk-stories-viewer__item cbk-stories-viewer__item--current">
                         <div class="cbk-stories-viewer__video-container"></div>
                     </div>
                     <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next"></div>
+                    <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next-2"></div>
                 </div>
                 <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--next" aria-label="Next">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -237,6 +259,25 @@
                     this.nextStory();
                 });
             }
+
+            // Far side items (jump by 2)
+            const prevItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--prev-2');
+            if (prevItem2) {
+                prevItem2.addEventListener('click', () => {
+                    if (this.currentIndex >= 2) {
+                        this.showStory(this.currentIndex - 2);
+                    }
+                });
+            }
+
+            const nextItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--next-2');
+            if (nextItem2) {
+                nextItem2.addEventListener('click', () => {
+                    if (this.currentIndex < this.stories.length - 2) {
+                        this.showStory(this.currentIndex + 2);
+                    }
+                });
+            }
         }
 
         showStory(index) {
@@ -247,10 +288,30 @@
             this.currentIndex = index;
             const story = this.stories[index];
             const videoUrl = story.dataset.videoUrl;
+
+            // Force center item dimensions
+            const currentItem = this.viewer.querySelector('.cbk-stories-viewer__item--current');
+            if (currentItem) {
+                currentItem.style.width = '380px';
+                currentItem.style.height = '680px';
+                currentItem.style.minWidth = '380px';
+                currentItem.style.minHeight = '680px';
+                currentItem.style.flexShrink = '0';
+                currentItem.style.position = 'relative';
+                currentItem.style.background = '#000';
+                currentItem.style.borderRadius = '12px';
+                currentItem.style.overflow = 'hidden';
+            }
+
             const videoContainer = this.viewer.querySelector('.cbk-stories-viewer__video-container');
 
             // Clear previous content
             videoContainer.innerHTML = '';
+
+            // Ensure container fills parent
+            videoContainer.style.width = '100%';
+            videoContainer.style.height = '100%';
+            videoContainer.style.position = 'relative';
 
             // Detect video type and create appropriate element
             const videoElement = this.createVideoElement(videoUrl);
@@ -267,7 +328,9 @@
 
         getThumbnailUrl(index) {
             if (index < 0 || index >= this.stories.length) return null;
-            const thumb = this.stories[index].querySelector('.cbk-stories__thumbnail');
+            const card = this.stories[index];
+            if (card.dataset.thumbUrl) return card.dataset.thumbUrl;
+            const thumb = card.querySelector('.cbk-stories__thumbnail');
             let url = '';
             if (thumb) {
                 url = thumb.dataset.src || '';
@@ -285,31 +348,47 @@
         updateSideItems(index) {
             const prevItem = this.viewer.querySelector('.cbk-stories-viewer__item--prev');
             const nextItem = this.viewer.querySelector('.cbk-stories-viewer__item--next');
+            const prevItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--prev-2');
+            const nextItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--next-2');
 
-            if (prevItem) {
-                const prevUrl = this.getThumbnailUrl(index - 1);
-                if (prevUrl) {
-                    prevItem.style.backgroundImage = `url('${prevUrl}')`;
-                    prevItem.style.opacity = '0.4';
-                    prevItem.style.pointerEvents = 'auto';
-                } else {
-                    prevItem.style.backgroundImage = 'none';
-                    prevItem.style.opacity = '0';
-                    prevItem.style.pointerEvents = 'none';
-                }
-            }
+            // Update prev item (index - 1)
+            this.updateSideItem(prevItem, index - 1, 0.7);
 
-            if (nextItem) {
-                const nextUrl = this.getThumbnailUrl(index + 1);
-                if (nextUrl) {
-                    nextItem.style.backgroundImage = `url('${nextUrl}')`;
-                    nextItem.style.opacity = '0.4';
-                    nextItem.style.pointerEvents = 'auto';
+            // Update next item (index + 1)
+            this.updateSideItem(nextItem, index + 1, 0.7);
+
+            // Update prev-2 item (index - 2)
+            this.updateSideItem(prevItem2, index - 2, 0.5);
+
+            // Update next-2 item (index + 2)
+            this.updateSideItem(nextItem2, index + 2, 0.5);
+        }
+
+        updateSideItem(element, storyIndex, opacity) {
+            if (!element) return;
+
+            const url = this.getThumbnailUrl(storyIndex);
+            console.log('updateSideItem:', storyIndex, url); // Debug
+
+            if (url) {
+                element.style.backgroundImage = `url('${url}')`;
+                element.style.opacity = opacity.toString();
+                element.style.pointerEvents = 'auto';
+                element.style.display = 'block';
+                // Ensure dimensions are set
+                if (element.classList.contains('cbk-stories-viewer__item--prev') ||
+                    element.classList.contains('cbk-stories-viewer__item--next')) {
+                    element.style.width = '150px';
+                    element.style.height = '270px';
                 } else {
-                    nextItem.style.backgroundImage = 'none';
-                    nextItem.style.opacity = '0';
-                    nextItem.style.pointerEvents = 'none';
+                    element.style.width = '120px';
+                    element.style.height = '215px';
                 }
+            } else {
+                element.style.backgroundImage = 'none';
+                element.style.opacity = '0';
+                element.style.pointerEvents = 'none';
+                element.style.display = 'none';
             }
         }
 
@@ -336,16 +415,17 @@
 
         createYouTubeEmbed(videoId) {
             const iframe = document.createElement('iframe');
-            let src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+            let src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`;
 
             if (this.autoplay) {
-                src += '&autoplay=1';
+                src += '&autoplay=1&mute=1';
             }
             if (this.loop) {
                 src += `&loop=1&playlist=${videoId}`;
             }
 
             iframe.src = src;
+            iframe.style.cssText = 'width:100%;height:100%;border:none;position:absolute;top:0;left:0;';
             iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
             iframe.allowFullscreen = true;
 
@@ -357,13 +437,14 @@
             let src = `https://player.vimeo.com/video/${videoId}?`;
 
             if (this.autoplay) {
-                src += 'autoplay=1&';
+                src += 'autoplay=1&muted=1&';
             }
             if (this.loop) {
                 src += 'loop=1&';
             }
 
             iframe.src = src;
+            iframe.style.cssText = 'width:100%;height:100%;border:none;position:absolute;top:0;left:0;';
             iframe.allow = 'autoplay; fullscreen; picture-in-picture';
             iframe.allowFullscreen = true;
 
