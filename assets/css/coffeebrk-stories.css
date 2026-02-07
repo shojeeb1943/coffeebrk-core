@@ -53,33 +53,29 @@
     justify-content: center;
     cursor: pointer;
     z-index: 5;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.25s ease;
-    color: #333;
     flex-shrink: 0;
+    transition: background 0.2s ease;
 }
 
 .cbk-stories-nav svg {
-    stroke: #333;
-    transition: stroke 0.25s ease;
+    stroke: #000000;
+    transition: stroke 0.2s ease;
 }
 
 .cbk-stories-nav:hover {
-    background: #ffffff;
-    transform: scale(1.08);
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3), 0 3px 10px rgba(0, 0, 0, 0.15);
+    background: #000000;
 }
 
 .cbk-stories-nav:hover svg {
-    stroke: #000000;
+    stroke: #ffffff;
 }
 
 .cbk-stories-nav--prev {
-    margin-right: 16px;
+    margin-right: 0;
 }
 
 .cbk-stories-nav--next {
-    margin-left: 16px;
+    margin-left: 0;
 }
 
 /* Ensure container scrolls correctly inside flex wrapper */
