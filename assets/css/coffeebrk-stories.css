@@ -79,7 +79,7 @@
 
 .cbk-stories-nav:active svg,
 .cbk-stories-nav:focus svg {
-    stroke: #000000;
+    stroke: #ffffff;
 }
 
 .cbk-stories-nav--prev {
@@ -96,31 +96,6 @@
     min-width: 0;
     width: auto;
     /* Allow flex to control width */
-    position: relative;
-}
-
-/* Gradient fade overlays on left and right edges */
-.cbk-stories-wrapper::before,
-.cbk-stories-wrapper::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 80px;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.cbk-stories-wrapper::before {
-    left: 48px;
-    /* After the prev button */
-    background: linear-gradient(to right, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 100%);
-}
-
-.cbk-stories-wrapper::after {
-    right: 48px;
-    /* Before the next button */
-    background: linear-gradient(to left, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 100%);
 }
 
 /* Ensure cards don't shrink */
