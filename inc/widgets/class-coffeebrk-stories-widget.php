@@ -533,8 +533,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         $scroll_class = $settings['enable_scroll'] === 'yes' ? 'cbk-stories--scrollable' : '';
         
         ?>
-        <div class="cbk-stories-wrapper" style="display: flex; flex-direction: row; align-items: center; width: 100%; position: relative; gap: 16px;">
-            <button class="cbk-stories-nav cbk-stories-nav--prev" aria-label="<?php esc_attr_e( 'Previous', 'coffeebrk-core' ); ?>" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #fff; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; padding: 0;">
+        <div class="cbk-stories-wrapper">
+            <button class="cbk-stories-nav cbk-stories-nav--prev" aria-label="<?php esc_attr_e( 'Previous', 'coffeebrk-core' ); ?>">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -617,7 +617,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 <?php endforeach; ?>
             </div>
 
-            <button class="cbk-stories-nav cbk-stories-nav--next" aria-label="<?php esc_attr_e( 'Next', 'coffeebrk-core' ); ?>" style="flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #fff; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; padding: 0;">
+            <button class="cbk-stories-nav cbk-stories-nav--next" aria-label="<?php esc_attr_e( 'Next', 'coffeebrk-core' ); ?>">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>

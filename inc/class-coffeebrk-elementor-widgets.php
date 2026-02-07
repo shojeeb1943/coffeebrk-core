@@ -96,7 +96,7 @@ add_action( 'elementor/frontend/after_enqueue_styles', function() {
         'coffeebrk-stories',
         COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-stories.css',
         [],
-        '1.0.1'
+        '1.9.3'
     );
 } );
 
@@ -106,7 +106,7 @@ add_action( 'elementor/frontend/after_enqueue_scripts', function() {
         'coffeebrk-stories',
         COFFEEBRK_CORE_URL . 'assets/js/coffeebrk-stories.js',
         [],
-        '1.9.2',
+        '1.9.3',
         true
     );
 } );
