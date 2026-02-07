@@ -79,7 +79,7 @@
 
 .cbk-stories-nav:active svg,
 .cbk-stories-nav:focus svg {
-    stroke: #ffffff;
+    stroke: #000000;
 }
 
 .cbk-stories-nav--prev {
