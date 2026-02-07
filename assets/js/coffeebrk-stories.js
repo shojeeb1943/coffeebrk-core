@@ -421,15 +421,18 @@
         }
 
         createYouTubeEmbed(videoId) {
+            console.log('Creating YouTube Embed:', videoId, 'Autoplay:', this.autoplay, 'Muted:', this.startMuted);
             const iframe = document.createElement('iframe');
-            let src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`;
+            let src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${window.location.origin}`;
 
             if (this.autoplay) {
                 src += '&autoplay=1';
             }
             if (this.startMuted) {
-                // Ensure muted if requested (required for autoplay usually)
+                // Ensure muted if requested
                 src += '&mute=1';
+            } else {
+                src += '&mute=0';
             }
             if (this.loop) {
                 src += `&loop=1&playlist=${videoId}`;
@@ -437,13 +440,14 @@
 
             iframe.src = src;
             iframe.style.cssText = 'width:100%;height:100%;border:none;position:absolute;top:0;left:0;';
-            iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+            iframe.allow = 'accelerometer; autoplay *; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
             iframe.allowFullscreen = true;
 
             return iframe;
         }
 
         createVimeoEmbed(videoId) {
+            console.log('Creating Vimeo Embed:', videoId, 'Autoplay:', this.autoplay, 'Muted:', this.startMuted);
             const iframe = document.createElement('iframe');
             let src = `https://player.vimeo.com/video/${videoId}?`;
 
@@ -452,6 +456,8 @@
             }
             if (this.startMuted) {
                 src += 'muted=1&';
+            } else {
+                src += 'muted=0&';
             }
             if (this.loop) {
                 src += 'loop=1&';
@@ -459,13 +465,14 @@
 
             iframe.src = src;
             iframe.style.cssText = 'width:100%;height:100%;border:none;position:absolute;top:0;left:0;';
-            iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+            iframe.allow = 'autoplay *; fullscreen; picture-in-picture';
             iframe.allowFullscreen = true;
 
             return iframe;
         }
 
         createHTMLVideo(url) {
+            console.log('Creating HTML Video:', url, 'Autoplay:', this.autoplay, 'Muted:', this.startMuted);
             const video = document.createElement('video');
             video.src = url;
             video.controls = true;
@@ -473,8 +480,11 @@
 
             if (this.autoplay) {
                 video.autoplay = true;
-                video.muted = true; // Muted is required for autoplay in most browsers
             }
+
+            // Explicitly set muted property
+            video.muted = this.startMuted;
+
             if (this.loop) {
                 video.loop = true;
             }
