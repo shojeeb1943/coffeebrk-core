@@ -15,6 +15,7 @@
             this.container = null;
             this.autoplay = true;
             this.loop = false;
+            this.startMuted = true;
 
             this.init();
         }
@@ -72,6 +73,7 @@
 
             this.autoplay = container.dataset.autoplay === 'true';
             this.loop = container.dataset.loop === 'true';
+            this.startMuted = container.dataset.muted === 'yes';
 
             cards.forEach((card, index) => {
                 card.addEventListener('click', () => {
@@ -346,22 +348,27 @@
         }
 
         updateSideItems(index) {
+            const len = this.stories.length;
+
             const prevItem = this.viewer.querySelector('.cbk-stories-viewer__item--prev');
+            let prevIndex = index - 1;
+            if (this.loop && prevIndex < 0) prevIndex = len - 1;
+            this.updateSideItem(prevItem, prevIndex, 0.7);
+
             const nextItem = this.viewer.querySelector('.cbk-stories-viewer__item--next');
+            let nextIndex = index + 1;
+            if (this.loop && nextIndex >= len) nextIndex = 0;
+            this.updateSideItem(nextItem, nextIndex, 0.7);
+
             const prevItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--prev-2');
+            let prevIndex2 = index - 2;
+            if (this.loop) prevIndex2 = (index - 2 + len) % len;
+            this.updateSideItem(prevItem2, prevIndex2, 0.5);
+
             const nextItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--next-2');
-
-            // Update prev item (index - 1)
-            this.updateSideItem(prevItem, index - 1, 0.7);
-
-            // Update next item (index + 1)
-            this.updateSideItem(nextItem, index + 1, 0.7);
-
-            // Update prev-2 item (index - 2)
-            this.updateSideItem(prevItem2, index - 2, 0.5);
-
-            // Update next-2 item (index + 2)
-            this.updateSideItem(nextItem2, index + 2, 0.5);
+            let nextIndex2 = index + 2;
+            if (this.loop) nextIndex2 = (index + 2) % len;
+            this.updateSideItem(nextItem2, nextIndex2, 0.5);
         }
 
         updateSideItem(element, storyIndex, opacity) {
@@ -418,7 +425,11 @@
             let src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&playsinline=1`;
 
             if (this.autoplay) {
-                src += '&autoplay=1&mute=1';
+                src += '&autoplay=1';
+            }
+            if (this.startMuted) {
+                // Ensure muted if requested (required for autoplay usually)
+                src += '&mute=1';
             }
             if (this.loop) {
                 src += `&loop=1&playlist=${videoId}`;
@@ -437,7 +448,10 @@
             let src = `https://player.vimeo.com/video/${videoId}?`;
 
             if (this.autoplay) {
-                src += 'autoplay=1&muted=1&';
+                src += 'autoplay=1&';
+            }
+            if (this.startMuted) {
+                src += 'muted=1&';
             }
             if (this.loop) {
                 src += 'loop=1&';
@@ -479,19 +493,29 @@
             const prevBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--prev');
             const nextBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--next');
 
-            prevBtn.disabled = this.currentIndex === 0;
-            nextBtn.disabled = this.currentIndex === this.stories.length - 1;
+            if (this.loop) {
+                // Always enabled in loop mode
+                prevBtn.disabled = false;
+                nextBtn.disabled = false;
+            } else {
+                prevBtn.disabled = this.currentIndex === 0;
+                nextBtn.disabled = this.currentIndex === this.stories.length - 1;
+            }
         }
 
         prevStory() {
             if (this.currentIndex > 0) {
                 this.showStory(this.currentIndex - 1);
+            } else if (this.loop) {
+                this.showStory(this.stories.length - 1);
             }
         }
 
         nextStory() {
             if (this.currentIndex < this.stories.length - 1) {
                 this.showStory(this.currentIndex + 1);
+            } else if (this.loop) {
+                this.showStory(0);
             }
         }
 

@@ -277,6 +277,18 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
             ]
         );
 
+        $this->add_control(
+            'start_muted',
+            [
+                'label' => __( 'Start Muted', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SWITCHER,
+                'label_on' => __( 'Yes', 'coffeebrk-core' ),
+                'label_off' => __( 'No', 'coffeebrk-core' ),
+                'return_value' => 'yes',
+                'default' => 'yes',
+            ]
+        );
+
         $this->end_controls_section();
 
         // ============================================
@@ -531,7 +543,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
             <div class="cbk-stories <?php echo esc_attr( $scroll_class ); ?>" 
                  data-autoplay="<?php echo esc_attr( $autoplay ); ?>"
                  data-loop="<?php echo esc_attr( $loop ); ?>"
-                 style="flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: row;">
+                 data-muted="<?php echo esc_attr( $settings['start_muted'] ?? 'yes' ); ?>"
+                 style="flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: row; scrollbar-width: none; -ms-overflow-style: none;">
                 <?php foreach ( $stories as $index => $story ) : 
                     $thumbnail_url = ! empty( $story['thumbnail']['url'] ) ? $story['thumbnail']['url'] : '';
                     $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '';
