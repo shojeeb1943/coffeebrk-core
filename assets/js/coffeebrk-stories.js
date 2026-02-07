@@ -67,8 +67,29 @@
             if (wrapper) {
                 const prevBtn = wrapper.querySelector('.cbk-stories-nav--prev');
                 const nextBtn = wrapper.querySelector('.cbk-stories-nav--next');
-                if (prevBtn) prevBtn.addEventListener('click', () => container.scrollBy({ left: -300, behavior: 'smooth' }));
-                if (nextBtn) nextBtn.addEventListener('click', () => container.scrollBy({ left: 300, behavior: 'smooth' }));
+
+                if (prevBtn) {
+                    prevBtn.addEventListener('click', () => {
+                        // If at the beginning, scroll to end (infinite loop)
+                        if (container.scrollLeft <= 10) {
+                            container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
+                        } else {
+                            container.scrollBy({ left: -300, behavior: 'smooth' });
+                        }
+                    });
+                }
+
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', () => {
+                        // If at the end, scroll to beginning (infinite loop)
+                        const maxScroll = container.scrollWidth - container.clientWidth;
+                        if (container.scrollLeft >= maxScroll - 10) {
+                            container.scrollTo({ left: 0, behavior: 'smooth' });
+                        } else {
+                            container.scrollBy({ left: 300, behavior: 'smooth' });
+                        }
+                    });
+                }
             }
 
             this.autoplay = container.dataset.autoplay === 'true';
