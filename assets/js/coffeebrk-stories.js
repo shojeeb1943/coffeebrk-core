@@ -17,12 +17,16 @@
             this.loop = false;
             this.startMuted = true;
 
+            // Singleton Player Instances
+            this.ytPlayer = null;
+            this.vimeoPlayer = null;
+            this.htmlVideoInfo = null; // Store reference to current HTML element
+
             this.init();
         }
 
         init() {
             this.loadAPIs();
-            // Wait for DOM to be ready
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => this.bindEvents());
             } else {
@@ -45,45 +49,26 @@
         }
 
         bindEvents() {
-            // Bind click events to all story cards
             document.querySelectorAll('.cbk-stories').forEach(container => {
                 this.setupContainer(container);
             });
 
-            // Close on escape key
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    this.closeViewer();
-                }
-                if (e.key === 'ArrowLeft') {
-                    this.prevStory();
-                }
-                if (e.key === 'ArrowRight') {
-                    this.nextStory();
-                }
+                if (e.key === 'Escape') this.closeViewer();
+                if (e.key === 'ArrowLeft') this.prevStory();
+                if (e.key === 'ArrowRight') this.nextStory();
             });
         }
 
         setupContainer(container) {
             const cards = container.querySelectorAll('.cbk-stories__card');
-
-            // Setup Carousel Navigation
             const wrapper = container.closest('.cbk-stories-wrapper');
+
             if (wrapper) {
                 const prevBtn = wrapper.querySelector('.cbk-stories-nav--prev');
                 const nextBtn = wrapper.querySelector('.cbk-stories-nav--next');
-
-                if (prevBtn) {
-                    prevBtn.addEventListener('click', () => {
-                        container.scrollBy({ left: -300, behavior: 'smooth' });
-                    });
-                }
-
-                if (nextBtn) {
-                    nextBtn.addEventListener('click', () => {
-                        container.scrollBy({ left: 300, behavior: 'smooth' });
-                    });
-                }
+                if (prevBtn) prevBtn.addEventListener('click', () => container.scrollBy({ left: -300, behavior: 'smooth' }));
+                if (nextBtn) nextBtn.addEventListener('click', () => container.scrollBy({ left: 300, behavior: 'smooth' }));
             }
 
             this.autoplay = container.dataset.autoplay === 'true';
@@ -91,11 +76,7 @@
             this.startMuted = container.dataset.muted === 'yes';
 
             cards.forEach((card, index) => {
-                card.addEventListener('click', () => {
-                    this.openViewer(container, index);
-                });
-
-                // Auto-detect gradient color if not set
+                card.addEventListener('click', () => this.openViewer(container, index));
                 if (card.classList.contains('cbk-stories__card--auto-gradient')) {
                     this.applyAutoGradient(card);
                 }
@@ -115,7 +96,6 @@
                 const color = this.extractDominantColor(img);
                 if (color) {
                     card.style.setProperty('--gradient-color', color);
-                    // Calculate gradient stops based on intensity
                     const startPercent = 100 - intensity;
                     const midPercent = 100 - (intensity * 0.5);
                     const highPercent = 100 - (intensity * 0.2);
@@ -129,7 +109,6 @@
                 }
             };
             img.onerror = () => {
-                // Fallback to a neutral gradient
                 gradientEl.style.background = 'linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)';
             };
             img.src = thumbUrl;
@@ -139,34 +118,20 @@
             try {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-
-                // Sample from the bottom third of the image (where gradient appears)
                 const sampleHeight = Math.floor(img.height / 3);
-                canvas.width = 50; // Small sample for performance
+                canvas.width = 50;
                 canvas.height = sampleHeight;
-
                 ctx.drawImage(img, 0, img.height - sampleHeight, img.width, sampleHeight, 0, 0, 50, sampleHeight);
-
-                const imageData = ctx.getImageData(0, 0, 50, sampleHeight);
-                const data = imageData.data;
-
+                const data = ctx.getImageData(0, 0, 50, sampleHeight).data;
                 let r = 0, g = 0, b = 0, count = 0;
-
-                // Sample every 4th pixel for performance
                 for (let i = 0; i < data.length; i += 16) {
                     r += data[i];
                     g += data[i + 1];
                     b += data[i + 2];
                     count++;
                 }
-
-                r = Math.round(r / count);
-                g = Math.round(g / count);
-                b = Math.round(b / count);
-
-                return this.rgbToHex(r, g, b);
+                return this.rgbToHex(Math.round(r / count), Math.round(g / count), Math.round(b / count));
             } catch (e) {
-                console.warn('Could not extract color from image:', e);
                 return null;
             }
         }
@@ -180,13 +145,7 @@
 
         hexToRgba(hex, alpha) {
             const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            if (result) {
-                const r = parseInt(result[1], 16);
-                const g = parseInt(result[2], 16);
-                const b = parseInt(result[3], 16);
-                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-            }
-            return `rgba(128, 128, 128, ${alpha})`;
+            return result ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})` : `rgba(128, 128, 128, ${alpha})`;
         }
 
         openViewer(container, index) {
@@ -194,7 +153,6 @@
             this.currentIndex = index;
             this.stories = Array.from(container.querySelectorAll('.cbk-stories__card'));
 
-            // Find or create viewer
             const widgetId = container.closest('[data-id]')?.dataset.id || 'default';
             this.viewer = document.getElementById(`cbk-stories-viewer-${widgetId}`);
 
@@ -219,9 +177,9 @@
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </button>
-                <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--prev" aria-label="Previous">
+                <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--prev">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </button>
                 <div class="cbk-stories-viewer__content">
@@ -233,9 +191,9 @@
                     <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next"></div>
                     <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next-2"></div>
                 </div>
-                <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--next" aria-label="Next">
+                <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--next">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </button>
             `;
@@ -243,308 +201,217 @@
         }
 
         bindViewerEvents() {
-            // Close button
-            this.viewer.querySelector('.cbk-stories-viewer__close').addEventListener('click', () => {
-                this.closeViewer();
+            const close = () => this.closeViewer();
+            const prev = () => this.prevStory();
+            const next = () => this.nextStory();
+
+            this.viewer.querySelector('.cbk-stories-viewer__close').onclick = close;
+            this.viewer.querySelector('.cbk-stories-viewer__overlay').onclick = close;
+            this.viewer.querySelector('.cbk-stories-viewer__nav--prev').onclick = prev;
+            this.viewer.querySelector('.cbk-stories-viewer__nav--next').onclick = next;
+
+            ['prev', 'next', 'prev-2', 'next-2'].forEach(type => {
+                const item = this.viewer.querySelector(`.cbk-stories-viewer__item--${type}`);
+                if (item) item.onclick = () => {
+                    if (type === 'prev') this.prevStory();
+                    if (type === 'next') this.nextStory();
+                    if (type === 'prev-2' && this.currentIndex >= 2) this.showStory(this.currentIndex - 2);
+                    if (type === 'next-2' && this.currentIndex < this.stories.length - 2) this.showStory(this.currentIndex + 2);
+                };
             });
-
-            // Overlay click to close
-            this.viewer.querySelector('.cbk-stories-viewer__overlay').addEventListener('click', () => {
-                this.closeViewer();
-            });
-
-            // Navigation
-            this.viewer.querySelector('.cbk-stories-viewer__nav--prev').addEventListener('click', () => {
-                this.prevStory();
-            });
-
-            this.viewer.querySelector('.cbk-stories-viewer__nav--next').addEventListener('click', () => {
-                this.nextStory();
-            });
-
-            // Side items click
-            const prevItem = this.viewer.querySelector('.cbk-stories-viewer__item--prev');
-            if (prevItem) {
-                prevItem.addEventListener('click', () => {
-                    this.prevStory();
-                });
-            }
-
-            const nextItem = this.viewer.querySelector('.cbk-stories-viewer__item--next');
-            if (nextItem) {
-                nextItem.addEventListener('click', () => {
-                    this.nextStory();
-                });
-            }
-
-            // Far side items (jump by 2)
-            const prevItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--prev-2');
-            if (prevItem2) {
-                prevItem2.addEventListener('click', () => {
-                    if (this.currentIndex >= 2) {
-                        this.showStory(this.currentIndex - 2);
-                    }
-                });
-            }
-
-            const nextItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--next-2');
-            if (nextItem2) {
-                nextItem2.addEventListener('click', () => {
-                    if (this.currentIndex < this.stories.length - 2) {
-                        this.showStory(this.currentIndex + 2);
-                    }
-                });
-            }
         }
 
         showStory(index) {
-            if (index < 0 || index >= this.stories.length) {
-                return;
-            }
+            if (index < 0 || index >= this.stories.length) return;
 
             this.currentIndex = index;
             const story = this.stories[index];
             const videoUrl = story.dataset.videoUrl;
-
-            // Force center item dimensions
-            const currentItem = this.viewer.querySelector('.cbk-stories-viewer__item--current');
-            if (currentItem) {
-                currentItem.style.width = '380px';
-                currentItem.style.height = '680px';
-                currentItem.style.minWidth = '380px';
-                currentItem.style.minHeight = '680px';
-                currentItem.style.flexShrink = '0';
-                currentItem.style.position = 'relative';
-                currentItem.style.background = '#000';
-                currentItem.style.borderRadius = '12px';
-                currentItem.style.overflow = 'hidden';
-            }
-
             const videoContainer = this.viewer.querySelector('.cbk-stories-viewer__video-container');
 
-            // Cleanup previous player
-            if (this.player) {
-                if (typeof this.player.destroy === 'function') {
-                    this.player.destroy();
-                } else if (typeof this.player.unload === 'function') {
-                    this.player.unload(); // Vimeo
-                }
-                this.player = null;
+            // Set size
+            const currentItem = this.viewer.querySelector('.cbk-stories-viewer__item--current');
+            if (currentItem) {
+                Object.assign(currentItem.style, {
+                    width: '380px', height: '680px', minWidth: '380px', minHeight: '680px',
+                    flexShrink: '0', position: 'relative', background: '#000', borderRadius: '12px', overflow: 'hidden'
+                });
+            }
+            if (videoContainer) {
+                Object.assign(videoContainer.style, {
+                    width: '100%', height: '100%', position: 'relative'
+                });
             }
 
-            // Clear content
-            videoContainer.innerHTML = '';
-
-            // Ensure container fills parent
-            videoContainer.style.width = '100%';
-            videoContainer.style.height = '100%';
-            videoContainer.style.position = 'relative';
-
-            // Detect video type
+            // Detect Type
             const youtubeMatch = videoUrl && videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
             const vimeoMatch = videoUrl && videoUrl.match(/(?:vimeo\.com\/)(\d+)/);
 
+            // Hide/Pause other players
+            this.pauseAllPlayers();
+
             if (youtubeMatch) {
-                const playerId = 'cbk-yt-player-' + Date.now();
-                videoContainer.innerHTML = `<div id="${playerId}"></div>`;
-                this.createYouTubePlayer(playerId, youtubeMatch[1]);
+                this.initYouTube(videoContainer, youtubeMatch[1]);
             } else if (vimeoMatch) {
-                const playerId = 'cbk-vimeo-player-' + Date.now();
-                videoContainer.innerHTML = `<div id="${playerId}"></div>`;
-                this.createVimeoPlayer(playerId, vimeoMatch[1]);
+                this.initVimeo(videoContainer, vimeoMatch[1]);
             } else if (videoUrl) {
-                const video = this.createHTMLVideo(videoUrl);
-                videoContainer.appendChild(video);
+                this.initHTMLVideo(videoContainer, videoUrl);
             } else {
+                videoContainer.innerHTML = '';
                 videoContainer.appendChild(this.createPlaceholder());
             }
 
-            // Update Side Items
             this.updateSideItems(index);
-
-            // Update navigation state
             this.updateNavigation();
         }
 
-        getThumbnailUrl(index) {
-            if (index < 0 || index >= this.stories.length) return null;
-            const card = this.stories[index];
-            if (card.dataset.thumbUrl) return card.dataset.thumbUrl;
-            const thumb = card.querySelector('.cbk-stories__thumbnail');
-            let url = '';
-            if (thumb) {
-                url = thumb.dataset.src || '';
-                if (!url) {
-                    // Fallback to style backgroundImage parsing if data-src missing
-                    const style = thumb.style.backgroundImage;
-                    if (style && style.indexOf('url(') !== -1) {
-                        url = style.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
-                    }
-                }
+        pauseAllPlayers() {
+            if (this.ytPlayer && typeof this.ytPlayer.stopVideo === 'function') {
+                this.ytPlayer.stopVideo();
+                if (this.ytPlayer.getIframe()) this.ytPlayer.getIframe().style.display = 'none';
             }
-            return url;
+            if (this.vimeoPlayer) {
+                this.vimeoPlayer.pause().catch(() => { });
+                if (this.vimeoPlayer.element) this.vimeoPlayer.element.style.display = 'none';
+            }
+            if (this.htmlVideoInfo) {
+                this.htmlVideoInfo.pause(); // Pause video
+                this.htmlVideoInfo.style.display = 'none';
+            }
         }
 
-        updateSideItems(index) {
-            const len = this.stories.length;
+        initYouTube(container, videoId) {
+            // Create container if not exists (singleton container)
+            let ytContainer = document.getElementById('cbk-yt-player-instance');
+            if (!ytContainer) {
+                ytContainer = document.createElement('div');
+                ytContainer.id = 'cbk-yt-player-instance';
+                container.appendChild(ytContainer);
+            } else if (ytContainer.parentNode !== container) {
+                container.appendChild(ytContainer);
+            }
+            ytContainer.style.display = 'block';
 
-            const prevItem = this.viewer.querySelector('.cbk-stories-viewer__item--prev');
-            let prevIndex = index - 1;
-            if (this.loop && prevIndex < 0) prevIndex = len - 1;
-            this.updateSideItem(prevItem, prevIndex, 0.7);
-
-            const nextItem = this.viewer.querySelector('.cbk-stories-viewer__item--next');
-            let nextIndex = index + 1;
-            if (this.loop && nextIndex >= len) nextIndex = 0;
-            this.updateSideItem(nextItem, nextIndex, 0.7);
-
-            const prevItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--prev-2');
-            let prevIndex2 = index - 2;
-            if (this.loop) prevIndex2 = (index - 2 + len) % len;
-            this.updateSideItem(prevItem2, prevIndex2, 0.5);
-
-            const nextItem2 = this.viewer.querySelector('.cbk-stories-viewer__item--next-2');
-            let nextIndex2 = index + 2;
-            if (this.loop) nextIndex2 = (index + 2) % len;
-            this.updateSideItem(nextItem2, nextIndex2, 0.5);
-        }
-
-        updateSideItem(element, storyIndex, opacity) {
-            if (!element) return;
-
-            const url = this.getThumbnailUrl(storyIndex);
-            console.log('updateSideItem:', storyIndex, url); // Debug
-
-            if (url) {
-                element.style.backgroundImage = `url('${url}')`;
-                element.style.opacity = opacity.toString();
-                element.style.pointerEvents = 'auto';
-                element.style.display = 'block';
-                // Ensure dimensions are set
-                if (element.classList.contains('cbk-stories-viewer__item--prev') ||
-                    element.classList.contains('cbk-stories-viewer__item--next')) {
-                    element.style.width = '150px';
-                    element.style.height = '270px';
+            if (this.ytPlayer) {
+                this.ytPlayer.loadVideoById(videoId);
+                this.handleYouTubeMuteAndPlay();
+            } else {
+                if (window.YT && window.YT.Player) {
+                    this.ytPlayer = new YT.Player('cbk-yt-player-instance', {
+                        videoId: videoId,
+                        width: '100%', height: '100%',
+                        playerVars: {
+                            'autoplay': 0, // We control playback manually
+                            'controls': 1,
+                            'rel': 0,
+                            'playsinline': 1,
+                            'enablejsapi': 1,
+                            'origin': window.location.origin
+                        },
+                        events: {
+                            'onReady': (event) => this.handleYouTubeMuteAndPlay(),
+                            'onStateChange': (event) => {
+                                if (event.data === YT.PlayerState.ENDED) this.nextStory();
+                            }
+                        }
+                    });
                 } else {
-                    element.style.width = '120px';
-                    element.style.height = '215px';
+                    setTimeout(() => this.initYouTube(container, videoId), 100);
                 }
-            } else {
-                element.style.backgroundImage = 'none';
-                element.style.opacity = '0';
-                element.style.pointerEvents = 'none';
-                element.style.display = 'none';
             }
         }
 
-        createYouTubePlayer(containerId, videoId) {
-            const onPlayerReady = (event) => {
-                if (this.startMuted) {
-                    event.target.mute();
-                } else {
-                    event.target.unMute();
-                }
-                if (this.autoplay) {
-                    event.target.playVideo();
-                }
-            };
-
-            const onPlayerStateChange = (event) => {
-                if (event.data === YT.PlayerState.ENDED) {
-                    this.nextStory();
-                }
-            };
-
-            const initPlayer = () => {
-                this.player = new YT.Player(containerId, {
-                    videoId: videoId,
-                    width: '100%',
-                    height: '100%',
-                    playerVars: {
-                        'autoplay': this.autoplay ? 1 : 0,
-                        'controls': 1,
-                        'rel': 0,
-                        'playsinline': 1,
-                        'enablejsapi': 1,
-                        'origin': window.location.origin,
-                        'mute': this.startMuted ? 1 : 0
-                    },
-                    events: {
-                        'onReady': onPlayerReady,
-                        'onStateChange': onPlayerStateChange
-                    }
-                });
-            };
-
-            if (window.YT && window.YT.Player) {
-                initPlayer();
-            } else {
-                const checkYT = setInterval(() => {
-                    if (window.YT && window.YT.Player) {
-                        clearInterval(checkYT);
-                        initPlayer();
-                    }
-                }, 100);
+        handleYouTubeMuteAndPlay() {
+            if (!this.ytPlayer) return;
+            // Force display again to be sure
+            if (this.ytPlayer.getIframe()) {
+                this.ytPlayer.getIframe().style.display = 'block';
+                this.ytPlayer.getIframe().style.width = '100%';
+                this.ytPlayer.getIframe().style.height = '100%';
             }
-        }
 
-        createVimeoPlayer(containerId, videoId) {
-            const initPlayer = () => {
-                const options = {
-                    id: videoId,
-                    width: 380,
-                    loop: false, // We handle loop via nextStory
-                    autoplay: this.autoplay,
-                    muted: this.startMuted
-                };
-
-                const player = new Vimeo.Player(containerId, options);
-                this.player = player;
-
-                player.on('play', () => {
-                    if (!this.startMuted) {
-                        player.setVolume(1).catch(() => { });
-                    }
-                });
-
-                player.on('ended', () => {
-                    this.nextStory();
-                });
-            };
-
-            if (window.Vimeo && window.Vimeo.Player) {
-                initPlayer();
+            if (this.startMuted) {
+                this.ytPlayer.mute();
             } else {
-                const checkVimeo = setInterval(() => {
-                    if (window.Vimeo && window.Vimeo.Player) {
-                        clearInterval(checkVimeo);
-                        initPlayer();
-                    }
-                }, 100);
+                this.ytPlayer.unMute();
             }
-        }
-
-        createHTMLVideo(url) {
-            console.log('Creating HTML Video:', url, 'Autoplay:', this.autoplay, 'Muted:', this.startMuted);
-            const video = document.createElement('video');
-            video.src = url;
-            video.controls = true;
-            video.playsInline = true;
 
             if (this.autoplay) {
-                video.autoplay = true;
+                this.ytPlayer.playVideo();
+            }
+        }
+
+        initVimeo(container, videoId) {
+            let vimeoContainer = document.getElementById('cbk-vimeo-player-instance');
+            if (!vimeoContainer) {
+                vimeoContainer = document.createElement('div');
+                vimeoContainer.id = 'cbk-vimeo-player-instance';
+                container.appendChild(vimeoContainer);
+            } else if (vimeoContainer.parentNode !== container) {
+                container.appendChild(vimeoContainer);
+            }
+            vimeoContainer.style.display = 'block';
+
+            if (this.vimeoPlayer) {
+                this.vimeoPlayer.loadVideo(videoId).then(() => {
+                    this.handleVimeoMuteAndPlay();
+                });
+                this.vimeoPlayer.element.style.display = 'block';
+            } else {
+                if (window.Vimeo && window.Vimeo.Player) {
+                    this.vimeoPlayer = new Vimeo.Player(vimeoContainer, {
+                        id: videoId,
+                        width: 380,
+                        autoplay: false,
+                        muted: this.startMuted,
+                        loop: false
+                    });
+
+                    this.vimeoPlayer.on('ended', () => this.nextStory());
+                    // Initial load
+                    this.handleVimeoMuteAndPlay();
+                } else {
+                    setTimeout(() => this.initVimeo(container, videoId), 100);
+                }
+            }
+        }
+
+        handleVimeoMuteAndPlay() {
+            if (!this.vimeoPlayer) return;
+
+            this.vimeoPlayer.setMuted(this.startMuted).catch(() => { });
+
+            if (this.autoplay) {
+                this.vimeoPlayer.play().catch(() => { });
+            }
+        }
+
+        initHTMLVideo(container, url) {
+            let video = document.getElementById('cbk-html-video-instance');
+            if (!video) {
+                video = document.createElement('video');
+                video.id = 'cbk-html-video-instance';
+                video.controls = true;
+                video.playsInline = true;
+                video.addEventListener('ended', () => this.nextStory());
+                container.appendChild(video);
+            } else if (video.parentNode !== container) {
+                container.appendChild(video);
             }
 
-            // Explicitly set muted property
+            this.htmlVideoInfo = video;
+            video.style.display = 'block';
+            video.style.width = '100%';
+            video.style.height = '100%';
+
+            if (video.src !== url) {
+                video.src = url;
+            }
+
             video.muted = this.startMuted;
-
-            // HTML5 video loop means repeating same video.
-            // If we want Cycle Loop, we need event listener.
-            video.addEventListener('ended', () => {
-                this.nextStory();
-            });
-
-            return video;
+            if (this.autoplay) {
+                video.play().catch(() => { });
+            }
         }
 
         createPlaceholder() {
@@ -554,14 +421,60 @@
             return placeholder;
         }
 
+        updateSideItems(index) {
+            const len = this.stories.length;
+            const update = (cls, idx, opacity) => {
+                const el = this.viewer.querySelector(cls);
+                this.updateSideItem(el, idx, opacity);
+            };
+
+            let prev = index - 1;
+            if (this.loop && prev < 0) prev = len - 1;
+            update('.cbk-stories-viewer__item--prev', prev, 0.7);
+
+            let next = index + 1;
+            if (this.loop && next >= len) next = 0;
+            update('.cbk-stories-viewer__item--next', next, 0.7);
+
+            let prev2 = index - 2;
+            if (this.loop) prev2 = (index - 2 + len) % len;
+            update('.cbk-stories-viewer__item--prev-2', prev2, 0.5);
+
+            let next2 = index + 2;
+            if (this.loop) next2 = (index + 2) % len;
+            update('.cbk-stories-viewer__item--next-2', next2, 0.5);
+        }
+
+        updateSideItem(element, storyIndex, opacity) {
+            if (!element) return;
+            const url = this.getThumbnailUrl(storyIndex);
+
+            if (url) {
+                element.style.backgroundImage = `url('${url}')`;
+                element.style.opacity = opacity;
+                element.style.pointerEvents = 'auto';
+                element.style.display = 'block';
+                if (element.className.includes('prev-2') || element.className.includes('next-2')) {
+                    element.style.width = '120px'; element.style.height = '215px';
+                } else {
+                    element.style.width = '150px'; element.style.height = '270px';
+                }
+            } else {
+                element.style.display = 'none';
+            }
+        }
+
+        getThumbnailUrl(index) {
+            if (index < 0 || index >= this.stories.length) return null;
+            const card = this.stories[index];
+            return card.dataset.thumbUrl || (card.querySelector('.cbk-stories__thumbnail')?.dataset.src) || '';
+        }
+
         updateNavigation() {
             const prevBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--prev');
             const nextBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--next');
-
             if (this.loop) {
-                // Always enabled in loop mode
-                prevBtn.disabled = false;
-                nextBtn.disabled = false;
+                prevBtn.disabled = nextBtn.disabled = false;
             } else {
                 prevBtn.disabled = this.currentIndex === 0;
                 nextBtn.disabled = this.currentIndex === this.stories.length - 1;
@@ -586,34 +499,16 @@
 
         closeViewer() {
             if (!this.viewer) return;
-
-            // Cleanup player
-            if (this.player) {
-                if (typeof this.player.destroy === 'function') {
-                    this.player.destroy();
-                } else if (typeof this.player.unload === 'function') {
-                    this.player.unload();
-                }
-                this.player = null;
-            }
-
-            // Clear video to stop playback
-            const videoContainer = this.viewer.querySelector('.cbk-stories-viewer__video-container');
-            if (videoContainer) {
-                videoContainer.innerHTML = '';
-            }
-
+            this.pauseAllPlayers();
             this.viewer.style.display = 'none';
             document.body.style.overflow = '';
         }
     }
 
-    // Initialize
     new CoffeebrkStoriesViewer();
 
-    // Re-initialize on Elementor frontend init (for live preview)
     if (window.elementorFrontend) {
-        window.elementorFrontend.hooks.addAction('frontend/element_ready/coffeebrk_stories.default', function ($scope) {
+        window.elementorFrontend.hooks.addAction('frontend/element_ready/coffeebrk_stories.default', function () {
             new CoffeebrkStoriesViewer();
         });
     }
