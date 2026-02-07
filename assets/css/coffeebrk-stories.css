@@ -55,6 +55,7 @@
     z-index: 5;
     flex-shrink: 0;
     transition: background 0.2s ease;
+    outline: none;
 }
 
 .cbk-stories-nav svg {
@@ -68,6 +69,17 @@
 
 .cbk-stories-nav:hover svg {
     stroke: #ffffff;
+}
+
+.cbk-stories-nav:active,
+.cbk-stories-nav:focus {
+    background: #ffffff;
+    outline: none;
+}
+
+.cbk-stories-nav:active svg,
+.cbk-stories-nav:focus svg {
+    stroke: #000000;
 }
 
 .cbk-stories-nav--prev {
