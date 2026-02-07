@@ -20,6 +20,7 @@ if ( ! defined( 'COFFEEBRK_CORE_URL' ) ) {
  
 require_once COFFEEBRK_CORE_PATH . 'inc/logger.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rss.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/stories-cpt.php';
  
 register_activation_hook( __FILE__, function() {
     if ( function_exists( 'coffeebrk_logger_ensure_paths' ) ) {

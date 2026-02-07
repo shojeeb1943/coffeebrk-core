@@ -50,11 +50,55 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         // ============================================
         // CONTENT TAB: Stories
         // ============================================
+        // ============================================
+        // CONTENT TAB: Source
+        // ============================================
+        $this->start_controls_section(
+            'section_source',
+            [
+                'label' => __( 'Source', 'coffeebrk-core' ),
+                'tab' => Controls_Manager::TAB_CONTENT,
+            ]
+        );
+
+        $this->add_control(
+            'source_type',
+            [
+                'label' => __( 'Source Type', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SELECT,
+                'default' => 'manual',
+                'options' => [
+                    'manual' => __( 'Manual (Repeater)', 'coffeebrk-core' ),
+                    'global' => __( 'Global (Admin Panel)', 'coffeebrk-core' ),
+                ],
+            ]
+        );
+
+        $this->add_control(
+            'global_limit',
+            [
+                'label' => __( 'Limit', 'coffeebrk-core' ),
+                'type' => Controls_Manager::NUMBER,
+                'default' => 10,
+                'condition' => [
+                    'source_type' => 'global',
+                ],
+            ]
+        );
+
+        $this->end_controls_section();
+
+        // ============================================
+        // CONTENT TAB: Stories
+        // ============================================
         $this->start_controls_section(
             'section_stories',
             [
-                'label' => __( 'Stories', 'coffeebrk-core' ),
+                'label' => __( 'Stories Items', 'coffeebrk-core' ),
                 'tab' => Controls_Manager::TAB_CONTENT,
+                'condition' => [
+                    'source_type' => 'manual',
+                ],
             ]
         );
 
@@ -395,7 +439,41 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
 
     protected function render() {
         $settings = $this->get_settings_for_display();
-        $stories = $settings['stories'] ?? [];
+        $source_type = $settings['source_type'] ?? 'manual';
+        
+        $stories = [];
+
+        if ( $source_type === 'global' ) {
+            $limit = ! empty( $settings['global_limit'] ) ? (int) $settings['global_limit'] : 10;
+            $args = [
+                'post_type' => 'cbk_story',
+                'posts_per_page' => $limit,
+                'post_status' => 'publish',
+                'orderby' => 'menu_order date',
+                'order' => 'DESC',
+            ];
+            
+            $query = new \WP_Query( $args );
+            
+            if ( $query->have_posts() ) {
+                foreach ( $query->posts as $post ) {
+                    $thumb_id = get_post_thumbnail_id( $post->ID );
+                    $thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'full' ) : '';
+                    
+                    $video_url = get_post_meta( $post->ID, '_cbk_story_video_url', true );
+                    $gradient = get_post_meta( $post->ID, '_cbk_story_gradient', true );
+                    
+                    $stories[] = [
+                        'story_title' => $post->post_title,
+                        'video_url' => $video_url,
+                        'thumbnail' => [ 'url' => $thumb_url ],
+                        'gradient_color' => $gradient,
+                    ];
+                }
+            }
+        } else {
+            $stories = $settings['stories'] ?? [];
+        }
         
         if ( empty( $stories ) ) {
             return;
