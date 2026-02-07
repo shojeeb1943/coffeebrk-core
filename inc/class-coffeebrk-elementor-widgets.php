@@ -106,7 +106,7 @@ add_action( 'elementor/frontend/after_enqueue_scripts', function() {
         'coffeebrk-stories',
         COFFEEBRK_CORE_URL . 'assets/js/coffeebrk-stories.js',
         [],
-        '1.0.1',
+        '1.9.1',
         true
     );
 } );

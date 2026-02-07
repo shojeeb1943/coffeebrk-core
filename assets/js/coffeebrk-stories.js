@@ -189,6 +189,13 @@
                         <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </button>
+                <button class="cbk-stories-viewer__unmute" aria-label="Unmute" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 100; background: rgba(0,0,0,0.7); border: 2px solid #fff; border-radius: 50%; width: 80px; height: 80px; cursor: pointer; color: #fff;">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin: auto; display: block;">
+                        <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <line x1="23" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="17" y1="9" x2="23" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
                 <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--prev">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -222,6 +229,16 @@
             this.viewer.querySelector('.cbk-stories-viewer__nav--prev').onclick = prev;
             this.viewer.querySelector('.cbk-stories-viewer__nav--next').onclick = next;
 
+            // Unmute button handler
+            const unmuteBtn = this.viewer.querySelector('.cbk-stories-viewer__unmute');
+            if (unmuteBtn) {
+                unmuteBtn.onclick = () => {
+                    console.log('[Stories] Unmute button clicked');
+                    this.forceUnmute();
+                    unmuteBtn.style.display = 'none';
+                };
+            }
+
             ['prev', 'next', 'prev-2', 'next-2'].forEach(type => {
                 const item = this.viewer.querySelector(`.cbk-stories-viewer__item--${type}`);
                 if (item) item.onclick = () => {
@@ -231,6 +248,38 @@
                     if (type === 'next-2' && this.currentIndex < this.stories.length - 2) this.showStory(this.currentIndex + 2);
                 };
             });
+        }
+
+        forceUnmute() {
+            if (this.ytPlayer && typeof this.ytPlayer.unMute === 'function') {
+                this.ytPlayer.unMute();
+                this.ytPlayer.setVolume(100);
+                console.log('[Stories] YouTube player unmuted');
+            }
+            if (this.vimeoPlayer) {
+                this.vimeoPlayer.setMuted(false).catch(() => { });
+                this.vimeoPlayer.setVolume(1).catch(() => { });
+                console.log('[Stories] Vimeo player unmuted');
+            }
+            if (this.htmlVideoInfo) {
+                this.htmlVideoInfo.muted = false;
+                console.log('[Stories] HTML video unmuted');
+            }
+        }
+
+        showUnmuteButton() {
+            const btn = this.viewer?.querySelector('.cbk-stories-viewer__unmute');
+            if (btn && !this.startMuted) {
+                btn.style.display = 'flex';
+                console.log('[Stories] Showing unmute button');
+            }
+        }
+
+        hideUnmuteButton() {
+            const btn = this.viewer?.querySelector('.cbk-stories-viewer__unmute');
+            if (btn) {
+                btn.style.display = 'none';
+            }
         }
 
         showStory(index) {
@@ -340,23 +389,41 @@
                             'origin': window.location.origin
                         },
                         events: {
-                            'onReady': (event) => this.handleYouTubeMuteAndPlay(),
+                            'onReady': (event) => {
+                                console.log('[Stories] YouTube onReady - startMuted:', this.startMuted, 'autoplay:', this.autoplay);
+                                this.handleYouTubeMuteAndPlay();
+                            },
                             'onStateChange': (event) => {
                                 // Loop Logic
                                 if (event.data === YT.PlayerState.ENDED) this.nextStory();
 
-                                // Enforcement Logic: If playing and supposed to be unmuted, force it
+                                // Check mute state when playing
                                 if (event.data === YT.PlayerState.PLAYING) {
-                                    if (!this.startMuted) {
-                                        if (event.target.isMuted()) {
-                                            console.log('Force unmute enforcement');
-                                            event.target.unMute();
-                                        }
+                                    const isMuted = event.target.isMuted();
+                                    console.log('[Stories] YouTube PLAYING - isMuted:', isMuted, 'startMuted setting:', this.startMuted);
+
+                                    if (!this.startMuted && isMuted) {
+                                        // Video is muted but shouldn't be - try to unmute
+                                        console.log('[Stories] Attempting to unmute...');
+                                        event.target.unMute();
                                         event.target.setVolume(100);
-                                    } else {
-                                        if (!event.target.isMuted()) {
-                                            event.target.mute();
-                                        }
+
+                                        // Check if unmute worked
+                                        setTimeout(() => {
+                                            if (event.target.isMuted()) {
+                                                console.log('[Stories] Unmute failed - showing unmute button');
+                                                this.showUnmuteButton();
+                                            } else {
+                                                console.log('[Stories] Unmute successful');
+                                                this.hideUnmuteButton();
+                                            }
+                                        }, 100);
+                                    } else if (this.startMuted && !isMuted) {
+                                        // Video should be muted but isn't
+                                        event.target.mute();
+                                    } else if (!this.startMuted && !isMuted) {
+                                        // Correctly unmuted
+                                        this.hideUnmuteButton();
                                     }
                                 }
                             }
