@@ -547,8 +547,14 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                  style="flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: row; scrollbar-width: none; -ms-overflow-style: none;">
                 <?php foreach ( $stories as $index => $story ) : 
                     $thumbnail_url = ! empty( $story['thumbnail']['url'] ) ? $story['thumbnail']['url'] : '';
-                    $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '';
                     $video_url = ! empty( $story['video_url'] ) ? $story['video_url'] : '';
+
+                    // Fallback to video thumbnail if no featured image
+                    if ( empty( $thumbnail_url ) && ! empty( $video_url ) ) {
+                        $thumbnail_url = $this->get_video_thumbnail( $video_url );
+                    }
+
+                    $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '';
                     $title = ! empty( $story['story_title'] ) ? $story['story_title'] : '';
                     $text_color = ! empty( $story['text_color'] ) ? $story['text_color'] : '';
                     $text_color_style = $text_color ? 'color: ' . esc_attr( $text_color ) . ';' : '';
@@ -571,7 +577,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                     // Calculate shadow color (slightly darker version of gradient)
                     $shadow_color = $gradient_color ? $this->darken_color( $gradient_color, 20 ) : 'rgba(0,0,0,0.3)';
                     
-                    // Auto-detect class if no gradient color selected
+                    // Auto-detect class if no gradient color selected or if we are using video thumbnail
                     $auto_gradient_class = empty( $gradient_color ) ? 'cbk-stories__card--auto-gradient' : '';
                 ?>
                 <div class="cbk-stories__card <?php echo esc_attr( $auto_gradient_class ); ?>" 
@@ -689,6 +695,30 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         return "rgba(" . round($r) . ", " . round($g) . ", " . round($b) . ", 0.5)";
     }
 
+    /**
+     * Get video thumbnail from URL
+     */
+    private function get_video_thumbnail( $url ) {
+        if ( empty( $url ) ) {
+            return '';
+        }
+
+        // YouTube
+        if ( preg_match( '/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $url, $matches ) ) {
+            return 'https://img.youtube.com/vi/' . $matches[1] . '/hqdefault.jpg';
+        }
+
+        // Vimeo
+        if ( preg_match( '/vimeo\.com\/(\d+)/', $url, $matches ) ) {
+            // For Vimeo we ideally need an API call, but we can't do that synchronously without caching.
+            // For now, we'll try to use a placeholder or skip, as fetching requires a remote request.
+            // Optionally, we could use a JS-side solution for Vimeo if needed.
+            return ''; 
+        }
+
+        return '';
+    }
+
     protected function content_template() {
         ?>
         <#
@@ -697,9 +727,20 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         <div class="cbk-stories {{{ scrollClass }}}">
             <# _.each( settings.stories, function( story, index ) { 
                 var thumbnailUrl = story.thumbnail && story.thumbnail.url ? story.thumbnail.url : '';
-                var gradientColor = story.gradient_color || '#F5F5FF';
+                var videoUrl = story.video_url || '';
+                var gradientColor = story.gradient_color || '';
+
+                // JS Fallback for preview
+                if ( ! thumbnailUrl && videoUrl ) {
+                    var youtubeMatch = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+                    if ( youtubeMatch ) {
+                        thumbnailUrl = 'https://img.youtube.com/vi/' + youtubeMatch[1] + '/hqdefault.jpg';
+                    }
+                }
+
+                var autoGradientClass = ! gradientColor ? 'cbk-stories__card--auto-gradient' : '';
             #>
-            <div class="cbk-stories__card" style="--gradient-color: {{{ gradientColor }}};">
+            <div class="cbk-stories__card {{{ autoGradientClass }}}" style="--gradient-color: {{{ gradientColor || '#888888' }}};" data-thumb-url="{{{ thumbnailUrl }}}" data-intensity="{{{ story.gradient_intensity && story.gradient_intensity.size ? story.gradient_intensity.size : 50 }}}">
                 <# if ( thumbnailUrl ) { #>
                 <div class="cbk-stories__thumbnail" style="background-image: url('{{{ thumbnailUrl }}}');"></div>
                 <# } else { #>
