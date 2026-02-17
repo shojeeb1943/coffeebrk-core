@@ -313,7 +313,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 ],
                 'default' => [
                     'unit' => 'px',
-                    'size' => 200,
+                    'size' => 170,
                 ],
                 'selectors' => [
                     '{{WRAPPER}} .cbk-stories__card' => 'width: {{SIZE}}{{UNIT}}; min-width: {{SIZE}}{{UNIT}};',
@@ -548,10 +548,12 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 <?php foreach ( $stories as $index => $story ) : 
                     $thumbnail_url = ! empty( $story['thumbnail']['url'] ) ? $story['thumbnail']['url'] : '';
                     $video_url = ! empty( $story['video_url'] ) ? $story['video_url'] : '';
+                    $is_video_thumb = false;
 
                     // Fallback to video thumbnail if no featured image
                     if ( empty( $thumbnail_url ) && ! empty( $video_url ) ) {
                         $thumbnail_url = $this->get_video_thumbnail( $video_url );
+                        $is_video_thumb = true;
                     }
 
                     $gradient_color = ! empty( $story['gradient_color'] ) ? $story['gradient_color'] : '';
@@ -585,10 +587,12 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                      data-video-url="<?php echo esc_attr( $video_url ); ?>"
                      data-thumb-url="<?php echo esc_attr( $thumbnail_url ); ?>"
                      data-intensity="<?php echo esc_attr( $gradient_intensity ); ?>"
-                     style="--gradient-color: <?php echo esc_attr( $gradient_color ?: '#888888' ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>; width: 200px; height: 300px; flex: 0 0 auto; border-radius: 12px;">
+                     style="--gradient-color: <?php echo esc_attr( $gradient_color ?: '#888888' ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>; width: 170px; height: 300px; flex: 0 0 auto; border-radius: 12px; margin-right: 16px;">
                     
-                    <?php if ( $thumbnail_url ) : ?>
-                    <div class="cbk-stories__thumbnail" 
+                    <?php if ( $thumbnail_url ) : 
+                        $thumb_class = 'cbk-stories__thumbnail' . ( $is_video_thumb ? ' cbk-stories__thumbnail--video' : '' );
+                    ?>
+                    <div class="<?php echo esc_attr( $thumb_class ); ?>" 
                          data-src="<?php echo esc_url( $thumbnail_url ); ?>"
                          style="background-image: url('<?php echo esc_url( $thumbnail_url ); ?>');">
                     </div>
@@ -733,18 +737,21 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 var gradientColor = story.gradient_color || '';
 
                 // JS Fallback for preview
+                var isVideoThumb = false;
                 if ( ! thumbnailUrl && videoUrl ) {
                     var youtubeMatch = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
                     if ( youtubeMatch ) {
                         thumbnailUrl = 'https://img.youtube.com/vi/' + youtubeMatch[1] + '/hqdefault.jpg';
+                        isVideoThumb = true;
                     }
                 }
 
                 var autoGradientClass = ! gradientColor ? 'cbk-stories__card--auto-gradient' : '';
+                var thumbClass = 'cbk-stories__thumbnail' + ( isVideoThumb ? ' cbk-stories__thumbnail--video' : '' );
             #>
             <div class="cbk-stories__card {{{ autoGradientClass }}}" style="--gradient-color: {{{ gradientColor || '#888888' }}};" data-thumb-url="{{{ thumbnailUrl }}}" data-intensity="{{{ story.gradient_intensity && story.gradient_intensity.size ? story.gradient_intensity.size : 50 }}}">
                 <# if ( thumbnailUrl ) { #>
-                <div class="cbk-stories__thumbnail" style="background-image: url('{{{ thumbnailUrl }}}');"></div>
+                <div class="{{{ thumbClass }}}" style="background-image: url('{{{ thumbnailUrl }}}');"></div>
                 <# } else { #>
                 <div class="cbk-stories__thumbnail cbk-stories__thumbnail--placeholder"></div>
                 <# } #>

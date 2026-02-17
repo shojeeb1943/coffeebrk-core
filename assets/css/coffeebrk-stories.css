@@ -5,7 +5,7 @@
  */
 
 /* ============================================
-   Stories Container
+   Stories Container All CSS
    ============================================ */
 .cbk-stories {
     display: flex;
@@ -24,7 +24,7 @@
     /* Hide scrollbar Firefox */
     -ms-overflow-style: none;
     /* Hide scrollbar IE/Edge */
-    gap: 12px;
+    gap: 20px;
     /* Consistent gap */
 }
 
@@ -114,7 +114,7 @@
     background: #ffffff;
     cursor: pointer;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-    width: 200px;
+    width: 170px;
     height: 300px;
     border-radius: 12px;
 }
@@ -142,8 +142,17 @@
     transition: transform 0.3s ease;
 }
 
+/* Higher zoom for video thumbnails to hide baked-in black bars on sides */
+.cbk-stories__thumbnail--video {
+    transform: scale(1.35);
+}
+
 .cbk-stories__card:hover .cbk-stories__thumbnail {
     transform: scale(1.1);
+}
+
+.cbk-stories__card:hover .cbk-stories__thumbnail--video {
+    transform: scale(1.45);
 }
 
 .cbk-stories__thumbnail--placeholder {
