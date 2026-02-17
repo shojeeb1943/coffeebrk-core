@@ -114,8 +114,8 @@
     background: #ffffff;
     cursor: pointer;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-    width: 160px;
-    height: 284px;
+    width: 200px;
+    height: 300px;
     border-radius: 12px;
 }
 
@@ -137,6 +137,13 @@
     background-position: center;
     background-repeat: no-repeat;
     z-index: 1;
+    /* Zoom slightly to hide potential baked-in black bars from video thumbnails */
+    transform: scale(1.05);
+    transition: transform 0.3s ease;
+}
+
+.cbk-stories__card:hover .cbk-stories__thumbnail {
+    transform: scale(1.1);
 }
 
 .cbk-stories__thumbnail--placeholder {

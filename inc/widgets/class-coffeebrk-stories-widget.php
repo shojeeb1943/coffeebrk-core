@@ -313,7 +313,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 ],
                 'default' => [
                     'unit' => 'px',
-                    'size' => 166,
+                    'size' => 200,
                 ],
                 'selectors' => [
                     '{{WRAPPER}} .cbk-stories__card' => 'width: {{SIZE}}{{UNIT}}; min-width: {{SIZE}}{{UNIT}};',
@@ -585,7 +585,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                      data-video-url="<?php echo esc_attr( $video_url ); ?>"
                      data-thumb-url="<?php echo esc_attr( $thumbnail_url ); ?>"
                      data-intensity="<?php echo esc_attr( $gradient_intensity ); ?>"
-                     style="--gradient-color: <?php echo esc_attr( $gradient_color ?: '#888888' ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>; width: 160px; height: 284px; flex: 0 0 auto; border-radius: 12px; margin-right: 16px;">
+                     style="--gradient-color: <?php echo esc_attr( $gradient_color ?: '#888888' ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>; width: 200px; height: 300px; flex: 0 0 auto; border-radius: 12px; margin-right: 16px;">
                     
                     <?php if ( $thumbnail_url ) : ?>
                     <div class="cbk-stories__thumbnail" 
@@ -705,6 +705,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
 
         // YouTube
         if ( preg_match( '/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $url, $matches ) ) {
+            // maxresdefault is 16:9, hqdefault is 4:3 with bars. We use hqdefault as base but CSS covers it.
+            // Using hqdefault as it's most reliable for all videos.
             return 'https://img.youtube.com/vi/' . $matches[1] . '/hqdefault.jpg';
         }
 
