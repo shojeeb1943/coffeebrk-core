@@ -237,12 +237,24 @@ function cbk_story_details_callback( $post ) {
         $text_color = '#323232';
     }
 
-    // Get gradient intensity
     $gradient_intensity = get_post_meta( $post->ID, '_cbk_story_gradient_intensity', true );
     if ( $gradient_intensity === '' ) {
         $gradient_intensity = 50; // Default 50%
     }
+
+    $show_frontend = get_post_meta( $post->ID, '_cbk_story_show_frontend', true );
+    if ( $show_frontend === '' ) {
+        $show_frontend = 'yes'; // Default to yes
+    }
     ?>
+    <p>
+        <label for="cbk_story_show_frontend">
+            <input type="checkbox" id="cbk_story_show_frontend" name="cbk_story_show_frontend" value="yes" <?php checked( $show_frontend, 'yes' ); ?>>
+            <strong><?php _e( 'Show on Frontend', 'coffeebrk-core' ); ?></strong>
+        </label><br>
+        <span class="description"><?php _e( 'Uncheck this to hide this story from the widget.', 'coffeebrk-core' ); ?></span>
+    </p>
+
     <p>
         <label for="cbk_story_video_url"><strong><?php _e( 'Video URL', 'coffeebrk-core' ); ?></strong></label><br>
         <input type="url" id="cbk_story_video_url" name="cbk_story_video_url" value="<?php echo esc_attr( $video_url ); ?>" class="widefat" placeholder="https://www.youtube.com/watch?v=...">
@@ -314,6 +326,10 @@ add_action( 'save_post', function( $post_id ) {
         $intensity = max( 0, min( 100, $intensity ) ); // Clamp 0-100
         update_post_meta( $post_id, '_cbk_story_gradient_intensity', $intensity );
     }
+
+    // Save Show on Frontend
+    $show_frontend = isset( $_POST['cbk_story_show_frontend'] ) ? 'yes' : 'no';
+    update_post_meta( $post_id, '_cbk_story_show_frontend', $show_frontend );
 });
 
 /**
@@ -325,6 +341,7 @@ add_filter( 'manage_cbk_story_posts_columns', function( $columns ) {
     $new_columns['thumbnail'] = __( 'Thumbnail', 'coffeebrk-core' );
     $new_columns['title'] = $columns['title'];
     $new_columns['video'] = __( 'Video', 'coffeebrk-core' );
+    $new_columns['show_frontend'] = __( 'Show', 'coffeebrk-core' );
     $new_columns['date'] = $columns['date'];
     return $new_columns;
 });
@@ -344,6 +361,14 @@ add_action( 'manage_cbk_story_posts_custom_column', function( $column, $post_id 
                 echo '<a href="' . esc_url( $url ) . '" target="_blank" title="' . esc_attr( $url ) . '"><span class="dashicons dashicons-video-alt3"></span></a>';
             } else {
                 echo '—';
+            }
+            break;
+        case 'show_frontend':
+            $show = get_post_meta( $post_id, '_cbk_story_show_frontend', true );
+            if ( $show === 'no' ) {
+                echo '<span class="dashicons dashicons-hidden" style="color:#aaa;" title="Hidden"></span>';
+            } else {
+                echo '<span class="dashicons dashicons-visibility" style="color:#46b450;" title="Visible"></span>';
             }
             break;
     }

@@ -80,7 +80,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
             [
                 'label' => __( 'Limit', 'coffeebrk-core' ),
                 'type' => Controls_Manager::NUMBER,
-                'default' => 10,
+                'default' => 50,
                 'condition' => [
                     'source_type' => 'global',
                 ],
@@ -493,6 +493,18 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 'post_status' => 'publish',
                 'orderby' => 'menu_order date',
                 'order' => 'DESC',
+                'meta_query' => [
+                    'relation' => 'OR',
+                    [
+                        'key'     => '_cbk_story_show_frontend',
+                        'value'   => 'no',
+                        'compare' => '!=',
+                    ],
+                    [
+                        'key'     => '_cbk_story_show_frontend',
+                        'compare' => 'NOT EXISTS',
+                    ],
+                ],
             ];
             
             $query = new \WP_Query( $args );
