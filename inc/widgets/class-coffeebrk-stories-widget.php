@@ -585,7 +585,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                      data-video-url="<?php echo esc_attr( $video_url ); ?>"
                      data-thumb-url="<?php echo esc_attr( $thumbnail_url ); ?>"
                      data-intensity="<?php echo esc_attr( $gradient_intensity ); ?>"
-                     style="--gradient-color: <?php echo esc_attr( $gradient_color ?: '#888888' ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>; width: 200px; height: 300px; flex: 0 0 auto; border-radius: 12px; margin-right: 16px;">
+                     style="--gradient-color: <?php echo esc_attr( $gradient_color ?: '#888888' ); ?>; --shadow-color: <?php echo esc_attr( $shadow_color ); ?>; width: 200px; height: 300px; flex: 0 0 auto; border-radius: 12px;">
                     
                     <?php if ( $thumbnail_url ) : ?>
                     <div class="cbk-stories__thumbnail" 

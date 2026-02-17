@@ -49,7 +49,7 @@ add_action( 'admin_menu', function() {
         'cbk-stories-import',
         'cbk_stories_import_page'
     );
-});
+}, 20 );
 
 /**
  * Handle JSON Import Logic
@@ -143,6 +143,9 @@ add_action( 'admin_init', function() {
  * Render Import Page
  */
 function cbk_stories_import_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
     ?>
     <div class="wrap">
         <h1><?php _e( 'Import Stories from JSON', 'coffeebrk-core' ); ?></h1>
