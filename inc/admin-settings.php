@@ -306,11 +306,14 @@ function coffeebrk_core_api_page(){
     // Display notices
     if ( isset( $_GET['msg'] ) ) {
         $msg = sanitize_key( (string) $_GET['msg'] );
-        if ( $msg === 'token_generated' ) {
-            echo '<div class="notice notice-success"><p>API token generated. Copy it now (it will only be shown once).</p></div>';
-        }
-        if ( $msg === 'token_revoked' ) {
-            echo '<div class="notice notice-success"><p>API token revoked.</p></div>';
+        $notices = [
+            'token_generated' => [ 'success', 'API token generated. Copy it now (it will only be shown once).' ],
+            'token_created'   => [ 'success', 'New API token created successfully. Copy the token now - it will not be shown again.' ],
+            'token_revoked'   => [ 'success', 'API token has been permanently revoked.' ],
+            'token_updated'   => [ 'success', 'Token settings updated successfully.' ],
+        ];
+        if ( isset( $notices[ $msg ] ) ) {
+            echo '<div class="notice notice-' . esc_attr( $notices[ $msg ][0] ) . ' is-dismissible"><p>' . esc_html( $notices[ $msg ][1] ) . '</p></div>';
         }
     }
 
@@ -350,54 +353,239 @@ function coffeebrk_core_api_page(){
  * Overview Tab
  */
 function coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $token_last4, $token_updated, $token_user_id, $uid ) {
+    // Get all tokens using new multi-token system
+    $tokens = function_exists( 'coffeebrk_get_api_tokens' ) ? coffeebrk_get_api_tokens() : [];
+    $new_token_id = isset( $_GET['new_token'] ) ? sanitize_text_field( $_GET['new_token'] ) : '';
     ?>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1200px;">
-        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
-            <h2 style="margin-top:0;">API Token Management</h2>
-            <p style="color:#555;">For server-to-server integrations (n8n, Zapier, custom apps), use Bearer token authentication.</p>
 
-            <?php if ( $token_hash !== '' ) : ?>
-                <?php
-                $when = $token_updated > 0 ? wp_date( 'Y-m-d H:i:s', $token_updated ) : '';
-                $owner = $token_user_id > 0 ? get_user_by( 'id', $token_user_id ) : false;
-                $owner_label = $owner instanceof WP_User ? $owner->user_login : '';
-                ?>
-                <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;padding:12px;margin:10px 0;">
-                    <strong style="color:#155724;">Status: Active</strong>
-                    <?php echo $token_last4 !== '' ? ' (ends with <code>' . esc_html( $token_last4 ) . '</code>)' : ''; ?>
-                    <?php echo $owner_label !== '' ? '<br>Owner: ' . esc_html( $owner_label ) : ''; ?>
-                    <?php echo $when !== '' ? '<br>Updated: ' . esc_html( $when ) : ''; ?>
-                </div>
-            <?php else : ?>
-                <div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:6px;padding:12px;margin:10px 0;">
-                    <strong style="color:#721c24;">Status: No active token</strong>
-                    <br><span style="color:#721c24;">Generate a token to enable API access.</span>
-                </div>
-            <?php endif; ?>
+    <style>
+        .cbk-token-card { background:#fff; border:1px solid #e5e5e5; border-radius:8px; padding:16px; margin-bottom:12px; transition: box-shadow 0.2s; }
+        .cbk-token-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .cbk-token-card.new-token { border-color: #ffc107; background: #fffdf5; }
+        .cbk-token-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+        .cbk-token-name { font-weight:600; font-size:15px; color:#1d2327; display:flex; align-items:center; gap:8px; }
+        .cbk-token-status { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; text-transform:uppercase; }
+        .cbk-token-status.active { background:#d4edda; color:#155724; }
+        .cbk-token-status.inactive { background:#f8d7da; color:#721c24; }
+        .cbk-token-meta { display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin:12px 0; padding:12px 0; border-top:1px solid #f0f0f0; border-bottom:1px solid #f0f0f0; }
+        .cbk-token-meta-item { text-align:center; }
+        .cbk-token-meta-label { font-size:11px; color:#666; text-transform:uppercase; letter-spacing:0.5px; }
+        .cbk-token-meta-value { font-size:13px; color:#1d2327; margin-top:4px; font-family:monospace; }
+        .cbk-token-value-row { display:flex; align-items:center; gap:8px; background:#f8f9fa; padding:10px 12px; border-radius:6px; margin:10px 0; }
+        .cbk-token-value { flex:1; font-family:monospace; font-size:13px; letter-spacing:0.5px; color:#1d2327; }
+        .cbk-token-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .cbk-btn-icon { padding:6px 10px; border:1px solid #ddd; background:#fff; border-radius:4px; cursor:pointer; font-size:13px; display:inline-flex; align-items:center; gap:4px; }
+        .cbk-btn-icon:hover { background:#f0f0f0; }
+        .cbk-btn-icon.danger { color:#dc3545; border-color:#dc3545; }
+        .cbk-btn-icon.danger:hover { background:#dc3545; color:#fff; }
+        .cbk-permissions { display:flex; gap:6px; margin-top:8px; }
+        .cbk-perm-badge { padding:2px 8px; border-radius:4px; font-size:11px; font-weight:500; }
+        .cbk-perm-badge.read { background:#e3f2fd; color:#1565c0; }
+        .cbk-perm-badge.write { background:#fff3e0; color:#e65100; }
+        .cbk-perm-badge.delete { background:#ffebee; color:#c62828; }
+        .cbk-new-token-form { background:#fff; border:1px solid #0073aa; border-radius:8px; padding:20px; margin-bottom:20px; }
+        .cbk-form-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+        .cbk-form-group { flex:1; min-width:200px; }
+        .cbk-form-group label { display:block; font-weight:500; margin-bottom:6px; color:#1d2327; }
+        .cbk-form-group input[type="text"] { width:100%; padding:8px 12px; border:1px solid #ddd; border-radius:4px; }
+        .cbk-checkbox-group { display:flex; gap:16px; padding:8px 0; }
+        .cbk-checkbox-group label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+        .cbk-copy-btn { background:#0073aa; color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:13px; }
+        .cbk-copy-btn:hover { background:#005a87; }
+        .cbk-copy-btn.copied { background:#28a745; }
+        .cbk-token-alert { background:#fff3cd; border:1px solid #ffc107; border-radius:6px; padding:12px 16px; margin-bottom:16px; }
+        .cbk-token-alert strong { color:#856404; }
+        .cbk-token-alert p { color:#856404; margin:4px 0 0; font-size:13px; }
+    </style>
 
-            <?php if ( $plain_token !== '' ) : ?>
-                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px;margin:10px 0;">
-                    <strong style="color:#856404;">Copy this token now!</strong>
-                    <p style="color:#856404;margin:5px 0 10px;">It will not be shown again after you leave this page.</p>
-                    <input type="text" readonly value="<?php echo esc_attr( $plain_token ); ?>" style="width:100%;font-family:monospace;padding:8px;" onclick="this.select();" />
-                </div>
-                <?php if ( $uid > 0 ) { delete_transient( 'coffeebrk_core_api_token_plain_' . $uid ); } ?>
-            <?php endif; ?>
+    <script>
+    function toggleTokenVisibility(btn, tokenId) {
+        const valueEl = btn.closest('.cbk-token-card').querySelector('.cbk-token-value');
+        const isHidden = valueEl.dataset.hidden === 'true';
 
-            <div style="display:flex;gap:10px;margin-top:15px;">
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                    <input type="hidden" name="action" value="coffeebrk_core_api_token_generate" />
-                    <?php wp_nonce_field( 'coffeebrk_core_api_token_generate' ); ?>
-                    <button type="submit" class="button button-primary">Generate New Token</button>
-                </form>
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                    <input type="hidden" name="action" value="coffeebrk_core_api_token_revoke" />
-                    <?php wp_nonce_field( 'coffeebrk_core_api_token_revoke' ); ?>
-                    <button type="submit" class="button">Revoke Token</button>
-                </form>
-            </div>
+        if (isHidden) {
+            valueEl.textContent = valueEl.dataset.full;
+            valueEl.dataset.hidden = 'false';
+            btn.innerHTML = '<span class="dashicons dashicons-hidden"></span> Hide';
+        } else {
+            valueEl.textContent = valueEl.dataset.masked;
+            valueEl.dataset.hidden = 'true';
+            btn.innerHTML = '<span class="dashicons dashicons-visibility"></span> Show';
+        }
+    }
+
+    function copyToken(btn, token) {
+        navigator.clipboard.writeText(token).then(function() {
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="dashicons dashicons-yes"></span> Copied!';
+            btn.classList.add('copied');
+            setTimeout(function() {
+                btn.innerHTML = originalText;
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    function confirmRevoke(tokenName) {
+        return confirm('Are you sure you want to permanently revoke the token "' + tokenName + '"?\n\nThis action cannot be undone and any integrations using this token will stop working.');
+    }
+    </script>
+
+    <div style="max-width:1200px;">
+        <!-- Create New Token Form -->
+        <div class="cbk-new-token-form">
+            <h3 style="margin:0 0 16px; display:flex; align-items:center; gap:8px;">
+                <span class="dashicons dashicons-plus-alt2" style="color:#0073aa;"></span>
+                Create New API Token
+            </h3>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <input type="hidden" name="action" value="coffeebrk_create_token" />
+                <?php wp_nonce_field( 'coffeebrk_create_token' ); ?>
+
+                <div class="cbk-form-row">
+                    <div class="cbk-form-group">
+                        <label for="token_name">Token Name</label>
+                        <input type="text" id="token_name" name="token_name" placeholder="e.g., n8n Production, Zapier Integration" />
+                    </div>
+
+                    <div class="cbk-form-group" style="flex:0 0 auto;">
+                        <label>Permissions</label>
+                        <div class="cbk-checkbox-group">
+                            <label><input type="checkbox" name="perm_read" checked /> Read</label>
+                            <label><input type="checkbox" name="perm_write" checked /> Write</label>
+                            <label><input type="checkbox" name="perm_delete" checked /> Delete</label>
+                        </div>
+                    </div>
+
+                    <div style="flex:0 0 auto;">
+                        <button type="submit" class="button button-primary button-large">
+                            <span class="dashicons dashicons-admin-network" style="margin-top:3px;"></span>
+                            Generate Token
+                        </button>
+                    </div>
+                </div>
+            </form>
         </div>
 
+        <!-- Token List -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h2 style="margin:0;">API Tokens (<?php echo count( $tokens ); ?>)</h2>
+            <span style="color:#666; font-size:13px;">Tokens are used for server-to-server authentication</span>
+        </div>
+
+        <?php if ( empty( $tokens ) ) : ?>
+            <div style="background:#f8f9fa; border:1px dashed #ddd; border-radius:8px; padding:40px; text-align:center;">
+                <span class="dashicons dashicons-admin-network" style="font-size:48px; color:#ccc; margin-bottom:16px;"></span>
+                <h3 style="margin:0 0 8px; color:#666;">No API Tokens</h3>
+                <p style="color:#888; margin:0;">Create your first token to start using the API with n8n, Zapier, or custom integrations.</p>
+            </div>
+        <?php else : ?>
+            <?php foreach ( $tokens as $token ) :
+                $is_new = $token['id'] === $new_token_id;
+                $new_plain_token = $is_new ? get_transient( 'coffeebrk_new_token_' . $token['id'] ) : '';
+                $owner = isset( $token['created_by'] ) && $token['created_by'] > 0 ? get_user_by( 'id', $token['created_by'] ) : false;
+                $masked_token = 'cbk_' . str_repeat( '*', 32 ) . ( $token['last4'] ?? '****' );
+            ?>
+                <div class="cbk-token-card <?php echo $is_new ? 'new-token' : ''; ?>">
+                    <?php if ( $is_new && $new_plain_token ) : ?>
+                        <div class="cbk-token-alert">
+                            <strong>New Token Created - Copy Now!</strong>
+                            <p>This is the only time you'll see this token. Store it securely.</p>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="cbk-token-header">
+                        <div class="cbk-token-name">
+                            <span class="dashicons dashicons-admin-network" style="color:#0073aa;"></span>
+                            <?php echo esc_html( $token['name'] ?? 'Unnamed Token' ); ?>
+                        </div>
+                        <span class="cbk-token-status <?php echo esc_attr( $token['status'] ?? 'active' ); ?>">
+                            <?php echo esc_html( $token['status'] ?? 'active' ); ?>
+                        </span>
+                    </div>
+
+                    <div class="cbk-token-value-row">
+                        <?php if ( $is_new && $new_plain_token ) : ?>
+                            <code class="cbk-token-value" data-hidden="false" data-full="<?php echo esc_attr( $new_plain_token ); ?>" data-masked="<?php echo esc_attr( $masked_token ); ?>">
+                                <?php echo esc_html( $new_plain_token ); ?>
+                            </code>
+                            <button type="button" class="cbk-btn-icon" onclick="toggleTokenVisibility(this, '<?php echo esc_attr( $token['id'] ); ?>')">
+                                <span class="dashicons dashicons-hidden"></span> Hide
+                            </button>
+                            <button type="button" class="cbk-copy-btn" onclick="copyToken(this, '<?php echo esc_attr( $new_plain_token ); ?>')">
+                                <span class="dashicons dashicons-admin-page" style="font-size:14px; margin-top:2px;"></span> Copy
+                            </button>
+                            <?php delete_transient( 'coffeebrk_new_token_' . $token['id'] ); ?>
+                        <?php else : ?>
+                            <code class="cbk-token-value" data-hidden="true" data-full="<?php echo esc_attr( ( $token['prefix'] ?? 'cbk_****' ) . str_repeat( '*', 28 ) . ( $token['last4'] ?? '****' ) ); ?>" data-masked="<?php echo esc_attr( $masked_token ); ?>">
+                                <?php echo esc_html( $masked_token ); ?>
+                            </code>
+                            <button type="button" class="cbk-btn-icon" onclick="toggleTokenVisibility(this, '<?php echo esc_attr( $token['id'] ); ?>')">
+                                <span class="dashicons dashicons-visibility"></span> Show
+                            </button>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="cbk-token-meta">
+                        <div class="cbk-token-meta-item">
+                            <div class="cbk-token-meta-label">Token ID</div>
+                            <div class="cbk-token-meta-value"><?php echo esc_html( $token['id'] ?? 'N/A' ); ?></div>
+                        </div>
+                        <div class="cbk-token-meta-item">
+                            <div class="cbk-token-meta-label">Created</div>
+                            <div class="cbk-token-meta-value"><?php echo esc_html( coffeebrk_time_ago( $token['created_at'] ?? 0 ) ); ?></div>
+                        </div>
+                        <div class="cbk-token-meta-item">
+                            <div class="cbk-token-meta-label">Last Used</div>
+                            <div class="cbk-token-meta-value"><?php echo esc_html( coffeebrk_time_ago( $token['last_used'] ?? null ) ); ?></div>
+                        </div>
+                        <div class="cbk-token-meta-item">
+                            <div class="cbk-token-meta-label">Created By</div>
+                            <div class="cbk-token-meta-value"><?php echo $owner ? esc_html( $owner->user_login ) : 'System'; ?></div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="cbk-permissions">
+                            <?php
+                            $perms = $token['permissions'] ?? [ 'read', 'write', 'delete' ];
+                            foreach ( $perms as $perm ) :
+                            ?>
+                                <span class="cbk-perm-badge <?php echo esc_attr( $perm ); ?>"><?php echo esc_html( ucfirst( $perm ) ); ?></span>
+                            <?php endforeach; ?>
+                        </div>
+
+                        <div class="cbk-token-actions">
+                            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;">
+                                <input type="hidden" name="action" value="coffeebrk_toggle_token" />
+                                <input type="hidden" name="token_id" value="<?php echo esc_attr( $token['id'] ); ?>" />
+                                <?php wp_nonce_field( 'coffeebrk_toggle_token_' . $token['id'] ); ?>
+                                <button type="submit" class="cbk-btn-icon">
+                                    <?php if ( ( $token['status'] ?? 'active' ) === 'active' ) : ?>
+                                        <span class="dashicons dashicons-controls-pause"></span> Disable
+                                    <?php else : ?>
+                                        <span class="dashicons dashicons-controls-play"></span> Enable
+                                    <?php endif; ?>
+                                </button>
+                            </form>
+
+                            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;" onsubmit="return confirmRevoke('<?php echo esc_attr( $token['name'] ?? 'this token' ); ?>');">
+                                <input type="hidden" name="action" value="coffeebrk_revoke_token" />
+                                <input type="hidden" name="token_id" value="<?php echo esc_attr( $token['id'] ); ?>" />
+                                <?php wp_nonce_field( 'coffeebrk_revoke_token_' . $token['id'] ); ?>
+                                <button type="submit" class="cbk-btn-icon danger">
+                                    <span class="dashicons dashicons-trash"></span> Revoke
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+
+    <!-- Quick Reference and Authentication sections below tokens -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1200px;margin-top:30px;">
         <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
             <h2 style="margin-top:0;">Quick Reference</h2>
             <p style="color:#555;margin-bottom:15px;">Base URL: <code><?php echo esc_html( $rest_base ); ?></code></p>
@@ -418,30 +606,29 @@ function coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $tok
                 </tbody>
             </table>
         </div>
-    </div>
 
-    <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-top:20px;max-width:1200px;">
-        <h2 style="margin-top:0;">Authentication</h2>
-        <p style="color:#555;">All API requests (except public endpoints) require authentication using a Bearer token.</p>
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+            <h2 style="margin-top:0;">Authentication</h2>
+            <p style="color:#555;">All API requests (except public endpoints) require authentication using a Bearer token.</p>
 
-        <h3>HTTP Header</h3>
-        <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code>Authorization: Bearer YOUR_API_TOKEN</code></pre>
+            <h3 style="font-size:14px;">HTTP Header</h3>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px;"><code>Authorization: Bearer cbk_your_token_here</code></pre>
 
-        <h3>Alternative Header</h3>
-        <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code>X-Coffeebrk-Token: YOUR_API_TOKEN</code></pre>
+            <h3 style="font-size:14px;">Alternative Header</h3>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:6px;overflow-x:auto;font-size:12px;"><code>X-Coffeebrk-Token: cbk_your_token_here</code></pre>
 
-        <h3>Response Codes</h3>
-        <table class="widefat striped" style="max-width:600px;">
-            <thead><tr><th>Code</th><th>Description</th></tr></thead>
-            <tbody>
-                <tr><td><code>200</code></td><td>Success</td></tr>
-                <tr><td><code>201</code></td><td>Created successfully</td></tr>
-                <tr><td><code>400</code></td><td>Bad request (invalid parameters)</td></tr>
-                <tr><td><code>401</code></td><td>Unauthorized (invalid/missing token)</td></tr>
-                <tr><td><code>404</code></td><td>Resource not found</td></tr>
-                <tr><td><code>500</code></td><td>Server error</td></tr>
-            </tbody>
-        </table>
+            <h3 style="font-size:14px;margin-top:16px;">Response Codes</h3>
+            <table class="widefat striped" style="font-size:13px;">
+                <tbody>
+                    <tr><td style="width:60px;"><code>200</code></td><td>Success</td></tr>
+                    <tr><td><code>201</code></td><td>Created successfully</td></tr>
+                    <tr><td><code>400</code></td><td>Bad request</td></tr>
+                    <tr><td><code>401</code></td><td>Unauthorized</td></tr>
+                    <tr><td><code>404</code></td><td>Not found</td></tr>
+                    <tr><td><code>500</code></td><td>Server error</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     <?php
 }

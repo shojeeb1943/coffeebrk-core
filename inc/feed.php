@@ -77,7 +77,15 @@ add_action('rest_api_init', function(){
                 return true;
             }
             $token = coffeebrk_core_get_bearer_token_from_rest_request( $req );
-            return $token !== '' && coffeebrk_core_api_token_is_valid( $token );
+            if ( $token === '' ) {
+                return false;
+            }
+            // Use new multi-token system if available
+            if ( function_exists( 'coffeebrk_token_has_permission' ) ) {
+                return coffeebrk_token_has_permission( $token, 'write' );
+            }
+            // Fallback to old system
+            return function_exists( 'coffeebrk_core_api_token_is_valid' ) && coffeebrk_core_api_token_is_valid( $token );
         },
         'callback' => function( WP_REST_Request $req ){
             $params = $req->get_json_params();

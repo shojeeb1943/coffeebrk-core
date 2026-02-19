@@ -159,13 +159,20 @@ function coffeebrk_register_rest_routes() {
 
 /**
  * Permission callback for read operations
- * Allows: Bearer token OR logged-in user
+ * Allows: Bearer token with 'read' permission OR logged-in user
  */
 function coffeebrk_api_permission_read( WP_REST_Request $req ) {
     // Check Bearer token first
     $token = coffeebrk_core_get_bearer_token_from_rest_request( $req );
-    if ( $token !== '' && coffeebrk_core_api_token_is_valid( $token ) ) {
-        return true;
+    if ( $token !== '' ) {
+        // Use new multi-token system if available
+        if ( function_exists( 'coffeebrk_token_has_permission' ) ) {
+            return coffeebrk_token_has_permission( $token, 'read' );
+        }
+        // Fallback to old system
+        if ( function_exists( 'coffeebrk_core_api_token_is_valid' ) && coffeebrk_core_api_token_is_valid( $token ) ) {
+            return true;
+        }
     }
 
     // Allow logged-in users
@@ -174,13 +181,20 @@ function coffeebrk_api_permission_read( WP_REST_Request $req ) {
 
 /**
  * Permission callback for write operations
- * Allows: Bearer token OR logged-in user with edit_posts
+ * Allows: Bearer token with 'write' permission OR logged-in user with edit_posts
  */
 function coffeebrk_api_permission_write( WP_REST_Request $req ) {
     // Check Bearer token first
     $token = coffeebrk_core_get_bearer_token_from_rest_request( $req );
-    if ( $token !== '' && coffeebrk_core_api_token_is_valid( $token ) ) {
-        return true;
+    if ( $token !== '' ) {
+        // Use new multi-token system if available
+        if ( function_exists( 'coffeebrk_token_has_permission' ) ) {
+            return coffeebrk_token_has_permission( $token, 'write' );
+        }
+        // Fallback to old system
+        if ( function_exists( 'coffeebrk_core_api_token_is_valid' ) && coffeebrk_core_api_token_is_valid( $token ) ) {
+            return true;
+        }
     }
 
     // Logged-in user with edit_posts capability
@@ -189,13 +203,20 @@ function coffeebrk_api_permission_write( WP_REST_Request $req ) {
 
 /**
  * Permission callback for delete operations
- * Allows: Bearer token OR logged-in user with delete_posts
+ * Allows: Bearer token with 'delete' permission OR logged-in user with delete_posts
  */
 function coffeebrk_api_permission_delete( WP_REST_Request $req ) {
     // Check Bearer token first
     $token = coffeebrk_core_get_bearer_token_from_rest_request( $req );
-    if ( $token !== '' && coffeebrk_core_api_token_is_valid( $token ) ) {
-        return true;
+    if ( $token !== '' ) {
+        // Use new multi-token system if available
+        if ( function_exists( 'coffeebrk_token_has_permission' ) ) {
+            return coffeebrk_token_has_permission( $token, 'delete' );
+        }
+        // Fallback to old system
+        if ( function_exists( 'coffeebrk_core_api_token_is_valid' ) && coffeebrk_core_api_token_is_valid( $token ) ) {
+            return true;
+        }
     }
 
     // Logged-in user with delete_posts capability
