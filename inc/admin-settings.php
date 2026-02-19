@@ -69,6 +69,25 @@ add_action('admin_menu', function() {
     );
 });
 
+// Ensure Dashboard is always the first submenu item
+// (CPT submenus like "All Stories" get auto-inserted before manual items)
+add_action( 'admin_menu', function() {
+    global $submenu;
+    if ( empty( $submenu['coffeebrk-core'] ) ) return;
+    $dashboard = null;
+    $rest = [];
+    foreach ( $submenu['coffeebrk-core'] as $item ) {
+        if ( isset( $item[2] ) && $item[2] === 'coffeebrk-core' ) {
+            $dashboard = $item;
+        } else {
+            $rest[] = $item;
+        }
+    }
+    if ( $dashboard ) {
+        $submenu['coffeebrk-core'] = array_values( array_merge( [ $dashboard ], $rest ) );
+    }
+}, 999 );
+
 /* ---- Enqueue dashboard CSS ---- */
 add_action( 'admin_enqueue_scripts', function( $hook ) {
     if ( $hook !== 'toplevel_page_coffeebrk-core' ) return;
