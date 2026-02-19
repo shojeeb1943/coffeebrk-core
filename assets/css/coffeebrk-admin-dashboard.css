@@ -1,0 +1,497 @@
+/* ==========================================================================
+   Coffeebrk Core — Admin Dashboard
+   ========================================================================== */
+
+/* ---- Custom Properties ---- */
+:root {
+    --cbk-brand:        #0073aa;
+    --cbk-brand-dark:   #005a87;
+    --cbk-brand-light:  #e8f4fb;
+    --cbk-accent:       #f97316;
+    --cbk-success:      #22c55e;
+    --cbk-warning:      #eab308;
+    --cbk-danger:       #ef4444;
+    --cbk-slate-900:    #0f172a;
+    --cbk-slate-800:    #1e293b;
+    --cbk-slate-700:    #334155;
+    --cbk-slate-600:    #475569;
+    --cbk-slate-500:    #64748b;
+    --cbk-slate-400:    #94a3b8;
+    --cbk-slate-300:    #cbd5e1;
+    --cbk-slate-200:    #e2e8f0;
+    --cbk-slate-100:    #f1f5f9;
+    --cbk-slate-50:     #f8fafc;
+    --cbk-white:        #ffffff;
+    --cbk-radius:       10px;
+    --cbk-radius-sm:    6px;
+    --cbk-shadow:       0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --cbk-shadow-md:    0 4px 6px -1px rgba(0,0,0,.07), 0 2px 4px -2px rgba(0,0,0,.05);
+    --cbk-shadow-lg:    0 10px 15px -3px rgba(0,0,0,.08), 0 4px 6px -4px rgba(0,0,0,.05);
+    --cbk-transition:   .2s ease;
+}
+
+/* ---- Reset inside our wrapper ---- */
+.cbk-dash *,
+.cbk-dash *::before,
+.cbk-dash *::after { box-sizing: border-box; }
+
+.cbk-dash {
+    max-width: 1280px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+                 Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    color: var(--cbk-slate-800);
+}
+
+/* ==========================================================================
+   Header Banner
+   ========================================================================== */
+.cbk-header {
+    background: linear-gradient(135deg, var(--cbk-slate-900) 0%, var(--cbk-brand-dark) 60%, var(--cbk-brand) 100%);
+    border-radius: var(--cbk-radius);
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: var(--cbk-shadow-lg);
+}
+
+.cbk-header-left {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+.cbk-header-logo {
+    width: 48px;
+    height: 48px;
+    background: rgba(255,255,255,.15);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    backdrop-filter: blur(4px);
+}
+
+.cbk-header-logo img {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+}
+
+.cbk-header-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--cbk-white);
+    margin: 0;
+    letter-spacing: -.3px;
+}
+
+.cbk-header-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,.7);
+    margin: 3px 0 0;
+}
+
+.cbk-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cbk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+
+.cbk-badge--version {
+    background: rgba(255,255,255,.15);
+    color: var(--cbk-white);
+    backdrop-filter: blur(4px);
+}
+
+.cbk-badge--ok {
+    background: rgba(34,197,94,.2);
+    color: #4ade80;
+}
+
+/* ==========================================================================
+   Stat Cards
+   ========================================================================== */
+.cbk-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.cbk-stat {
+    background: var(--cbk-white);
+    border: 1px solid var(--cbk-slate-200);
+    border-radius: var(--cbk-radius);
+    padding: 20px 22px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    box-shadow: var(--cbk-shadow);
+    transition: box-shadow var(--cbk-transition), transform var(--cbk-transition);
+    border-left: 4px solid var(--cbk-brand);
+    position: relative;
+    overflow: hidden;
+}
+
+.cbk-stat:hover {
+    box-shadow: var(--cbk-shadow-md);
+    transform: translateY(-2px);
+}
+
+.cbk-stat:nth-child(2) { border-left-color: var(--cbk-accent); }
+.cbk-stat:nth-child(3) { border-left-color: var(--cbk-success); }
+.cbk-stat:nth-child(4) { border-left-color: #8b5cf6; }
+
+.cbk-stat__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.cbk-stat:nth-child(1) .cbk-stat__icon { background: var(--cbk-brand-light); color: var(--cbk-brand); }
+.cbk-stat:nth-child(2) .cbk-stat__icon { background: #fff7ed; color: var(--cbk-accent); }
+.cbk-stat:nth-child(3) .cbk-stat__icon { background: #f0fdf4; color: var(--cbk-success); }
+.cbk-stat:nth-child(4) .cbk-stat__icon { background: #f5f3ff; color: #8b5cf6; }
+
+.cbk-stat__body { flex: 1; min-width: 0; }
+
+.cbk-stat__label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--cbk-slate-500);
+    margin: 0 0 4px;
+}
+
+.cbk-stat__value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--cbk-slate-900);
+    line-height: 1.1;
+    margin: 0;
+}
+
+.cbk-stat__sub {
+    font-size: 12px;
+    color: var(--cbk-slate-400);
+    margin-top: 4px;
+}
+
+/* ==========================================================================
+   Two-column Layout
+   ========================================================================== */
+.cbk-columns {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+/* ==========================================================================
+   Navigation Grid
+   ========================================================================== */
+.cbk-panel {
+    background: var(--cbk-white);
+    border: 1px solid var(--cbk-slate-200);
+    border-radius: var(--cbk-radius);
+    box-shadow: var(--cbk-shadow);
+    overflow: hidden;
+}
+
+.cbk-panel__head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--cbk-slate-200);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cbk-panel__title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--cbk-slate-800);
+    margin: 0;
+}
+
+.cbk-panel__body {
+    padding: 20px;
+}
+
+.cbk-nav-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.cbk-nav-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 10px;
+    border-radius: var(--cbk-radius-sm);
+    background: var(--cbk-slate-50);
+    border: 1px solid transparent;
+    text-decoration: none;
+    color: var(--cbk-slate-700);
+    transition: all var(--cbk-transition);
+    text-align: center;
+}
+
+.cbk-nav-card:hover {
+    background: var(--cbk-brand-light);
+    border-color: var(--cbk-brand);
+    color: var(--cbk-brand-dark);
+    transform: translateY(-2px);
+    box-shadow: var(--cbk-shadow-md);
+}
+
+.cbk-nav-card:focus {
+    outline: 2px solid var(--cbk-brand);
+    outline-offset: 2px;
+}
+
+.cbk-nav-card .dashicons {
+    font-size: 26px;
+    width: 26px;
+    height: 26px;
+    color: var(--cbk-brand);
+    transition: color var(--cbk-transition);
+}
+
+.cbk-nav-card:hover .dashicons {
+    color: var(--cbk-brand-dark);
+}
+
+.cbk-nav-card__label {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* ==========================================================================
+   System Health Panel
+   ========================================================================== */
+.cbk-health-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cbk-health-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--cbk-slate-100);
+}
+
+.cbk-health-item:last-child { border-bottom: none; }
+
+.cbk-health-item__left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cbk-health-item__icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.cbk-health-item__icon--blue  { background: var(--cbk-brand-light); color: var(--cbk-brand); }
+.cbk-health-item__icon--green { background: #f0fdf4; color: var(--cbk-success); }
+.cbk-health-item__icon--amber { background: #fefce8; color: var(--cbk-warning); }
+.cbk-health-item__icon--red   { background: #fef2f2; color: var(--cbk-danger); }
+
+.cbk-health-item__label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--cbk-slate-700);
+}
+
+.cbk-health-item__detail {
+    font-size: 11px;
+    color: var(--cbk-slate-400);
+    margin-top: 1px;
+}
+
+.cbk-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cbk-pill--green  { background: #dcfce7; color: #15803d; }
+.cbk-pill--amber  { background: #fef9c3; color: #a16207; }
+.cbk-pill--red    { background: #fee2e2; color: #b91c1c; }
+.cbk-pill--gray   { background: var(--cbk-slate-100); color: var(--cbk-slate-500); }
+
+/* ==========================================================================
+   Activity Table
+   ========================================================================== */
+.cbk-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.cbk-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+}
+
+.cbk-table thead th {
+    background: var(--cbk-slate-50);
+    color: var(--cbk-slate-600);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 2px solid var(--cbk-slate-200);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.cbk-table thead th:first-child { border-radius: var(--cbk-radius-sm) 0 0 0; }
+.cbk-table thead th:last-child  { border-radius: 0 var(--cbk-radius-sm) 0 0; }
+
+.cbk-table tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--cbk-slate-100);
+    color: var(--cbk-slate-700);
+    vertical-align: middle;
+}
+
+.cbk-table tbody tr:last-child td { border-bottom: none; }
+
+.cbk-table tbody tr:hover td {
+    background: var(--cbk-slate-50);
+}
+
+.cbk-table .cbk-time {
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+    font-size: 12px;
+    color: var(--cbk-slate-500);
+}
+
+.cbk-table .cbk-context {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--cbk-slate-100);
+    color: var(--cbk-slate-600);
+    font-weight: 600;
+}
+
+.cbk-table .cbk-event {
+    color: var(--cbk-brand);
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   Info Footer
+   ========================================================================== */
+.cbk-info-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.cbk-info-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: var(--cbk-slate-100);
+    font-size: 12px;
+    color: var(--cbk-slate-600);
+}
+
+.cbk-info-tag code {
+    font-size: 11px;
+    background: var(--cbk-white);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--cbk-slate-200);
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+.cbk-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--cbk-slate-400);
+}
+
+.cbk-empty .dashicons {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 10px;
+    opacity: .4;
+}
+
+.cbk-empty p {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 1200px) {
+    .cbk-columns { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+    .cbk-stats { grid-template-columns: repeat(2, 1fr); }
+    .cbk-nav-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 600px) {
+    .cbk-stats { grid-template-columns: 1fr; }
+    .cbk-nav-grid { grid-template-columns: repeat(2, 1fr); }
+    .cbk-header { padding: 20px; }
+    .cbk-header-title { font-size: 18px; }
+}

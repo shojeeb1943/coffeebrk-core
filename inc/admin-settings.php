@@ -69,155 +69,266 @@ add_action('admin_menu', function() {
     );
 });
 
+/* ---- Enqueue dashboard CSS ---- */
+add_action( 'admin_enqueue_scripts', function( $hook ) {
+    if ( $hook !== 'toplevel_page_coffeebrk-core' ) return;
+    wp_enqueue_style(
+        'coffeebrk-admin-dashboard',
+        COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-admin-dashboard.css',
+        [],
+        '2.1.0'
+    );
+});
+
 function coffeebrk_core_dashboard_page(){
-    if(!current_user_can('manage_options'))return;
-    $auth = admin_url('admin.php?page=coffeebrk-core-auth');
-    $dyn  = admin_url('admin.php?page=coffeebrk-core-dynfields');
-    $asp  = admin_url('admin.php?page=coffeebrk-core-aspires');
-    $logs = admin_url('admin.php?page=coffeebrk-core-logs');
-    $rss  = admin_url('admin.php?page=coffeebrk-core-rss');
-    $json = admin_url('admin.php?page=coffeebrk-core-json-importer');
-    $api  = admin_url('admin.php?page=coffeebrk-core-api');
+    if ( ! current_user_can( 'manage_options' ) ) return;
 
-    $core_settings = (array) get_option( 'coffeebrk_core_settings', [] );
+    // ---- Data gathering ----
+    $version = get_file_data( COFFEEBRK_CORE_PATH . 'coffeebrk-core.php', [ 'Version' => 'Version' ] )['Version'] ?? '';
+    $core_settings   = (array) get_option( 'coffeebrk_core_settings', [] );
     $supabase_url_set = ! empty( $core_settings['supabase_url'] );
+    $dyn_fields = (array) get_option( 'coffeebrk_dynamic_fields', [] );
+    $aspires    = (array) get_option( 'coffeebrk_aspires', [] );
 
-    $rss_total = null;
-    $rss_enabled = null;
+    $post_count = (int) wp_count_posts()->publish;
+
+    $rss_total = null; $rss_enabled = null;
     if ( function_exists( 'coffeebrk_rss_table_name' ) ) {
         global $wpdb;
         $tbl = coffeebrk_rss_table_name();
         if ( is_string( $tbl ) && $tbl !== '' ) {
-            $rss_total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$tbl}" );
+            $rss_total   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$tbl}" );
             $rss_enabled = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$tbl} WHERE enabled = 1" );
         }
     }
 
-    $rss_next = wp_next_scheduled( 'coffeebrk_rss_import_all' );
+    $rss_next     = wp_next_scheduled( 'coffeebrk_rss_import_all' );
     $rss_next_str = $rss_next ? wp_date( 'Y-m-d H:i:s', (int) $rss_next ) : 'Not scheduled';
 
-    $rss_log_count = 0;
-    $rss_recent = [];
+    $rss_log_count = 0; $rss_recent = [];
     if ( function_exists( 'coffeebrk_rss_log_option_key' ) ) {
         $tmp = get_option( coffeebrk_rss_log_option_key(), [] );
         if ( is_array( $tmp ) ) {
             $rss_log_count = count( $tmp );
-            $rss_recent = array_slice( array_reverse( $tmp ), 0, 8 );
+            $rss_recent    = array_slice( array_reverse( $tmp ), 0, 8 );
         }
     }
 
+    $json_log_key   = 'cbk_json_articles_importer_log_history';
     $json_log_count = 0;
-    $json_log_key = 'cbk_json_articles_importer_log_history';
-    $json_tmp = get_option( $json_log_key, [] );
-    if ( is_array( $json_tmp ) ) {
-        $json_log_count = count( $json_tmp );
-    }
-    echo '<div class="wrap cbk-admin">';
-    echo '<h1 style="margin-bottom:10px;">Coffeebrk Core</h1>';
-    echo '<p style="max-width:760px;color:#555;">Auth + Onboarding via Supabase, Dynamic Post Meta, Aspire mapping, Elementor dynamic tags, and a simple personalized feed endpoint.</p>';
-    echo '<div class="cbk-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:20px;">';
-    echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">Quick Links</h2><div style="display:flex;flex-direction:column;gap:8px;">'
-        .'<a class="button button-primary" href="'.$auth.'">Auth Settings</a>'
-        .'<a class="button" href="'.$dyn.'">Dynamic Fields</a>'
-        .'<a class="button" href="'.$asp.'">Aspire Manager</a>'
-        .'<a class="button" href="'.$logs.'">View Logs</a>'
-        .'<a class="button" href="'.$rss.'">RSS Aggregator</a>'
-        .'<a class="button" href="'.$json.'">JSON Articles Importer</a>'
-        .'<a class="button" href="'.$api.'">API</a>'
-        .'</div></div>';
-    echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">Status</h2>'
-        .'<ul style="margin:0;padding-left:18px;">'
-        .'<li>Plugin version: '.esc_html( get_file_data( COFFEEBRK_CORE_PATH.'coffeebrk-core.php', ['Version'=>'Version'] )['Version'] ?? '' ).'</li>'
-        .'<li>Supabase URL set: '.( $supabase_url_set ? 'Yes' : 'No').'</li>'
-        .'<li>Dynamic fields: '.count((array)get_option('coffeebrk_dynamic_fields',[])).'</li>'
-        .'<li>Aspire options: '.count((array)get_option('coffeebrk_aspires',[])).'</li>'
-        .'</ul></div>';
-    echo '<div class="cbk-card" style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:16px;"><h2 style="margin:0 0 10px;">RSS Summary</h2>'
-        .'<ul style="margin:0;padding-left:18px;">'
-        .'<li>Feeds total: '.esc_html( $rss_total === null ? '—' : (string) $rss_total ).'</li>'
-        .'<li>Feeds enabled: '.esc_html( $rss_enabled === null ? '—' : (string) $rss_enabled ).'</li>'
-        .'<li>Next RSS auto-run: '.esc_html( $rss_next_str ).'</li>'
-        .'<li>RSS log entries (24h retention): '.esc_html( (string) $rss_log_count ).'</li>'
-        .'</ul>'
-        .'<p style="margin:10px 0 0;"><a class="button" href="'.$rss.'">Open RSS Aggregator</a></p>'
-        .'</div>';
-    echo '</div></div>';
+    $json_tmp       = get_option( $json_log_key, [] );
+    if ( is_array( $json_tmp ) ) { $json_log_count = count( $json_tmp ); }
 
-    echo '<h2 style="margin-top:26px;">Recent Activity (last 24h)</h2>';
+    $token_hash = (string) get_option( 'coffeebrk_core_api_token_hash', '' );
+    $has_token  = $token_hash !== '';
+
+    // ---- Navigation links ----
+    $nav = [
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-auth'),          'icon' => 'dashicons-shield',          'label' => 'Auth Settings' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-dynfields'),     'icon' => 'dashicons-forms',           'label' => 'Dynamic Fields' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-aspires'),       'icon' => 'dashicons-star-filled',     'label' => 'Aspire Manager' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-rss'),           'icon' => 'dashicons-rss',             'label' => 'RSS Aggregator' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-json-importer'), 'icon' => 'dashicons-upload',          'label' => 'JSON Importer' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-api'),           'icon' => 'dashicons-rest-api',        'label' => 'API' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-logs'),          'icon' => 'dashicons-list-view',       'label' => 'Logs' ],
+        [ 'url' => admin_url('edit.php?post_type=cbk_story'),                'icon' => 'dashicons-format-video',    'label' => 'Stories' ],
+    ];
+
+    // ---- Render ----
+    echo '<div class="wrap cbk-dash">';
+
+    // ======== HEADER ========
+    echo '<div class="cbk-header">';
+    echo '  <div class="cbk-header-left">';
+    echo '    <div class="cbk-header-logo"><span class="dashicons dashicons-coffee" style="color:#fff;font-size:28px;width:28px;height:28px;"></span></div>';
+    echo '    <div>';
+    echo '      <h1 class="cbk-header-title">Coffeebrk Core</h1>';
+    echo '      <p class="cbk-header-sub">Auth · Dynamic Meta · RSS · API · Elementor Tags</p>';
+    echo '    </div>';
+    echo '  </div>';
+    echo '  <div class="cbk-header-right">';
+    echo '    <span class="cbk-badge cbk-badge--version"><span class="dashicons dashicons-tag" style="font-size:14px;width:14px;height:14px;"></span> v' . esc_html( $version ) . '</span>';
+    if ( $supabase_url_set ) {
+        echo '  <span class="cbk-badge cbk-badge--ok"><span class="dashicons dashicons-yes-alt" style="font-size:14px;width:14px;height:14px;"></span> Connected</span>';
+    }
+    echo '  </div>';
+    echo '</div>';
+
+    // ======== STAT CARDS ========
+    echo '<div class="cbk-stats">';
+
+    echo '<div class="cbk-stat">';
+    echo '  <div class="cbk-stat__icon"><span class="dashicons dashicons-admin-post"></span></div>';
+    echo '  <div class="cbk-stat__body">';
+    echo '    <p class="cbk-stat__label">Published Posts</p>';
+    echo '    <p class="cbk-stat__value">' . esc_html( (string) $post_count ) . '</p>';
+    echo '  </div>';
+    echo '</div>';
+
+    echo '<div class="cbk-stat">';
+    echo '  <div class="cbk-stat__icon"><span class="dashicons dashicons-rss"></span></div>';
+    echo '  <div class="cbk-stat__body">';
+    echo '    <p class="cbk-stat__label">RSS Feeds</p>';
+    echo '    <p class="cbk-stat__value">' . esc_html( $rss_total === null ? '—' : (string) $rss_total ) . '</p>';
+    echo '    <p class="cbk-stat__sub">' . esc_html( $rss_enabled === null ? '' : $rss_enabled . ' enabled' ) . '</p>';
+    echo '  </div>';
+    echo '</div>';
+
+    echo '<div class="cbk-stat">';
+    echo '  <div class="cbk-stat__icon"><span class="dashicons dashicons-forms"></span></div>';
+    echo '  <div class="cbk-stat__body">';
+    echo '    <p class="cbk-stat__label">Dynamic Fields</p>';
+    echo '    <p class="cbk-stat__value">' . esc_html( (string) count( $dyn_fields ) ) . '</p>';
+    echo '  </div>';
+    echo '</div>';
+
+    echo '<div class="cbk-stat">';
+    echo '  <div class="cbk-stat__icon"><span class="dashicons dashicons-star-filled"></span></div>';
+    echo '  <div class="cbk-stat__body">';
+    echo '    <p class="cbk-stat__label">Aspire Options</p>';
+    echo '    <p class="cbk-stat__value">' . esc_html( (string) count( $aspires ) ) . '</p>';
+    echo '  </div>';
+    echo '</div>';
+
+    echo '</div>'; // .cbk-stats
+
+    // ======== TWO-COLUMN LAYOUT ========
+    echo '<div class="cbk-columns">';
+
+    // ---- Left: Navigation Grid ----
+    echo '<div class="cbk-panel">';
+    echo '  <div class="cbk-panel__head"><span class="dashicons dashicons-screenoptions" style="color:var(--cbk-brand);"></span><h2 class="cbk-panel__title">Quick Navigation</h2></div>';
+    echo '  <div class="cbk-panel__body"><div class="cbk-nav-grid">';
+    foreach ( $nav as $n ) {
+        echo '<a href="' . esc_url( $n['url'] ) . '" class="cbk-nav-card">';
+        echo '  <span class="dashicons ' . esc_attr( $n['icon'] ) . '"></span>';
+        echo '  <span class="cbk-nav-card__label">' . esc_html( $n['label'] ) . '</span>';
+        echo '</a>';
+    }
+    echo '  </div></div>';
+    echo '</div>';
+
+    // ---- Right: System Health ----
+    echo '<div class="cbk-panel">';
+    echo '  <div class="cbk-panel__head"><span class="dashicons dashicons-heart" style="color:var(--cbk-danger);"></span><h2 class="cbk-panel__title">System Health</h2></div>';
+    echo '  <div class="cbk-panel__body"><ul class="cbk-health-list">';
+
+    // Supabase
+    $supa_pill = $supabase_url_set ? 'cbk-pill--green' : 'cbk-pill--red';
+    $supa_text = $supabase_url_set ? 'Connected' : 'Not Set';
+    echo '<li class="cbk-health-item">';
+    echo '  <div class="cbk-health-item__left">';
+    echo '    <div class="cbk-health-item__icon cbk-health-item__icon--blue"><span class="dashicons dashicons-cloud"></span></div>';
+    echo '    <div><div class="cbk-health-item__label">Supabase</div><div class="cbk-health-item__detail">' . esc_html( $supabase_url_set ? $core_settings['supabase_url'] : 'Configure in Auth Settings' ) . '</div></div>';
+    echo '  </div>';
+    echo '  <span class="cbk-pill ' . $supa_pill . '">' . $supa_text . '</span>';
+    echo '</li>';
+
+    // RSS Cron
+    $cron_ok   = (bool) $rss_next;
+    $cron_pill = $cron_ok ? 'cbk-pill--green' : 'cbk-pill--amber';
+    $cron_text = $cron_ok ? 'Scheduled' : 'Not Scheduled';
+    echo '<li class="cbk-health-item">';
+    echo '  <div class="cbk-health-item__left">';
+    echo '    <div class="cbk-health-item__icon cbk-health-item__icon--green"><span class="dashicons dashicons-clock"></span></div>';
+    echo '    <div><div class="cbk-health-item__label">RSS Cron</div><div class="cbk-health-item__detail">Next: ' . esc_html( $rss_next_str ) . '</div></div>';
+    echo '  </div>';
+    echo '  <span class="cbk-pill ' . $cron_pill . '">' . $cron_text . '</span>';
+    echo '</li>';
+
+    // API Token
+    $tok_pill = $has_token ? 'cbk-pill--green' : 'cbk-pill--gray';
+    $tok_text = $has_token ? 'Active' : 'None';
+    echo '<li class="cbk-health-item">';
+    echo '  <div class="cbk-health-item__left">';
+    echo '    <div class="cbk-health-item__icon cbk-health-item__icon--amber"><span class="dashicons dashicons-admin-network"></span></div>';
+    echo '    <div><div class="cbk-health-item__label">API Token</div><div class="cbk-health-item__detail">' . ( $has_token ? 'Token is configured' : 'Generate in API page' ) . '</div></div>';
+    echo '  </div>';
+    echo '  <span class="cbk-pill ' . $tok_pill . '">' . $tok_text . '</span>';
+    echo '</li>';
+
+    // RSS Activity
+    echo '<li class="cbk-health-item">';
+    echo '  <div class="cbk-health-item__left">';
+    echo '    <div class="cbk-health-item__icon cbk-health-item__icon--green"><span class="dashicons dashicons-chart-area"></span></div>';
+    echo '    <div><div class="cbk-health-item__label">RSS Activity</div><div class="cbk-health-item__detail">' . esc_html( (string) $rss_log_count ) . ' log entries (24h)</div></div>';
+    echo '  </div>';
+    echo '  <span class="cbk-pill cbk-pill--green">' . esc_html( (string) $rss_log_count ) . '</span>';
+    echo '</li>';
+
+    // JSON Importer
+    echo '<li class="cbk-health-item">';
+    echo '  <div class="cbk-health-item__left">';
+    echo '    <div class="cbk-health-item__icon cbk-health-item__icon--blue"><span class="dashicons dashicons-media-code"></span></div>';
+    echo '    <div><div class="cbk-health-item__label">JSON Importer</div><div class="cbk-health-item__detail">' . esc_html( (string) $json_log_count ) . ' import records</div></div>';
+    echo '  </div>';
+    echo '  <span class="cbk-pill cbk-pill--green">' . esc_html( (string) $json_log_count ) . '</span>';
+    echo '</li>';
+
+    echo '  </ul></div>';
+    echo '</div>'; // panel
+
+    echo '</div>'; // .cbk-columns
+
+    // ======== RECENT ACTIVITY TABLE ========
+    echo '<div class="cbk-panel" style="margin-bottom:24px;">';
+    echo '  <div class="cbk-panel__head"><span class="dashicons dashicons-backup" style="color:var(--cbk-brand);"></span><h2 class="cbk-panel__title">Recent Activity (last 24h)</h2></div>';
+    echo '  <div class="cbk-panel__body">';
+
     if ( ! empty( $rss_recent ) ) {
-        echo '<table class="widefat striped"><thead><tr><th style="width:170px;">Time</th><th style="width:80px;">Context</th><th style="width:120px;">Event</th><th>Feed</th><th style="width:80px;">Status</th><th style="width:90px;">Post</th><th>Details</th></tr></thead><tbody>';
+        echo '<div class="cbk-table-wrap"><table class="cbk-table"><thead><tr>';
+        echo '<th style="width:170px;">Time</th><th style="width:80px;">Context</th><th style="width:120px;">Event</th><th>Feed</th><th style="width:80px;">Status</th><th style="width:80px;">Post</th><th>Details</th>';
+        echo '</tr></thead><tbody>';
+
         foreach ( $rss_recent as $row ) {
             if ( ! is_array( $row ) ) continue;
-            $t = isset( $row['time'] ) ? (int) $row['time'] : 0;
+            $t        = isset( $row['time'] ) ? (int) $row['time'] : 0;
             $time_str = $t > 0 ? wp_date( 'Y-m-d H:i:s', $t ) : '';
-            $context = isset( $row['context'] ) ? (string) $row['context'] : '';
-            $event = isset( $row['event'] ) ? (string) $row['event'] : '';
-            $feed_name = isset( $row['feed_name'] ) ? (string) $row['feed_name'] : '';
-            $status = isset( $row['status'] ) ? (string) $row['status'] : '';
-            $post_id = isset( $row['post_id'] ) ? (int) $row['post_id'] : 0;
-            $title = isset( $row['title'] ) ? (string) $row['title'] : '';
-            $message = isset( $row['message'] ) ? (string) $row['message'] : '';
-            $reason = isset( $row['reason'] ) ? (string) $row['reason'] : '';
-            $details = $title !== '' ? $title : $message;
+            $context  = (string) ( $row['context']   ?? '' );
+            $event    = (string) ( $row['event']     ?? '' );
+            $feed_nm  = (string) ( $row['feed_name'] ?? '' );
+            $status   = (string) ( $row['status']    ?? '' );
+            $post_id  = (int)    ( $row['post_id']   ?? 0 );
+            $title    = (string) ( $row['title']     ?? '' );
+            $message  = (string) ( $row['message']   ?? '' );
+            $reason   = (string) ( $row['reason']    ?? '' );
+            $details  = $title !== '' ? $title : $message;
             if ( $reason !== '' ) {
-                $details = ( $details !== '' ? $details . ' | ' : '' ) . 'Reason: ' . $reason;
+                $details = ( $details !== '' ? $details . ' — ' : '' ) . $reason;
             }
 
+            // Status pill
+            $s_class = 'cbk-pill--gray';
+            if ( $status === 'ok' || $status === 'imported' ) $s_class = 'cbk-pill--green';
+            elseif ( $status === 'skipped' )                  $s_class = 'cbk-pill--amber';
+            elseif ( $status === 'error' || $status === 'failed' ) $s_class = 'cbk-pill--red';
+
             echo '<tr>';
-            echo '<td>' . esc_html( $time_str ) . '</td>';
-            echo '<td>' . esc_html( $context ) . '</td>';
-            echo '<td>' . esc_html( $event ) . '</td>';
-            echo '<td>' . esc_html( $feed_name ) . '</td>';
-            echo '<td>' . esc_html( $status ) . '</td>';
-            echo '<td>' . esc_html( $post_id > 0 ? (string) $post_id : '—' ) . '</td>';
+            echo '<td><span class="cbk-time">' . esc_html( $time_str ) . '</span></td>';
+            echo '<td><span class="cbk-context">' . esc_html( $context ) . '</span></td>';
+            echo '<td><span class="cbk-event">' . esc_html( $event ) . '</span></td>';
+            echo '<td>' . esc_html( $feed_nm ) . '</td>';
+            echo '<td><span class="cbk-pill ' . $s_class . '">' . esc_html( $status ) . '</span></td>';
+            echo '<td>' . ( $post_id > 0 ? '<a href="' . esc_url( get_edit_post_link( $post_id ) ) . '">#' . $post_id . '</a>' : '—' ) . '</td>';
             echo '<td>' . esc_html( $details ) . '</td>';
             echo '</tr>';
         }
-        echo '</tbody></table>';
+        echo '</tbody></table></div>';
     } else {
-        echo '<p style="color:#555;">No recent RSS activity recorded yet.</p>';
+        echo '<div class="cbk-empty"><span class="dashicons dashicons-format-aside"></span><p>No recent RSS activity recorded yet.</p></div>';
     }
 
-    echo '<h2 style="margin-top:26px;">Plugin Summary</h2>';
-    echo '<table class="widefat striped"><tbody>';
-    echo '<tr><th style="width:260px;">JSON Importer log entries</th><td>' . esc_html( (string) $json_log_count ) . ' (stored in option <code>' . esc_html( $json_log_key ) . '</code>)</td></tr>';
-    echo '<tr><th>RSS log option</th><td><code>' . esc_html( function_exists( 'coffeebrk_rss_log_option_key' ) ? coffeebrk_rss_log_option_key() : 'coffeebrk_rss_import_log' ) . '</code> (24 hour retention)</td></tr>';
-    echo '</tbody></table>';
+    echo '  </div>';
+    echo '</div>';
 
-    echo '<h2 style="margin-top:26px;">Endpoints & Access</h2>';
-    echo '<p style="max-width:980px;color:#555;">This section lists admin pages, actions, AJAX, REST endpoints, and cron hooks exposed by this plugin, plus required access details.</p>';
-    echo '<table class="widefat striped"><thead><tr><th style="width:220px;">Type</th><th>Endpoint</th><th style="width:260px;">Access / Notes</th></tr></thead><tbody>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core</code></td><td>Capability: <code>manage_options</code></td></tr>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-auth</code></td><td>Capability: <code>manage_options</code></td></tr>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-dynfields</code></td><td>Capability: <code>manage_options</code></td></tr>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-aspires</code></td><td>Capability: <code>manage_options</code></td></tr>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-logs</code></td><td>Capability: <code>manage_options</code></td></tr>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-api</code></td><td>Capability: <code>manage_options</code></td></tr>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-rss</code></td><td>Capability: <code>manage_options</code>, actions via <code>admin-post.php</code> + nonces</td></tr>';
-    echo '<tr><td>Admin Page</td><td><code>admin.php?page=coffeebrk-core-json-importer</code></td><td>Capability: <code>manage_options</code>, AJAX actions + nonce</td></tr>';
-    echo '<tr><td>Admin Action</td><td><code>admin-post.php?action=coffeebrk_rss_save_feed</code></td><td>Capability: <code>manage_options</code>, nonce: <code>coffeebrk_rss_save_feed</code></td></tr>';
-    echo '<tr><td>Admin Action</td><td><code>admin-post.php?action=coffeebrk_rss_delete_feed&amp;feed_id=&lt;id&gt;</code></td><td>Capability: <code>manage_options</code>, nonce: <code>coffeebrk_rss_delete_&lt;id&gt;</code></td></tr>';
-    echo '<tr><td>Admin Action</td><td><code>admin-post.php?action=coffeebrk_rss_toggle_feed&amp;feed_id=&lt;id&gt;</code></td><td>Capability: <code>manage_options</code>, nonce: <code>coffeebrk_rss_toggle_&lt;id&gt;</code></td></tr>';
-    echo '<tr><td>Admin Action</td><td><code>admin-post.php?action=coffeebrk_rss_run_feed&amp;feed_id=&lt;id&gt;</code></td><td>Capability: <code>manage_options</code>, nonce: <code>coffeebrk_rss_run_&lt;id&gt;</code></td></tr>';
-    echo '<tr><td>Admin Action</td><td><code>admin-post.php?action=coffeebrk_rss_run_all</code></td><td>Capability: <code>manage_options</code>, nonce: <code>coffeebrk_rss_run_all</code></td></tr>';
-    echo '<tr><td>AJAX</td><td><code>wp-admin/admin-ajax.php?action=cbk_json_articles_import_start</code></td><td>Logged-in admin, nonce: <code>cbk_json_articles_import</code></td></tr>';
-    echo '<tr><td>AJAX</td><td><code>wp-admin/admin-ajax.php?action=cbk_json_articles_import_process</code></td><td>Logged-in admin, nonce: <code>cbk_json_articles_import</code></td></tr>';
-    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/posts</code></td><td>Bearer token - List posts with filtering</td></tr>';
-    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/posts/{id}</code></td><td>Bearer token - Get single post</td></tr>';
-    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/posts</code></td><td>Bearer token - Create new post</td></tr>';
-    echo '<tr><td>REST</td><td><code>PUT /wp-json/coffeebrk/v1/posts/{id}</code></td><td>Bearer token - Update post</td></tr>';
-    echo '<tr><td>REST</td><td><code>DELETE /wp-json/coffeebrk/v1/posts/{id}</code></td><td>Bearer token - Delete post</td></tr>';
-    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/bulk-posts</code></td><td>Bearer token - Bulk create posts</td></tr>';
-    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/categories</code></td><td>Bearer token - List categories</td></tr>';
-    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/meta-fields</code></td><td>Bearer token - List available meta fields</td></tr>';
-    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/feed</code></td><td>Requires logged-in user (<code>is_user_logged_in()</code>)</td></tr>';
-    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/site</code></td><td>Public endpoint</td></tr>';
-    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/rss-info</code></td><td>Public endpoint - RSS feed information</td></tr>';
-    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/submit</code></td><td>Bearer token - Legacy create post endpoint</td></tr>';
-    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/supabase/login</code></td><td>Public endpoint; validates Supabase token server-side</td></tr>';
-    echo '<tr><td>RSS Feed</td><td><code>/feed/coffeebrk/</code> or <code>/?feed=coffeebrk</code></td><td>Public site RSS feed</td></tr>';
-    echo '<tr><td>Cron Hook</td><td><code>coffeebrk_rss_import_all</code></td><td>Schedule: hourly; drafts posts from enabled feeds</td></tr>';
-    echo '</tbody></table>';
+    // ======== INFO FOOTER ========
+    echo '<div class="cbk-info-footer">';
+    echo '  <span class="cbk-info-tag"><span class="dashicons dashicons-database" style="font-size:14px;width:14px;height:14px;"></span> JSON log: <code>' . esc_html( $json_log_key ) . '</code></span>';
+    echo '  <span class="cbk-info-tag"><span class="dashicons dashicons-database" style="font-size:14px;width:14px;height:14px;"></span> RSS log: <code>' . esc_html( function_exists( 'coffeebrk_rss_log_option_key' ) ? coffeebrk_rss_log_option_key() : 'coffeebrk_rss_import_log' ) . '</code> (24h retention)</span>';
+    echo '  <span class="cbk-info-tag"><span class="dashicons dashicons-admin-plugins" style="font-size:14px;width:14px;height:14px;"></span> Plugin: v' . esc_html( $version ) . '</span>';
+    echo '</div>';
+
+    echo '</div>'; // .cbk-dash
 }
 
 add_action( 'admin_post_coffeebrk_core_api_token_generate', function(){
