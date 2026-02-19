@@ -720,7 +720,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         }
 
         // YouTube (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
-        if ( preg_match( '/(?:youtube\.com\/(?:shorts\/|[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $url, $matches ) ) {
+        if ( preg_match( '/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $matches ) ) {
             // maxresdefault is 16:9, hqdefault is 4:3 with bars. We use hqdefault as base but CSS covers it.
             // Using hqdefault as it's most reliable for all videos.
             return 'https://img.youtube.com/vi/' . $matches[1] . '/hqdefault.jpg';
@@ -751,7 +751,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 // JS Fallback for preview (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
                 var isVideoThumb = false;
                 if ( ! thumbnailUrl && videoUrl ) {
-                    var youtubeMatch = videoUrl.match(/(?:youtube\.com\/(?:shorts\/|[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+                    var youtubeMatch = videoUrl.match(/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
                     if ( youtubeMatch ) {
                         thumbnailUrl = 'https://img.youtube.com/vi/' + youtubeMatch[1] + '/hqdefault.jpg';
                         isVideoThumb = true;

@@ -326,7 +326,7 @@
             }
 
             // Detect Type (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
-            const youtubeMatch = videoUrl && videoUrl.match(/(?:youtube\.com\/(?:shorts\/|[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+            const youtubeMatch = videoUrl && videoUrl.match(/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
             const vimeoMatch = videoUrl && videoUrl.match(/(?:vimeo\.com\/)(\d+)/);
 
             // Hide/Pause other players
