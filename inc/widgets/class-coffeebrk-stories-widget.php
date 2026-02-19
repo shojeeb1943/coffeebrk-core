@@ -497,8 +497,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                     'relation' => 'OR',
                     [
                         'key'     => '_cbk_story_show_frontend',
-                        'value'   => 'no',
-                        'compare' => '!=',
+                        'value'   => 'yes',
+                        'compare' => '=',
                     ],
                     [
                         'key'     => '_cbk_story_show_frontend',
@@ -719,8 +719,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
             return '';
         }
 
-        // YouTube
-        if ( preg_match( '/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $url, $matches ) ) {
+        // YouTube (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
+        if ( preg_match( '/(?:youtube\.com\/(?:shorts\/|[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/', $url, $matches ) ) {
             // maxresdefault is 16:9, hqdefault is 4:3 with bars. We use hqdefault as base but CSS covers it.
             // Using hqdefault as it's most reliable for all videos.
             return 'https://img.youtube.com/vi/' . $matches[1] . '/hqdefault.jpg';
@@ -748,10 +748,10 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 var videoUrl = story.video_url || '';
                 var gradientColor = story.gradient_color || '';
 
-                // JS Fallback for preview
+                // JS Fallback for preview (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
                 var isVideoThumb = false;
                 if ( ! thumbnailUrl && videoUrl ) {
-                    var youtubeMatch = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+                    var youtubeMatch = videoUrl.match(/(?:youtube\.com\/(?:shorts\/|[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
                     if ( youtubeMatch ) {
                         thumbnailUrl = 'https://img.youtube.com/vi/' + youtubeMatch[1] + '/hqdefault.jpg';
                         isVideoThumb = true;

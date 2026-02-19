@@ -325,8 +325,8 @@
                 });
             }
 
-            // Detect Type
-            const youtubeMatch = videoUrl && videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+            // Detect Type (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
+            const youtubeMatch = videoUrl && videoUrl.match(/(?:youtube\.com\/(?:shorts\/|[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
             const vimeoMatch = videoUrl && videoUrl.match(/(?:vimeo\.com\/)(\d+)/);
 
             // Hide/Pause other players
