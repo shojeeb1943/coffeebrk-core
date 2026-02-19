@@ -78,10 +78,11 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         $this->add_control(
             'global_limit',
             [
-                'label' => __( 'Limit', 'coffeebrk-core' ),
+                'label' => __( 'Limit (0 = All)', 'coffeebrk-core' ),
                 'type' => Controls_Manager::NUMBER,
-                'default' => -1,
-                'description' => __( 'Maximum number of stories to show. Use -1 or leave empty to show all stories.', 'coffeebrk-core' ),
+                'default' => 0,
+                'min' => 0,
+                'description' => __( 'Maximum number of stories to display. Set to 0 to show ALL visible stories.', 'coffeebrk-core' ),
                 'condition' => [
                     'source_type' => 'global',
                 ],
@@ -487,7 +488,9 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         $stories = [];
 
         if ( $source_type === 'global' ) {
-            $limit = ! empty( $settings['global_limit'] ) ? (int) $settings['global_limit'] : -1;
+            // Get limit setting: -1, 0, or empty means unlimited
+            $limit_setting = isset( $settings['global_limit'] ) ? $settings['global_limit'] : -1;
+            $limit = ( $limit_setting === '' || $limit_setting === null || (int) $limit_setting <= 0 ) ? 0 : (int) $limit_setting;
 
             // Get all published stories without meta_query (filter in PHP for reliability)
             $args = [
@@ -509,7 +512,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                         continue;
                     }
 
-                    // Apply limit if set
+                    // Apply limit only if explicitly set to a positive number
                     if ( $limit > 0 && $count >= $limit ) {
                         break;
                     }
