@@ -488,33 +488,35 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
 
         if ( $source_type === 'global' ) {
             $limit = ! empty( $settings['global_limit'] ) ? (int) $settings['global_limit'] : -1;
+
+            // Get all published stories without meta_query (filter in PHP for reliability)
             $args = [
                 'post_type' => 'cbk_story',
-                'posts_per_page' => $limit,
+                'posts_per_page' => -1, // Get all, then filter
                 'post_status' => 'publish',
                 'orderby' => 'menu_order date',
                 'order' => 'DESC',
-                'meta_query' => [
-                    'relation' => 'OR',
-                    [
-                        'key'     => '_cbk_story_show_frontend',
-                        'value'   => 'no',
-                        'compare' => '!=',
-                    ],
-                    [
-                        'key'     => '_cbk_story_show_frontend',
-                        'compare' => 'NOT EXISTS',
-                    ],
-                ],
             ];
-            
+
             $query = new \WP_Query( $args );
-            
+
             if ( $query->have_posts() ) {
+                $count = 0;
                 foreach ( $query->posts as $post ) {
+                    // Filter: skip stories explicitly marked as hidden
+                    $show_frontend = get_post_meta( $post->ID, '_cbk_story_show_frontend', true );
+                    if ( $show_frontend === 'no' ) {
+                        continue;
+                    }
+
+                    // Apply limit if set
+                    if ( $limit > 0 && $count >= $limit ) {
+                        break;
+                    }
+
                     $thumb_id = get_post_thumbnail_id( $post->ID );
                     $thumb_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'full' ) : '';
-                    
+
                     $video_url = get_post_meta( $post->ID, '_cbk_story_video_url', true );
                     $gradient = get_post_meta( $post->ID, '_cbk_story_gradient', true );
                     $text_color = get_post_meta( $post->ID, '_cbk_story_text_color', true );
@@ -522,7 +524,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                     if ( $gradient_intensity === '' ) {
                         $gradient_intensity = 50;
                     }
-                    
+
                     $stories[] = [
                         'story_title' => $post->post_title,
                         'video_url' => $video_url,
@@ -531,6 +533,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                         'text_color' => $text_color,
                         'gradient_intensity' => (int) $gradient_intensity,
                     ];
+
+                    $count++;
                 }
             }
         } else {

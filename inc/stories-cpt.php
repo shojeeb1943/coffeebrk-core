@@ -367,11 +367,107 @@ add_action( 'manage_cbk_story_posts_custom_column', function( $column, $post_id 
             break;
         case 'show_frontend':
             $show = get_post_meta( $post_id, '_cbk_story_show_frontend', true );
-            if ( $show === 'no' ) {
-                echo '<span class="dashicons dashicons-hidden" style="color:#aaa;" title="Hidden"></span>';
-            } else {
-                echo '<span class="dashicons dashicons-visibility" style="color:#46b450;" title="Visible"></span>';
-            }
+            $is_visible = ( $show !== 'no' );
+            $icon_class = $is_visible ? 'dashicons-visibility' : 'dashicons-hidden';
+            $icon_color = $is_visible ? '#46b450' : '#aaa';
+            $title = $is_visible ? __( 'Visible - Click to hide', 'coffeebrk-core' ) : __( 'Hidden - Click to show', 'coffeebrk-core' );
+            printf(
+                '<a href="#" class="cbk-toggle-visibility" data-post-id="%d" data-visible="%s" title="%s" style="text-decoration:none;">
+                    <span class="dashicons %s" style="color:%s;cursor:pointer;"></span>
+                </a>',
+                esc_attr( $post_id ),
+                esc_attr( $is_visible ? 'yes' : 'no' ),
+                esc_attr( $title ),
+                esc_attr( $icon_class ),
+                esc_attr( $icon_color )
+            );
             break;
     }
 }, 10, 2 );
+
+/**
+ * AJAX Handler for Toggle Visibility
+ */
+add_action( 'wp_ajax_cbk_toggle_story_visibility', function() {
+    // Check nonce
+    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'cbk_toggle_visibility' ) ) {
+        wp_send_json_error( [ 'message' => 'Invalid nonce' ] );
+    }
+
+    // Check permissions
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Unauthorized' ] );
+    }
+
+    $post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    if ( ! $post_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid post ID' ] );
+    }
+
+    // Get current value and toggle
+    $current = get_post_meta( $post_id, '_cbk_story_show_frontend', true );
+    $new_value = ( $current === 'no' ) ? 'yes' : 'no';
+
+    update_post_meta( $post_id, '_cbk_story_show_frontend', $new_value );
+
+    wp_send_json_success( [
+        'new_value' => $new_value,
+        'is_visible' => ( $new_value !== 'no' ),
+    ] );
+});
+
+/**
+ * Enqueue Admin Scripts for Stories List
+ */
+add_action( 'admin_footer', function() {
+    $screen = get_current_screen();
+    if ( ! $screen || $screen->id !== 'edit-cbk_story' ) {
+        return;
+    }
+
+    $nonce = wp_create_nonce( 'cbk_toggle_visibility' );
+    ?>
+    <script>
+    jQuery(document).ready(function($) {
+        $('.cbk-toggle-visibility').on('click', function(e) {
+            e.preventDefault();
+
+            var $link = $(this);
+            var postId = $link.data('post-id');
+            var $icon = $link.find('.dashicons');
+
+            // Disable during request
+            $link.css('pointer-events', 'none');
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'cbk_toggle_story_visibility',
+                    post_id: postId,
+                    nonce: '<?php echo esc_js( $nonce ); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        var isVisible = response.data.is_visible;
+                        $icon.removeClass('dashicons-visibility dashicons-hidden')
+                             .addClass(isVisible ? 'dashicons-visibility' : 'dashicons-hidden')
+                             .css('color', isVisible ? '#46b450' : '#aaa');
+                        $link.attr('title', isVisible ? '<?php echo esc_js( __( 'Visible - Click to hide', 'coffeebrk-core' ) ); ?>' : '<?php echo esc_js( __( 'Hidden - Click to show', 'coffeebrk-core' ) ); ?>');
+                        $link.data('visible', isVisible ? 'yes' : 'no');
+                    } else {
+                        alert('Error: ' + (response.data.message || 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    alert('Request failed');
+                },
+                complete: function() {
+                    $link.css('pointer-events', 'auto');
+                }
+            });
+        });
+    });
+    </script>
+    <?php
+});
