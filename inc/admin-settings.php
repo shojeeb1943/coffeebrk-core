@@ -202,9 +202,18 @@ function coffeebrk_core_dashboard_page(){
     echo '<tr><td>Admin Action</td><td><code>admin-post.php?action=coffeebrk_rss_run_all</code></td><td>Capability: <code>manage_options</code>, nonce: <code>coffeebrk_rss_run_all</code></td></tr>';
     echo '<tr><td>AJAX</td><td><code>wp-admin/admin-ajax.php?action=cbk_json_articles_import_start</code></td><td>Logged-in admin, nonce: <code>cbk_json_articles_import</code></td></tr>';
     echo '<tr><td>AJAX</td><td><code>wp-admin/admin-ajax.php?action=cbk_json_articles_import_process</code></td><td>Logged-in admin, nonce: <code>cbk_json_articles_import</code></td></tr>';
+    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/posts</code></td><td>Bearer token - List posts with filtering</td></tr>';
+    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/posts/{id}</code></td><td>Bearer token - Get single post</td></tr>';
+    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/posts</code></td><td>Bearer token - Create new post</td></tr>';
+    echo '<tr><td>REST</td><td><code>PUT /wp-json/coffeebrk/v1/posts/{id}</code></td><td>Bearer token - Update post</td></tr>';
+    echo '<tr><td>REST</td><td><code>DELETE /wp-json/coffeebrk/v1/posts/{id}</code></td><td>Bearer token - Delete post</td></tr>';
+    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/bulk-posts</code></td><td>Bearer token - Bulk create posts</td></tr>';
+    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/categories</code></td><td>Bearer token - List categories</td></tr>';
+    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/meta-fields</code></td><td>Bearer token - List available meta fields</td></tr>';
     echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/feed</code></td><td>Requires logged-in user (<code>is_user_logged_in()</code>)</td></tr>';
     echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/site</code></td><td>Public endpoint</td></tr>';
-    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/submit</code></td><td>Bearer token or logged-in user with <code>edit_posts</code></td></tr>';
+    echo '<tr><td>REST</td><td><code>GET /wp-json/coffeebrk/v1/rss-info</code></td><td>Public endpoint - RSS feed information</td></tr>';
+    echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/submit</code></td><td>Bearer token - Legacy create post endpoint</td></tr>';
     echo '<tr><td>REST</td><td><code>POST /wp-json/coffeebrk/v1/supabase/login</code></td><td>Public endpoint; validates Supabase token server-side</td></tr>';
     echo '<tr><td>RSS Feed</td><td><code>/feed/coffeebrk/</code> or <code>/?feed=coffeebrk</code></td><td>Public site RSS feed</td></tr>';
     echo '<tr><td>Cron Hook</td><td><code>coffeebrk_rss_import_all</code></td><td>Schedule: hourly; drafts posts from enabled feeds</td></tr>';
@@ -285,6 +294,16 @@ function coffeebrk_core_api_page(){
     }
     $allowed_meta_keys = array_values( array_unique( $allowed_meta_keys ) );
 
+    // Get current tab
+    $current_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'overview';
+    $tabs = [
+        'overview' => 'Overview',
+        'post-api' => 'POST API',
+        'get-api'  => 'GET API',
+        'rss'      => 'RSS Feeds',
+    ];
+
+    // Display notices
     if ( isset( $_GET['msg'] ) ) {
         $msg = sanitize_key( (string) $_GET['msg'] );
         if ( $msg === 'token_generated' ) {
@@ -296,97 +315,686 @@ function coffeebrk_core_api_page(){
     }
 
     echo '<div class="wrap">';
-    echo '<h1>API</h1>';
-    echo '<p style="max-width:980px;color:#555;">Use these endpoints to integrate CoffeeBrk with your site. All URLs below are relative to <code>' . esc_html( $site ) . '</code>.</p>';
+    echo '<h1>Coffeebrk API Documentation</h1>';
+    echo '<p style="max-width:980px;color:#555;">Complete REST API for integrating Coffeebrk with n8n, Zapier, custom applications, and external services.</p>';
 
-    echo '<h2>REST API</h2>';
-    echo '<h3 style="margin-top:16px;">API Token</h3>';
-    echo '<p style="max-width:980px;color:#555;">For server-to-server integrations, use a token in the request header: <code>Authorization: Bearer &lt;token&gt;</code>.</p>';
-    echo '<div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:14px;max-width:980px;">';
-    if ( $token_hash !== '' ) {
-        $when = $token_updated > 0 ? wp_date( 'Y-m-d H:i:s', $token_updated ) : '';
-        $owner = $token_user_id > 0 ? get_user_by( 'id', $token_user_id ) : false;
-        $owner_label = $owner instanceof WP_User ? $owner->user_login : '';
-        echo '<p style="margin:0 0 10px;"><strong>Status:</strong> Active'
-            . ( $token_last4 !== '' ? ' (ends with ' . esc_html( $token_last4 ) . ')' : '' )
-            . ( $owner_label !== '' ? ' • Owner: ' . esc_html( $owner_label ) : '' )
-            . ( $when !== '' ? ' • Updated: ' . esc_html( $when ) : '' )
-            . '</p>';
-    } else {
-        echo '<p style="margin:0 0 10px;"><strong>Status:</strong> No active token</p>';
+    // Tab navigation
+    echo '<nav class="nav-tab-wrapper" style="margin-bottom:20px;">';
+    foreach ( $tabs as $tab_key => $tab_label ) {
+        $active = $current_tab === $tab_key ? ' nav-tab-active' : '';
+        $url = add_query_arg( [ 'page' => 'coffeebrk-core-api', 'tab' => $tab_key ], admin_url( 'admin.php' ) );
+        echo '<a href="' . esc_url( $url ) . '" class="nav-tab' . $active . '">' . esc_html( $tab_label ) . '</a>';
+    }
+    echo '</nav>';
+
+    // Tab content
+    switch ( $current_tab ) {
+        case 'post-api':
+            coffeebrk_api_tab_post_api( $rest_base, $plain_token, $token_hash, $token_last4, $token_updated, $token_user_id, $allowed_meta_keys, $uid );
+            break;
+        case 'get-api':
+            coffeebrk_api_tab_get_api( $rest_base, $plain_token, $token_hash );
+            break;
+        case 'rss':
+            coffeebrk_api_tab_rss( $rss_pretty, $rss_query, $rest_base );
+            break;
+        default:
+            coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $token_last4, $token_updated, $token_user_id, $uid );
+            break;
     }
 
-    if ( $plain_token !== '' ) {
-        echo '<p style="margin:0 0 8px;color:#b32d2e;"><strong>Copy this token now.</strong> It will not be shown again after you leave this page.</p>';
-        echo '<input type="text" readonly value="' . esc_attr( $plain_token ) . '" style="width:100%;font-family:monospace;" onclick="this.select();" />';
-        if ( $uid > 0 ) {
-            delete_transient( 'coffeebrk_core_api_token_plain_' . $uid );
-        }
+    echo '</div>';
+}
+
+/**
+ * Overview Tab
+ */
+function coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $token_last4, $token_updated, $token_user_id, $uid ) {
+    ?>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1200px;">
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+            <h2 style="margin-top:0;">API Token Management</h2>
+            <p style="color:#555;">For server-to-server integrations (n8n, Zapier, custom apps), use Bearer token authentication.</p>
+
+            <?php if ( $token_hash !== '' ) : ?>
+                <?php
+                $when = $token_updated > 0 ? wp_date( 'Y-m-d H:i:s', $token_updated ) : '';
+                $owner = $token_user_id > 0 ? get_user_by( 'id', $token_user_id ) : false;
+                $owner_label = $owner instanceof WP_User ? $owner->user_login : '';
+                ?>
+                <div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;padding:12px;margin:10px 0;">
+                    <strong style="color:#155724;">Status: Active</strong>
+                    <?php echo $token_last4 !== '' ? ' (ends with <code>' . esc_html( $token_last4 ) . '</code>)' : ''; ?>
+                    <?php echo $owner_label !== '' ? '<br>Owner: ' . esc_html( $owner_label ) : ''; ?>
+                    <?php echo $when !== '' ? '<br>Updated: ' . esc_html( $when ) : ''; ?>
+                </div>
+            <?php else : ?>
+                <div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:6px;padding:12px;margin:10px 0;">
+                    <strong style="color:#721c24;">Status: No active token</strong>
+                    <br><span style="color:#721c24;">Generate a token to enable API access.</span>
+                </div>
+            <?php endif; ?>
+
+            <?php if ( $plain_token !== '' ) : ?>
+                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px;margin:10px 0;">
+                    <strong style="color:#856404;">Copy this token now!</strong>
+                    <p style="color:#856404;margin:5px 0 10px;">It will not be shown again after you leave this page.</p>
+                    <input type="text" readonly value="<?php echo esc_attr( $plain_token ); ?>" style="width:100%;font-family:monospace;padding:8px;" onclick="this.select();" />
+                </div>
+                <?php if ( $uid > 0 ) { delete_transient( 'coffeebrk_core_api_token_plain_' . $uid ); } ?>
+            <?php endif; ?>
+
+            <div style="display:flex;gap:10px;margin-top:15px;">
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                    <input type="hidden" name="action" value="coffeebrk_core_api_token_generate" />
+                    <?php wp_nonce_field( 'coffeebrk_core_api_token_generate' ); ?>
+                    <button type="submit" class="button button-primary">Generate New Token</button>
+                </form>
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                    <input type="hidden" name="action" value="coffeebrk_core_api_token_revoke" />
+                    <?php wp_nonce_field( 'coffeebrk_core_api_token_revoke' ); ?>
+                    <button type="submit" class="button">Revoke Token</button>
+                </form>
+            </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+            <h2 style="margin-top:0;">Quick Reference</h2>
+            <p style="color:#555;margin-bottom:15px;">Base URL: <code><?php echo esc_html( $rest_base ); ?></code></p>
+
+            <table class="widefat striped" style="margin:0;">
+                <thead><tr><th>Method</th><th>Endpoint</th><th>Auth</th></tr></thead>
+                <tbody>
+                    <tr><td><span style="background:#28a745;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">GET</span></td><td><code>/posts</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#28a745;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">GET</span></td><td><code>/posts/{id}</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#ffc107;color:#000;padding:2px 6px;border-radius:3px;font-size:11px;">POST</span></td><td><code>/posts</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#17a2b8;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">PUT</span></td><td><code>/posts/{id}</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#dc3545;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">DELETE</span></td><td><code>/posts/{id}</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#ffc107;color:#000;padding:2px 6px;border-radius:3px;font-size:11px;">POST</span></td><td><code>/bulk-posts</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#28a745;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">GET</span></td><td><code>/categories</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#28a745;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">GET</span></td><td><code>/meta-fields</code></td><td>Bearer Token</td></tr>
+                    <tr><td><span style="background:#28a745;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">GET</span></td><td><code>/site</code></td><td>Public</td></tr>
+                    <tr><td><span style="background:#28a745;color:#fff;padding:2px 6px;border-radius:3px;font-size:11px;">GET</span></td><td><code>/rss-info</code></td><td>Public</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-top:20px;max-width:1200px;">
+        <h2 style="margin-top:0;">Authentication</h2>
+        <p style="color:#555;">All API requests (except public endpoints) require authentication using a Bearer token.</p>
+
+        <h3>HTTP Header</h3>
+        <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code>Authorization: Bearer YOUR_API_TOKEN</code></pre>
+
+        <h3>Alternative Header</h3>
+        <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code>X-Coffeebrk-Token: YOUR_API_TOKEN</code></pre>
+
+        <h3>Response Codes</h3>
+        <table class="widefat striped" style="max-width:600px;">
+            <thead><tr><th>Code</th><th>Description</th></tr></thead>
+            <tbody>
+                <tr><td><code>200</code></td><td>Success</td></tr>
+                <tr><td><code>201</code></td><td>Created successfully</td></tr>
+                <tr><td><code>400</code></td><td>Bad request (invalid parameters)</td></tr>
+                <tr><td><code>401</code></td><td>Unauthorized (invalid/missing token)</td></tr>
+                <tr><td><code>404</code></td><td>Resource not found</td></tr>
+                <tr><td><code>500</code></td><td>Server error</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <?php
+}
+
+/**
+ * POST API Tab
+ */
+function coffeebrk_api_tab_post_api( $rest_base, $plain_token, $token_hash, $token_last4, $token_updated, $token_user_id, $allowed_meta_keys, $uid ) {
+    ?>
+    <div style="max-width:1200px;">
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="margin-top:0;color:#0073aa;">POST /posts - Create New Post</h2>
+            <p style="color:#555;">Create a new blog post or news article. Perfect for n8n automation workflows.</p>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px;">
+                <div>
+                    <h3>Endpoint</h3>
+                    <code style="background:#f1f1f1;padding:10px;display:block;border-radius:4px;"><?php echo esc_html( $rest_base ); ?>/posts</code>
+
+                    <h3 style="margin-top:20px;">Method</h3>
+                    <span style="background:#ffc107;color:#000;padding:4px 12px;border-radius:4px;font-weight:bold;">POST</span>
+
+                    <h3 style="margin-top:20px;">Authentication</h3>
+                    <p><code>Authorization: Bearer YOUR_TOKEN</code></p>
+                </div>
+                <div>
+                    <h3>Required Headers</h3>
+                    <pre style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:6px;font-size:13px;margin:0;"><code>Content-Type: application/json
+Authorization: Bearer YOUR_TOKEN</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Request Body Parameters</h3>
+            <table class="widefat striped">
+                <thead><tr><th style="width:150px;">Parameter</th><th style="width:100px;">Type</th><th style="width:80px;">Required</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>title</code></td><td>string</td><td>Yes*</td><td>Post title. Required unless content is provided.</td></tr>
+                    <tr><td><code>content</code></td><td>string</td><td>Yes*</td><td>Post content (HTML allowed). Required unless title is provided.</td></tr>
+                    <tr><td><code>excerpt</code></td><td>string</td><td>No</td><td>Post excerpt/summary.</td></tr>
+                    <tr><td><code>status</code></td><td>string</td><td>No</td><td>Post status: <code>draft</code> (default), <code>publish</code>, <code>pending</code>, <code>private</code></td></tr>
+                    <tr><td><code>category_id</code></td><td>integer</td><td>No</td><td>Single category ID.</td></tr>
+                    <tr><td><code>categories</code></td><td>array</td><td>No</td><td>Array of category IDs. Example: <code>[1, 5, 12]</code></td></tr>
+                    <tr><td><code>tags</code></td><td>array</td><td>No</td><td>Array of tag names. Example: <code>["AI", "Tech", "News"]</code></td></tr>
+                    <tr><td><code>source_url</code></td><td>string</td><td>No</td><td>Original article URL.</td></tr>
+                    <tr><td><code>source_name</code></td><td>string</td><td>No</td><td>Source name (e.g., "TechCrunch").</td></tr>
+                    <tr><td><code>image_url</code></td><td>string</td><td>No</td><td>Featured image URL.</td></tr>
+                    <tr><td><code>author_id</code></td><td>integer</td><td>No</td><td>WordPress user ID for author.</td></tr>
+                    <tr><td><code>date</code></td><td>string</td><td>No</td><td>Post date (format: YYYY-MM-DD HH:MM:SS).</td></tr>
+                    <tr><td><code>slug</code></td><td>string</td><td>No</td><td>Custom URL slug.</td></tr>
+                    <tr><td><code>meta</code></td><td>object</td><td>No</td><td>Custom meta fields object.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Allowed Meta Keys</h3>
+            <p style="color:#555;">Only these meta keys are accepted via API (configure in Dynamic Fields):</p>
+            <?php if ( ! empty( $allowed_meta_keys ) ) : ?>
+                <div style="background:#f8f9fa;padding:12px;border-radius:6px;font-family:monospace;">
+                    <?php echo esc_html( implode( ', ', array_merge( [ '_source_name', '_source_url', '_image', '_organization_logo', '_tagline', '_date' ], $allowed_meta_keys ) ) ); ?>
+                </div>
+            <?php else : ?>
+                <div style="background:#f8f9fa;padding:12px;border-radius:6px;font-family:monospace;">
+                    _source_name, _source_url, _image, _organization_logo, _tagline, _date
+                </div>
+                <p style="color:#666;font-size:13px;margin-top:10px;">Add more fields in <strong>Coffeebrk Core > Dynamic Fields</strong>.</p>
+            <?php endif; ?>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Example Request - cURL</h3>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl -X POST "<?php echo esc_html( $rest_base ); ?>/posts" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -d '{
+    "title": "Breaking: AI Revolution in 2025",
+    "content": "&lt;p&gt;This is the article content with &lt;strong&gt;HTML&lt;/strong&gt; support.&lt;/p&gt;",
+    "excerpt": "A brief summary of the article...",
+    "status": "publish",
+    "categories": [5, 12],
+    "tags": ["AI", "Technology", "Breaking News"],
+    "source_url": "https://example.com/original-article",
+    "source_name": "TechNews Daily",
+    "image_url": "https://example.com/featured-image.jpg",
+    "meta": {
+      "_tagline": "The future is here",
+      "_organization_logo": "https://example.com/logo.png"
     }
+  }'</code></pre>
+        </div>
 
-    echo '<div style="display:flex;gap:10px;margin-top:12px;">';
-    echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-    echo '<input type="hidden" name="action" value="coffeebrk_core_api_token_generate" />';
-    wp_nonce_field( 'coffeebrk_core_api_token_generate' );
-    echo '<button type="submit" class="button button-primary">Generate New Token</button>';
-    echo '</form>';
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Example Request - n8n HTTP Request Node</h3>
+            <p style="color:#555;">Configure the HTTP Request node in n8n with these settings:</p>
 
-    echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-    echo '<input type="hidden" name="action" value="coffeebrk_core_api_token_revoke" />';
-    wp_nonce_field( 'coffeebrk_core_api_token_revoke' );
-    echo '<button type="submit" class="button">Revoke Token</button>';
-    echo '</form>';
-    echo '</div>';
-    echo '</div>';
+            <table class="widefat" style="margin-top:15px;">
+                <tbody>
+                    <tr><th style="width:180px;background:#f1f1f1;">Method</th><td>POST</td></tr>
+                    <tr><th style="background:#f1f1f1;">URL</th><td><code><?php echo esc_html( $rest_base ); ?>/posts</code></td></tr>
+                    <tr><th style="background:#f1f1f1;">Authentication</th><td>Header Auth</td></tr>
+                    <tr><th style="background:#f1f1f1;">Header Name</th><td>Authorization</td></tr>
+                    <tr><th style="background:#f1f1f1;">Header Value</th><td>Bearer YOUR_API_TOKEN</td></tr>
+                    <tr><th style="background:#f1f1f1;">Body Content Type</th><td>JSON</td></tr>
+                </tbody>
+            </table>
 
-    echo '<table class="widefat striped"><thead><tr><th style="width:180px;">Method</th><th>Endpoint</th><th style="width:360px;">Auth</th></tr></thead><tbody>';
-    echo '<tr><td>GET</td><td><code>' . esc_html( $rest_base . '/site' ) . '</code></td><td>Public</td></tr>';
-    echo '<tr><td>GET</td><td><code>' . esc_html( $rest_base . '/feed' ) . '</code></td><td>Requires logged-in user (cookie auth)</td></tr>';
-    echo '<tr><td>POST</td><td><code>' . esc_html( $rest_base . '/submit' ) . '</code></td><td>Bearer token or logged-in user with <code>edit_posts</code></td></tr>';
-    echo '<tr><td>POST</td><td><code>' . esc_html( $rest_base . '/supabase/login' ) . '</code></td><td>Public (Supabase token validation)</td></tr>';
-    echo '</tbody></table>';
+            <h4 style="margin-top:20px;">n8n JSON Body Example (using expressions):</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "title": "{{ $json.title }}",
+  "content": "{{ $json.content }}",
+  "status": "publish",
+  "source_url": "{{ $json.url }}",
+  "source_name": "{{ $json.source }}",
+  "image_url": "{{ $json.image }}",
+  "categories": [{{ $json.category_id }}],
+  "tags": {{ JSON.stringify($json.tags) }}
+}</code></pre>
+        </div>
 
-    echo '<h3 style="margin-top:18px;">Posting Articles with Custom Fields</h3>';
-    echo '<p style="max-width:980px;color:#555;">Use <code>POST ' . esc_html( $rest_base . '/submit' ) . '</code> and pass custom fields in a <code>meta</code> object. For safety, only keys configured in <strong>Dynamic Fields</strong> are accepted.</p>';
-    if ( ! empty( $allowed_meta_keys ) ) {
-        echo '<p style="max-width:980px;color:#555;margin:0 0 6px;"><strong>Allowed meta keys:</strong></p>';
-        echo '<div style="max-width:980px;background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:10px;">';
-        echo '<code style="display:block;white-space:pre-wrap;">' . esc_html( implode( ', ', $allowed_meta_keys ) ) . '</code>';
-        echo '</div>';
-    } else {
-        echo '<p style="max-width:980px;color:#555;">No Dynamic Fields are configured yet. Add them in <strong>Coffeebrk Core → Dynamic Fields</strong> to allow meta keys via API.</p>';
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Success Response (201 Created)</h3>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "success": true,
+  "message": "Post created successfully.",
+  "post": {
+    "id": 123,
+    "title": "Breaking: AI Revolution in 2025",
+    "slug": "breaking-ai-revolution-in-2025",
+    "status": "publish",
+    "date": "2025-01-15 10:30:00",
+    "permalink": "https://yoursite.com/breaking-ai-revolution-in-2025/",
+    "author": {
+      "id": 1,
+      "name": "Admin"
+    },
+    "categories": [
+      {"id": 5, "name": "Technology", "slug": "technology"}
+    ],
+    "tags": [
+      {"id": 10, "name": "AI", "slug": "ai"}
+    ],
+    "featured_image": "https://example.com/featured-image.jpg",
+    "meta": {
+      "_source_name": "TechNews Daily",
+      "_source_url": "https://example.com/original-article"
     }
+  },
+  "edit_link": "https://yoursite.com/wp-admin/post.php?post=123&action=edit"
+}</code></pre>
+        </div>
 
-    echo '<h3 style="margin-top:18px;">Authentication</h3>';
-    echo '<p style="max-width:980px;color:#555;">For protected endpoints, use either:</p>';
-    echo '<ul style="max-width:980px;color:#555;list-style:disc;padding-left:20px;">'
-        .'<li>Cookie auth (same browser session) + header <code>X-WP-Nonce</code></li>'
-        .'<li>Bearer token (recommended) for server-to-server calls</li>'
-        .'</ul>';
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;color:#0073aa;">POST /bulk-posts - Create Multiple Posts</h3>
+            <p style="color:#555;">Create up to 50 posts in a single request. Ideal for batch imports.</p>
 
-    echo '<p style="max-width:980px;color:#555;">Current admin REST nonce (for testing in your browser session): <code>' . esc_html( $nonce ) . '</code></p>';
+            <h4>Request Body</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "posts": [
+    {
+      "title": "First Article",
+      "content": "Content of first article...",
+      "status": "draft",
+      "source_name": "Source 1"
+    },
+    {
+      "title": "Second Article",
+      "content": "Content of second article...",
+      "status": "publish",
+      "categories": [5]
+    }
+  ]
+}</code></pre>
 
-    echo '<h3 style="margin-top:18px;">Examples</h3>';
-    echo '<pre style="background:#111;color:#eee;padding:12px;border-radius:6px;overflow:auto;max-width:980px;">'
-        . esc_html(
-            "# Public\n" .
-            "curl -s \"{$rest_base}/site\"\n\n" .
-            "# Create a draft post (Bearer token)\n" .
-            "curl -s -H \"Authorization: Bearer YOUR_TOKEN\" -H \"Content-Type: application/json\" \\\n+  -d '{\"title\":\"Hello\",\"content\":\"My content\",\"meta\":{\"_source_name\":\"My Feed\",\"_source_url\":\"https://example.com\"}}' \\\n+  \"{$rest_base}/submit\"\n\n" .
-            "# Create a draft post (cookie auth + nonce)\n" .
-            "curl -s -H \"X-WP-Nonce: {$nonce}\" -H \"Content-Type: application/json\" \\\n   -d '{\"title\":\"Hello\",\"content\":\"My content\"}' \\\n   \"{$rest_base}/submit\"\n"
-        )
-        . '</pre>';
+            <h4 style="margin-top:15px;">Response</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "success": true,
+  "total": 2,
+  "success_count": 2,
+  "error_count": 0,
+  "results": [
+    {"index": 0, "success": true, "id": 124, "permalink": "..."},
+    {"index": 1, "success": true, "id": 125, "permalink": "..."}
+  ]
+}</code></pre>
+        </div>
 
-    echo '<h2 style="margin-top:26px;">Site RSS Feed</h2>';
-    echo '<p style="max-width:980px;color:#555;">Public RSS feed of your latest published posts:</p>';
-    echo '<ul style="max-width:980px;color:#555;list-style:disc;padding-left:20px;">'
-        .'<li><code>' . esc_html( $rss_pretty ) . '</code></li>'
-        .'<li><code>' . esc_html( $rss_query ) . '</code></li>'
-        .'</ul>';
-    echo '<p style="max-width:980px;color:#555;">If you see a 404, go to <strong>Settings → Permalinks</strong> and click <strong>Save Changes</strong> once.</p>';
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;color:#17a2b8;">PUT /posts/{id} - Update Post</h3>
+            <p style="color:#555;">Update an existing post. Only include fields you want to change.</p>
 
-    echo '</div>';
+            <h4>Endpoint</h4>
+            <code style="background:#f1f1f1;padding:10px;display:block;border-radius:4px;"><?php echo esc_html( $rest_base ); ?>/posts/{id}</code>
+
+            <h4 style="margin-top:15px;">Example - Update title and status</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl -X PUT "<?php echo esc_html( $rest_base ); ?>/posts/123" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -d '{
+    "title": "Updated Title",
+    "status": "publish"
+  }'</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+            <h3 style="margin-top:0;color:#dc3545;">DELETE /posts/{id} - Delete Post</h3>
+            <p style="color:#555;">Move a post to trash or permanently delete it.</p>
+
+            <h4>Parameters</h4>
+            <table class="widefat striped" style="max-width:500px;">
+                <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>force</code></td><td>boolean</td><td>If <code>true</code>, permanently delete. Default: <code>false</code> (trash).</td></tr>
+                </tbody>
+            </table>
+
+            <h4 style="margin-top:15px;">Example - Move to trash</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl -X DELETE "<?php echo esc_html( $rest_base ); ?>/posts/123" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Example - Permanent delete</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl -X DELETE "<?php echo esc_html( $rest_base ); ?>/posts/123?force=true" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+        </div>
+    </div>
+
+    <div style="background:#e7f3ff;border:1px solid #b6d4fe;border-radius:8px;padding:20px;margin-top:20px;max-width:1200px;">
+        <h3 style="margin-top:0;color:#084298;">n8n Workflow Tips</h3>
+        <ul style="color:#084298;margin:0;padding-left:20px;">
+            <li>Use the <strong>HTTP Request</strong> node with POST method</li>
+            <li>Store your API token in n8n credentials for security</li>
+            <li>Use expressions like <code>{{ $json.field }}</code> to map RSS or webhook data</li>
+            <li>Add an <strong>IF</strong> node to check response <code>success === true</code></li>
+            <li>Use <strong>bulk-posts</strong> endpoint when processing multiple items to reduce API calls</li>
+        </ul>
+    </div>
+    <?php
+}
+
+/**
+ * GET API Tab
+ */
+function coffeebrk_api_tab_get_api( $rest_base, $plain_token, $token_hash ) {
+    ?>
+    <div style="max-width:1200px;">
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="margin-top:0;color:#28a745;">GET /posts - List Posts</h2>
+            <p style="color:#555;">Retrieve posts with powerful filtering, pagination, and sorting options.</p>
+
+            <h3>Endpoint</h3>
+            <code style="background:#f1f1f1;padding:10px;display:block;border-radius:4px;"><?php echo esc_html( $rest_base ); ?>/posts</code>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Query Parameters</h3>
+            <table class="widefat striped">
+                <thead><tr><th style="width:150px;">Parameter</th><th style="width:100px;">Type</th><th style="width:150px;">Default</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>page</code></td><td>integer</td><td>1</td><td>Page number for pagination.</td></tr>
+                    <tr><td><code>per_page</code></td><td>integer</td><td>10</td><td>Posts per page (max: 100).</td></tr>
+                    <tr><td><code>status</code></td><td>string</td><td>publish</td><td>Filter by status: <code>publish</code>, <code>draft</code>, <code>pending</code>, <code>any</code></td></tr>
+                    <tr><td><code>category</code></td><td>integer</td><td>-</td><td>Filter by category ID.</td></tr>
+                    <tr><td><code>category_slug</code></td><td>string</td><td>-</td><td>Filter by category slug.</td></tr>
+                    <tr><td><code>search</code></td><td>string</td><td>-</td><td>Search posts by keyword.</td></tr>
+                    <tr><td><code>orderby</code></td><td>string</td><td>date</td><td>Sort by: <code>date</code>, <code>title</code>, <code>modified</code>, <code>ID</code>, <code>rand</code></td></tr>
+                    <tr><td><code>order</code></td><td>string</td><td>DESC</td><td>Sort order: <code>ASC</code> or <code>DESC</code></td></tr>
+                    <tr><td><code>author</code></td><td>integer</td><td>-</td><td>Filter by author ID.</td></tr>
+                    <tr><td><code>meta_key</code></td><td>string</td><td>-</td><td>Filter by meta key (use with meta_value).</td></tr>
+                    <tr><td><code>meta_value</code></td><td>string</td><td>-</td><td>Filter by meta value.</td></tr>
+                    <tr><td><code>after</code></td><td>string</td><td>-</td><td>Posts after date (YYYY-MM-DD).</td></tr>
+                    <tr><td><code>before</code></td><td>string</td><td>-</td><td>Posts before date (YYYY-MM-DD).</td></tr>
+                    <tr><td><code>include_meta</code></td><td>boolean</td><td>true</td><td>Include meta fields in response.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Example Requests</h3>
+
+            <h4>Get latest 10 published posts</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/posts" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Get posts from specific category with pagination</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/posts?category=5&page=2&per_page=20" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Search posts and sort by title</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/posts?search=AI&orderby=title&order=ASC" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Get draft posts from last week</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/posts?status=draft&after=2025-01-08" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Filter by meta field</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/posts?meta_key=source_name&meta_value=TechCrunch" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">Response Format</h3>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "success": true,
+  "page": 1,
+  "per_page": 10,
+  "total": 156,
+  "total_pages": 16,
+  "items": [
+    {
+      "id": 123,
+      "title": "Post Title",
+      "slug": "post-title",
+      "status": "publish",
+      "date": "2025-01-15 10:30:00",
+      "date_gmt": "2025-01-15 15:30:00",
+      "modified": "2025-01-15 11:00:00",
+      "excerpt": "First 30 words of content...",
+      "permalink": "https://yoursite.com/post-title/",
+      "author": {
+        "id": 1,
+        "name": "Admin"
+      },
+      "categories": [
+        {"id": 5, "name": "Technology", "slug": "technology"}
+      ],
+      "tags": [
+        {"id": 10, "name": "AI", "slug": "ai"}
+      ],
+      "featured_image": "https://yoursite.com/image.jpg",
+      "featured_image_id": 456,
+      "meta": {
+        "_source_name": "TechNews",
+        "_source_url": "https://example.com/article"
+      }
+    }
+  ]
+}</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="margin-top:0;color:#28a745;">GET /posts/{id} - Single Post</h2>
+            <p style="color:#555;">Retrieve a single post with full content.</p>
+
+            <h4>Example</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/posts/123" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Response (includes full content)</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "success": true,
+  "post": {
+    "id": 123,
+    "title": "Post Title",
+    "content": "&lt;p&gt;Full HTML content...&lt;/p&gt;",
+    "content_rendered": "&lt;p&gt;Processed content with shortcodes...&lt;/p&gt;",
+    ...
+  }
+}</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="margin-top:0;color:#28a745;">GET /categories - List Categories</h2>
+            <p style="color:#555;">Retrieve all categories for mapping in your automation.</p>
+
+            <h4>Example</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/categories" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Response</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "success": true,
+  "total": 5,
+  "items": [
+    {"id": 1, "name": "Uncategorized", "slug": "uncategorized", "description": "", "count": 10, "parent": 0},
+    {"id": 5, "name": "Technology", "slug": "technology", "description": "Tech news", "count": 45, "parent": 0}
+  ]
+}</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="margin-top:0;color:#28a745;">GET /meta-fields - Available Meta Fields</h2>
+            <p style="color:#555;">Get list of all available meta fields for posts.</p>
+
+            <h4>Example</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/meta-fields" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"</code></pre>
+
+            <h4 style="margin-top:15px;">Response</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "success": true,
+  "total": 6,
+  "fields": [
+    {"key": "_source_name", "label": "Source Name", "type": "text", "required": false, "core": true},
+    {"key": "_source_url", "label": "Source URL", "type": "url", "required": false, "core": true},
+    {"key": "_image", "label": "Featured Image URL", "type": "image_url", "required": false, "core": true},
+    {"key": "_custom_field", "label": "Custom Field", "type": "text", "choices": "", "required": false, "core": false}
+  ]
+}</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+            <h2 style="margin-top:0;color:#28a745;">GET /site - Site Information (Public)</h2>
+            <p style="color:#555;">Get basic site information. No authentication required.</p>
+
+            <h4>Example</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/site"</code></pre>
+
+            <h4 style="margin-top:15px;">Response</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "name": "My News Site",
+  "description": "Latest news and updates",
+  "url": "https://yoursite.com/",
+  "timezone": "America/New_York",
+  "coffeebrk_core_version": "2.1.0"
+}</code></pre>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * RSS Tab
+ */
+function coffeebrk_api_tab_rss( $rss_pretty, $rss_query, $rest_base ) {
+    ?>
+    <div style="max-width:1200px;">
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="margin-top:0;color:#fd7e14;">RSS Feeds</h2>
+            <p style="color:#555;">Subscribe to your site's RSS feed or use it in automation workflows.</p>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+                <h3 style="margin-top:0;">Coffeebrk RSS Feed</h3>
+                <p style="color:#555;">Custom RSS feed with latest 20 published posts.</p>
+
+                <h4>Pretty URL</h4>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <code style="background:#f1f1f1;padding:10px;flex:1;border-radius:4px;word-break:break-all;"><?php echo esc_html( $rss_pretty ); ?></code>
+                    <a href="<?php echo esc_url( $rss_pretty ); ?>" target="_blank" class="button">Open</a>
+                </div>
+
+                <h4 style="margin-top:15px;">Query String URL</h4>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <code style="background:#f1f1f1;padding:10px;flex:1;border-radius:4px;word-break:break-all;"><?php echo esc_html( $rss_query ); ?></code>
+                    <a href="<?php echo esc_url( $rss_query ); ?>" target="_blank" class="button">Open</a>
+                </div>
+
+                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px;margin-top:15px;">
+                    <strong style="color:#856404;">404 Error?</strong>
+                    <p style="color:#856404;margin:5px 0 0;">Go to <strong>Settings > Permalinks</strong> and click <strong>Save Changes</strong> to flush rewrite rules.</p>
+                </div>
+            </div>
+
+            <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+                <h3 style="margin-top:0;">WordPress Default Feed</h3>
+                <p style="color:#555;">Standard WordPress RSS 2.0 feed.</p>
+
+                <h4>URL</h4>
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <code style="background:#f1f1f1;padding:10px;flex:1;border-radius:4px;word-break:break-all;"><?php echo esc_html( get_bloginfo( 'rss2_url' ) ); ?></code>
+                    <a href="<?php echo esc_url( get_bloginfo( 'rss2_url' ) ); ?>" target="_blank" class="button">Open</a>
+                </div>
+            </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-top:20px;">
+            <h3 style="margin-top:0;">RSS Feed Structure</h3>
+            <p style="color:#555;">The Coffeebrk RSS feed follows RSS 2.0 specification with content:encoded extension.</p>
+
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"&gt;
+  &lt;channel&gt;
+    &lt;title&gt;Site Name&lt;/title&gt;
+    &lt;link&gt;https://yoursite.com/&lt;/link&gt;
+    &lt;description&gt;Site description&lt;/description&gt;
+    &lt;language&gt;en-US&lt;/language&gt;
+    &lt;lastBuildDate&gt;Wed, 15 Jan 2025 10:30:00 +0000&lt;/lastBuildDate&gt;
+
+    &lt;item&gt;
+      &lt;title&gt;Post Title&lt;/title&gt;
+      &lt;link&gt;https://yoursite.com/post-title/&lt;/link&gt;
+      &lt;guid isPermaLink="true"&gt;https://yoursite.com/post-title/&lt;/guid&gt;
+      &lt;pubDate&gt;Wed, 15 Jan 2025 10:30:00 +0000&lt;/pubDate&gt;
+      &lt;description&gt;&lt;![CDATA[Post excerpt...]]&gt;&lt;/description&gt;
+      &lt;content:encoded&gt;&lt;![CDATA[Full HTML content...]]&gt;&lt;/content:encoded&gt;
+    &lt;/item&gt;
+  &lt;/channel&gt;
+&lt;/rss&gt;</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-top:20px;">
+            <h3 style="margin-top:0;">GET /rss-info - RSS Information API (Public)</h3>
+            <p style="color:#555;">Programmatically get RSS feed URLs and information.</p>
+
+            <h4>Example</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">curl "<?php echo esc_html( $rest_base ); ?>/rss-info"</code></pre>
+
+            <h4 style="margin-top:15px;">Response</h4>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;">{
+  "success": true,
+  "feeds": [
+    {
+      "name": "Coffeebrk Main Feed",
+      "url": "<?php echo esc_html( $rss_pretty ); ?>",
+      "url_alt": "<?php echo esc_html( $rss_query ); ?>",
+      "format": "RSS 2.0",
+      "description": "Latest published posts from the site."
+    },
+    {
+      "name": "WordPress Default Feed",
+      "url": "<?php echo esc_html( get_bloginfo( 'rss2_url' ) ); ?>",
+      "format": "RSS 2.0",
+      "description": "Standard WordPress RSS feed."
+    }
+  ]
+}</code></pre>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-top:20px;">
+            <h3 style="margin-top:0;">Using RSS with n8n</h3>
+            <p style="color:#555;">Use the RSS Feed Read node in n8n to fetch posts from your site.</p>
+
+            <h4>n8n RSS Feed Read Node Configuration</h4>
+            <table class="widefat" style="margin-top:15px;max-width:600px;">
+                <tbody>
+                    <tr><th style="width:150px;background:#f1f1f1;">URL</th><td><code><?php echo esc_html( $rss_pretty ); ?></code></td></tr>
+                    <tr><th style="background:#f1f1f1;">Trigger</th><td>On Schedule (e.g., every 15 minutes)</td></tr>
+                </tbody>
+            </table>
+
+            <h4 style="margin-top:20px;">Example n8n Workflow</h4>
+            <ol style="color:#555;padding-left:20px;">
+                <li>Add <strong>RSS Feed Read</strong> node with your feed URL</li>
+                <li>Add <strong>IF</strong> node to filter new items</li>
+                <li>Add <strong>HTTP Request</strong> node to POST to another service</li>
+                <li>Connect nodes and activate workflow</li>
+            </ol>
+        </div>
+    </div>
+
+    <div style="background:#e7f3ff;border:1px solid #b6d4fe;border-radius:8px;padding:20px;margin-top:20px;max-width:1200px;">
+        <h3 style="margin-top:0;color:#084298;">Pro Tips</h3>
+        <ul style="color:#084298;margin:0;padding-left:20px;">
+            <li>Use the Coffeebrk feed (<code>/feed/coffeebrk/</code>) for consistent formatting</li>
+            <li>RSS feeds are cached by WordPress - changes may take a few minutes to appear</li>
+            <li>For real-time notifications, consider using webhooks instead of RSS polling</li>
+            <li>The feed includes full HTML content in <code>content:encoded</code> for rich formatting</li>
+        </ul>
+    </div>
+    <?php
 }
 
 function coffeebrk_auth_settings_page(){
