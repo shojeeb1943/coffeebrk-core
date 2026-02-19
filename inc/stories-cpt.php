@@ -107,6 +107,8 @@ add_action( 'admin_init', function() {
             if ( $video_url ) {
                 update_post_meta( $post_id, '_cbk_story_video_url', $video_url );
             }
+            // Set show on frontend to 'yes' by default for imported stories
+            update_post_meta( $post_id, '_cbk_story_show_frontend', 'yes' );
             $imported++;
         }
     }

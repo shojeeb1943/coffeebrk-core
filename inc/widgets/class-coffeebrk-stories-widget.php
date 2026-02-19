@@ -80,7 +80,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
             [
                 'label' => __( 'Limit', 'coffeebrk-core' ),
                 'type' => Controls_Manager::NUMBER,
-                'default' => 50,
+                'default' => -1,
+                'description' => __( 'Maximum number of stories to show. Use -1 or leave empty to show all stories.', 'coffeebrk-core' ),
                 'condition' => [
                     'source_type' => 'global',
                 ],
@@ -486,7 +487,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
         $stories = [];
 
         if ( $source_type === 'global' ) {
-            $limit = ! empty( $settings['global_limit'] ) ? (int) $settings['global_limit'] : 10;
+            $limit = ! empty( $settings['global_limit'] ) ? (int) $settings['global_limit'] : -1;
             $args = [
                 'post_type' => 'cbk_story',
                 'posts_per_page' => $limit,
@@ -497,8 +498,8 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                     'relation' => 'OR',
                     [
                         'key'     => '_cbk_story_show_frontend',
-                        'value'   => 'yes',
-                        'compare' => '=',
+                        'value'   => 'no',
+                        'compare' => '!=',
                     ],
                     [
                         'key'     => '_cbk_story_show_frontend',
