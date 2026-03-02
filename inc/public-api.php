@@ -14,6 +14,23 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 add_action( 'rest_api_init', 'coffeebrk_register_public_routes' );
 
 /**
+ * Force CORS headers for all public routes BEFORE WordPress's own handler
+ * (which fires at priority 10 and can emit an empty Access-Control-Allow-Origin).
+ */
+add_filter( 'rest_pre_serve_request', function ( $served, $result, $request ) {
+    if ( strpos( $request->get_route(), '/coffeebrk/v1/public/' ) === 0 ) {
+        header( 'Access-Control-Allow-Origin: *' );
+        header( 'Access-Control-Allow-Methods: GET, OPTIONS' );
+        header( 'Access-Control-Allow-Headers: Content-Type' );
+        if ( 'OPTIONS' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
+            status_header( 204 );
+            exit;
+        }
+    }
+    return $served;
+}, 5, 3 );
+
+/**
  * Register public (no-auth) read-only routes.
  */
 function coffeebrk_register_public_routes() {
@@ -98,18 +115,13 @@ function coffeebrk_public_get_posts( WP_REST_Request $req ) {
         ];
     }
 
-    $response = new WP_REST_Response( [
+    return new WP_REST_Response( [
         'page'        => $page,
         'per_page'    => $per_page,
         'total'       => (int) $query->found_posts,
         'total_pages' => (int) $query->max_num_pages,
         'items'       => $items,
     ], 200 );
-
-    // Allow cross-origin requests from extensions
-    $response->header( 'Access-Control-Allow-Origin', '*' );
-
-    return $response;
 }
 
 /**
@@ -131,8 +143,5 @@ function coffeebrk_public_get_categories( WP_REST_Request $req ) {
         ];
     }
 
-    $response = new WP_REST_Response( $items, 200 );
-    $response->header( 'Access-Control-Allow-Origin', '*' );
-
-    return $response;
+    return new WP_REST_Response( $items, 200 );
 }
