@@ -49,6 +49,27 @@ function coffeebrk_core_page_url($slug){
     return home_url('/' . $slug . '/');
 }
 
+// Get the configured App URL (where users go after onboarding), fallback to home
+function coffeebrk_core_app_url(){
+    $app_url = coffeebrk_core_get_option('app_url', '');
+    if ( ! empty($app_url) ) {
+        return esc_url_raw( rtrim($app_url, '/') . '/' );
+    }
+    return home_url('/');
+}
+
+// Allow redirects to the configured App URL domain
+add_filter('allowed_redirect_hosts', function($hosts){
+    $app_url = coffeebrk_core_get_option('app_url', '');
+    if ( ! empty($app_url) ) {
+        $parsed = wp_parse_url($app_url);
+        if ( ! empty($parsed['host']) ) {
+            $hosts[] = $parsed['host'];
+        }
+    }
+    return $hosts;
+});
+
 // Safe redirect that falls back to JS if headers already sent (prevents warnings)
 function coffeebrk_safe_redirect($url){
     $url = esc_url_raw($url);
@@ -71,12 +92,12 @@ add_action('template_redirect', function(){
             $has_name = (bool) ($u->first_name);
             $has_aspire = ! empty( get_user_meta($u->ID, 'aspire', true) );
             if ( $has_name && $has_aspire ) {
-                coffeebrk_safe_redirect( home_url('/') );
+                coffeebrk_safe_redirect( coffeebrk_core_app_url() );
             }
             return; // let incomplete users finish onboarding
         }
         if ( is_page( [ (int)($ids['coffeebrk-hello'] ?? 0), (int)($ids['coffeebrk-login'] ?? 0), (int)($ids['coffeebrk-signup'] ?? 0) ] ) ) {
-            coffeebrk_safe_redirect( home_url('/') );
+            coffeebrk_safe_redirect( coffeebrk_core_app_url() );
         }
         return;
     }
@@ -394,7 +415,7 @@ add_action('template_redirect', function(){
                 $vals = array_values(array_unique(array_filter($vals)));
                 update_user_meta($user->ID, 'aspire', $vals );
                 update_user_meta($user->ID, 'aspire_csv', implode(', ', $vals) );
-                coffeebrk_safe_redirect( home_url('/') );
+                coffeebrk_safe_redirect( coffeebrk_core_app_url() );
             }
         }
         return;

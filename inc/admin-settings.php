@@ -11,9 +11,10 @@ add_action('admin_init', function() {
         'supabase_service_role'=>'Supabase Service Role Key (server-only)',
         'google_client_id' => 'Google Client ID',
         'google_client_secret' => 'Google Client Secret',
+        'app_url' => 'App URL (redirect after onboarding)',
         'allowed_origins' => 'Allowed Origins (one per line)'
     ] as $key=>$label){
-        add_settings_field($key,$label,function()use($key){$opt=get_option('coffeebrk_core_settings',[]);if($key==='allowed_origins'){printf('<textarea name="coffeebrk_core_settings[%s]" rows="3" style="width:100%%;" placeholder="https://wp.coffeebrk.ai\nhttps://app.coffeebrk.ai">%s</textarea>',$key,esc_textarea($opt[$key]??''));}else{$type=$key==='supabase_service_role'?'password':'text';printf('<input type="%s" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;">',$type,$key,esc_attr($opt[$key]??''));}},'coffeebrk_auth_options','coffeebrk_auth_section');
+        add_settings_field($key,$label,function()use($key){$opt=get_option('coffeebrk_core_settings',[]);if($key==='allowed_origins'){printf('<textarea name="coffeebrk_core_settings[%s]" rows="3" style="width:100%%;" placeholder="https://wp.coffeebrk.ai\nhttps://app.coffeebrk.ai">%s</textarea>',$key,esc_textarea($opt[$key]??''));}elseif($key==='app_url'){printf('<input type="url" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;" placeholder="https://app.coffeebrk.ai">',$key,esc_attr($opt[$key]??''));echo '<p class="description">Users will be redirected here after completing onboarding. Defaults to site home if empty.</p>';}else{$type=$key==='supabase_service_role'?'password':'text';printf('<input type="%s" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;">',$type,$key,esc_attr($opt[$key]??''));}},'coffeebrk_auth_options','coffeebrk_auth_section');
     }
 });
 
