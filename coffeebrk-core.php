@@ -191,5 +191,6 @@ require_once COFFEEBRK_CORE_PATH . 'meta/meta-aspires.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/feed.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/api-tokens.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rest-api.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/public-api.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/auth.php';
 require_once COFFEEBRK_CORE_PATH . 'admin/json-articles-importer.php';
