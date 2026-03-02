@@ -14,21 +14,66 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 add_action( 'rest_api_init', 'coffeebrk_register_public_routes' );
 
 /**
- * Force CORS headers for all public routes BEFORE WordPress's own handler
- * (which fires at priority 10 and can emit an empty Access-Control-Allow-Origin).
+ * Handle CORS preflight requests early before WordPress processes anything.
+ * This catches OPTIONS requests at the init stage.
+ */
+add_action( 'init', function() {
+    // Check if this is a REST API request to our public endpoints
+    $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+    if ( strpos( $request_uri, '/wp-json/coffeebrk/v1/public' ) !== false ) {
+        // Remove any existing CORS headers WordPress might have set
+        header_remove( 'Access-Control-Allow-Origin' );
+
+        // Set proper CORS headers
+        header( 'Access-Control-Allow-Origin: *' );
+        header( 'Access-Control-Allow-Methods: GET, POST, OPTIONS' );
+        header( 'Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With' );
+        header( 'Access-Control-Max-Age: 86400' );
+
+        // Handle preflight OPTIONS request
+        if ( $_SERVER['REQUEST_METHOD'] === 'OPTIONS' ) {
+            status_header( 204 );
+            exit;
+        }
+    }
+}, 1 );
+
+/**
+ * Force CORS headers for all public routes via REST filter.
+ * This runs before WordPress's own CORS handler.
  */
 add_filter( 'rest_pre_serve_request', function ( $served, $result, $request ) {
-    if ( strpos( $request->get_route(), '/coffeebrk/v1/public/' ) === 0 ) {
+    $route = $request->get_route();
+    // Check both with and without leading slash
+    if ( strpos( $route, '/coffeebrk/v1/public' ) === 0 ||
+         strpos( $route, 'coffeebrk/v1/public' ) === 0 ) {
+        // Remove any existing CORS headers to prevent duplicates
+        header_remove( 'Access-Control-Allow-Origin' );
+
         header( 'Access-Control-Allow-Origin: *' );
-        header( 'Access-Control-Allow-Methods: GET, OPTIONS' );
-        header( 'Access-Control-Allow-Headers: Content-Type' );
+        header( 'Access-Control-Allow-Methods: GET, POST, OPTIONS' );
+        header( 'Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With' );
+
         if ( 'OPTIONS' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
             status_header( 204 );
             exit;
         }
     }
     return $served;
-}, 5, 3 );
+}, 1, 3 );
+
+/**
+ * Also hook into rest_send_cors_headers to ensure proper CORS.
+ */
+add_filter( 'rest_send_cors_headers', function( $value ) {
+    $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+    if ( strpos( $request_uri, '/wp-json/coffeebrk/v1/public' ) !== false ) {
+        header_remove( 'Access-Control-Allow-Origin' );
+        header( 'Access-Control-Allow-Origin: *' );
+        return false; // Prevent WordPress from sending its own headers
+    }
+    return $value;
+}, 1 );
 
 /**
  * Register public (no-auth) read-only routes.
