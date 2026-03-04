@@ -100,6 +100,16 @@ function coffeebrk_register_public_routes() {
         'permission_callback' => '__return_true',
         'callback'            => 'coffeebrk_public_get_categories',
     ]);
+
+    // GET /public/stories — list of stories for carousel
+    register_rest_route( $ns, '/public/stories', [
+        'methods'             => 'GET',
+        'permission_callback' => '__return_true',
+        'callback'            => 'coffeebrk_public_get_stories',
+        'args'                => [
+            'limit' => [ 'type' => 'integer', 'default' => 10, 'minimum' => 1, 'maximum' => 20 ],
+        ],
+    ]);
 }
 
 /**
@@ -189,4 +199,62 @@ function coffeebrk_public_get_categories( WP_REST_Request $req ) {
     }
 
     return new WP_REST_Response( $items, 200 );
+}
+
+/**
+ * GET /public/stories
+ */
+function coffeebrk_public_get_stories( WP_REST_Request $req ) {
+    $limit = max( 1, min( 20, (int) $req->get_param( 'limit' ) ) );
+
+    $args = [
+        'post_type'      => 'cbk_story',
+        'post_status'    => 'publish',
+        'posts_per_page' => $limit,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'meta_query'     => [
+            'relation' => 'OR',
+            [
+                'key'     => '_cbk_story_show_frontend',
+                'value'   => 'yes',
+                'compare' => '=',
+            ],
+            [
+                'key'     => '_cbk_story_show_frontend',
+                'compare' => 'NOT EXISTS',
+            ],
+        ],
+    ];
+
+    $query = new WP_Query( $args );
+    $items = [];
+
+    foreach ( $query->posts as $post ) {
+        $thumb_id  = get_post_thumbnail_id( $post->ID );
+        $image_url = $thumb_id ? wp_get_attachment_image_url( $thumb_id, 'medium' ) : '';
+        $video_url = get_post_meta( $post->ID, '_cbk_story_video_url', true );
+        $gradient  = get_post_meta( $post->ID, '_cbk_story_gradient', true ) ?: '#F5F5FF';
+        $text_color = get_post_meta( $post->ID, '_cbk_story_text_color', true ) ?: '#323232';
+        $gradient_intensity = get_post_meta( $post->ID, '_cbk_story_gradient_intensity', true );
+        if ( $gradient_intensity === '' ) {
+            $gradient_intensity = 50;
+        }
+
+        $items[] = [
+            'id'                 => (int) $post->ID,
+            'title'              => get_the_title( $post ),
+            'image'              => $image_url ?: null,
+            'video_url'          => $video_url ?: null,
+            'gradient'           => $gradient,
+            'text_color'         => $text_color,
+            'gradient_intensity' => (int) $gradient_intensity,
+            'date'               => $post->post_date,
+        ];
+    }
+
+    return new WP_REST_Response( [
+        'total' => (int) $query->found_posts,
+        'items' => $items,
+    ], 200 );
 }
