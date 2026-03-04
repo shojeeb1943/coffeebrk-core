@@ -299,6 +299,7 @@ function coffeebrk_public_video_embed( WP_REST_Request $req ) {
 
     // Output HTML page directly
     header( 'Content-Type: text/html; charset=utf-8' );
+    header( 'X-Frame-Options: ALLOWALL' );
     echo '<!DOCTYPE html>
 <html>
 <head>
@@ -307,12 +308,15 @@ function coffeebrk_public_video_embed( WP_REST_Request $req ) {
 <title>Video</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;background:#000}
+html,body{width:100%;height:100%;background:#000;overflow:hidden}
+.wrapper{position:absolute;top:0;left:0;width:calc(100% + 80px);height:100%;overflow:hidden}
 iframe{width:100%;height:100%;border:none}
 </style>
 </head>
 <body>
+<div class="wrapper">
 <iframe src="' . esc_url( $embed_url ) . '" allow="autoplay;encrypted-media;picture-in-picture" allowfullscreen></iframe>
+</div>
 </body>
 </html>';
     exit;
