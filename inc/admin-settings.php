@@ -4,17 +4,72 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // Register settings used by the Auth page
 add_action('admin_init', function() {
     register_setting('coffeebrk_auth_options', 'coffeebrk_core_settings');
-    add_settings_section('coffeebrk_auth_section','Supabase / Auth Settings',function(){echo'<p>Configure Supabase credentials. Do not expose Service Role on frontend. Supabase OAuth runs on client; server only validates tokens.</p>';},'coffeebrk_auth_options');
+
+    // General Auth Settings Section
+    add_settings_section('coffeebrk_general_section', 'General Auth Settings', function(){
+        echo '<p>Configure general authentication settings.</p>';
+    }, 'coffeebrk_auth_options');
+
+    // Auth Provider Selection
+    add_settings_field('auth_provider', 'Auth Provider', function(){
+        $opt = get_option('coffeebrk_core_settings', []);
+        $provider = $opt['auth_provider'] ?? 'supabase';
+        ?>
+        <select name="coffeebrk_core_settings[auth_provider]" id="coffeebrk_auth_provider">
+            <option value="supabase" <?php selected($provider, 'supabase'); ?>>Supabase</option>
+            <option value="firebase" <?php selected($provider, 'firebase'); ?>>Firebase</option>
+        </select>
+        <p class="description">Select the authentication provider to use for Google sign-in.</p>
+        <?php
+    }, 'coffeebrk_auth_options', 'coffeebrk_general_section');
+
+    // App URL
+    add_settings_field('app_url', 'App URL (redirect after onboarding)', function(){
+        $opt = get_option('coffeebrk_core_settings', []);
+        printf('<input type="url" name="coffeebrk_core_settings[app_url]" value="%s" style="width:100%%;" placeholder="https://app.coffeebrk.ai">', esc_attr($opt['app_url'] ?? ''));
+        echo '<p class="description">Users will be redirected here after completing onboarding. Defaults to site home if empty.</p>';
+    }, 'coffeebrk_auth_options', 'coffeebrk_general_section');
+
+    // Allowed Origins
+    add_settings_field('allowed_origins', 'Allowed Origins (one per line)', function(){
+        $opt = get_option('coffeebrk_core_settings', []);
+        printf('<textarea name="coffeebrk_core_settings[allowed_origins]" rows="3" style="width:100%%;" placeholder="https://wp.coffeebrk.ai\nhttps://app.coffeebrk.ai">%s</textarea>', esc_textarea($opt['allowed_origins'] ?? ''));
+    }, 'coffeebrk_auth_options', 'coffeebrk_general_section');
+
+    // Supabase Settings Section
+    add_settings_section('coffeebrk_supabase_section', 'Supabase Settings', function(){
+        echo '<p>Configure Supabase credentials. Only needed if using Supabase as auth provider.</p>';
+    }, 'coffeebrk_auth_options');
+
+    foreach(['supabase_url' => 'Supabase URL', 'supabase_anon_key' => 'Supabase Anon Key', 'supabase_service_role' => 'Supabase Service Role Key (server-only)'] as $key => $label) {
+        add_settings_field($key, $label, function() use ($key) {
+            $opt = get_option('coffeebrk_core_settings', []);
+            $type = $key === 'supabase_service_role' ? 'password' : 'text';
+            printf('<input type="%s" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;">', $type, $key, esc_attr($opt[$key] ?? ''));
+        }, 'coffeebrk_auth_options', 'coffeebrk_supabase_section');
+    }
+
+    // Firebase Settings Section
+    add_settings_section('coffeebrk_firebase_section', 'Firebase Settings', function(){
+        echo '<p>Configure Firebase credentials. Only needed if using Firebase as auth provider.</p>';
+    }, 'coffeebrk_auth_options');
+
     foreach([
-        'supabase_url'=>'Supabase URL',
-        'supabase_anon_key'=>'Supabase Anon Key',
-        'supabase_service_role'=>'Supabase Service Role Key (server-only)',
-        'google_client_id' => 'Google Client ID',
-        'google_client_secret' => 'Google Client Secret',
-        'app_url' => 'App URL (redirect after onboarding)',
-        'allowed_origins' => 'Allowed Origins (one per line)'
-    ] as $key=>$label){
-        add_settings_field($key,$label,function()use($key){$opt=get_option('coffeebrk_core_settings',[]);if($key==='allowed_origins'){printf('<textarea name="coffeebrk_core_settings[%s]" rows="3" style="width:100%%;" placeholder="https://wp.coffeebrk.ai\nhttps://app.coffeebrk.ai">%s</textarea>',$key,esc_textarea($opt[$key]??''));}elseif($key==='app_url'){printf('<input type="url" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;" placeholder="https://app.coffeebrk.ai">',$key,esc_attr($opt[$key]??''));echo '<p class="description">Users will be redirected here after completing onboarding. Defaults to site home if empty.</p>';}else{$type=$key==='supabase_service_role'?'password':'text';printf('<input type="%s" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;">',$type,$key,esc_attr($opt[$key]??''));}},'coffeebrk_auth_options','coffeebrk_auth_section');
+        'firebase_api_key' => 'Firebase API Key',
+        'firebase_auth_domain' => 'Firebase Auth Domain',
+        'firebase_project_id' => 'Firebase Project ID',
+        'firebase_storage_bucket' => 'Firebase Storage Bucket',
+        'firebase_messaging_sender_id' => 'Firebase Messaging Sender ID',
+        'firebase_app_id' => 'Firebase App ID',
+        'firebase_measurement_id' => 'Firebase Measurement ID (optional)'
+    ] as $key => $label) {
+        add_settings_field($key, $label, function() use ($key) {
+            $opt = get_option('coffeebrk_core_settings', []);
+            $placeholder = '';
+            if ($key === 'firebase_auth_domain') $placeholder = 'your-app.firebaseapp.com';
+            if ($key === 'firebase_storage_bucket') $placeholder = 'your-app.firebasestorage.app';
+            printf('<input type="text" name="coffeebrk_core_settings[%s]" value="%s" style="width:100%%;" placeholder="%s">', $key, esc_attr($opt[$key] ?? ''), esc_attr($placeholder));
+        }, 'coffeebrk_auth_options', 'coffeebrk_firebase_section');
     }
 });
 
