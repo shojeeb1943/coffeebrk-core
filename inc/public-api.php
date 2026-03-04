@@ -309,14 +309,11 @@ function coffeebrk_public_video_embed( WP_REST_Request $req ) {
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;background:#000;overflow:hidden}
-.wrapper{position:absolute;top:0;left:0;width:calc(100% + 80px);height:100%;overflow:hidden}
-iframe{width:100%;height:100%;border:none}
+iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:none}
 </style>
 </head>
 <body>
-<div class="wrapper">
 <iframe src="' . esc_url( $embed_url ) . '" allow="autoplay;encrypted-media;picture-in-picture" allowfullscreen></iframe>
-</div>
 </body>
 </html>';
     exit;
