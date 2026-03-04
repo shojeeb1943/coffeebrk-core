@@ -4,16 +4,16 @@
 
   let firebaseApp = null;
   let firebaseAuth = null;
+  let isProcessing = false;
 
   // Dynamically load Firebase SDK
   async function loadFirebaseSDK() {
-    if (window.firebase && firebaseApp) return true;
+    if (firebaseApp && firebaseAuth) return true;
 
     try {
-      // Load Firebase App
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
-      // Load Firebase Auth
-      const { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+      // Load Firebase modules
+      const appModule = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+      const authModule = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
 
       const firebaseConfig = {
         apiKey: CoffeebrkAuth.firebaseApiKey,
@@ -22,18 +22,19 @@
         storageBucket: CoffeebrkAuth.firebaseStorageBucket,
         messagingSenderId: CoffeebrkAuth.firebaseMessagingSenderId,
         appId: CoffeebrkAuth.firebaseAppId,
-        measurementId: CoffeebrkAuth.firebaseMeasurementId
+        measurementId: CoffeebrkAuth.firebaseMeasurementId || undefined
       };
 
-      firebaseApp = initializeApp(firebaseConfig);
-      firebaseAuth = getAuth(firebaseApp);
+      firebaseApp = appModule.initializeApp(firebaseConfig);
+      firebaseAuth = authModule.getAuth(firebaseApp);
 
-      // Store references globally for use in other functions
+      // Store auth module functions globally
       window.CoffeebrkFirebase = {
         auth: firebaseAuth,
-        signInWithPopup,
-        GoogleAuthProvider,
-        onAuthStateChanged
+        signInWithPopup: authModule.signInWithPopup,
+        signInWithRedirect: authModule.signInWithRedirect,
+        getRedirectResult: authModule.getRedirectResult,
+        GoogleAuthProvider: authModule.GoogleAuthProvider
       };
 
       return true;
@@ -45,44 +46,52 @@
 
   // Finalize login by sending token to WordPress
   async function finalizeWithToken(token) {
+    if (isProcessing) return false;
+    isProcessing = true;
+
     try {
       const response = await fetch(CoffeebrkAuth.finalizeUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ access_token: token, provider: 'firebase' })
+        body: JSON.stringify({ access_token: token })
       });
       const result = await response.json();
+
       if (result && result.success) {
         window.location.replace(result.redirect || CoffeebrkAuth.redirectAfter || '/');
         return true;
       } else {
         console.error('Finalize failed:', result);
+        isProcessing = false;
       }
     } catch (e) {
       console.error('Finalize error:', e);
+      isProcessing = false;
     }
     return false;
   }
 
-  // Check if user is already signed in
-  async function checkExistingSession() {
+  // Check for redirect result (in case popup was blocked and we used redirect)
+  async function checkRedirectResult() {
     if (!await loadFirebaseSDK()) return;
 
-    const { auth, onAuthStateChanged } = window.CoffeebrkFirebase;
+    try {
+      const { auth, getRedirectResult } = window.CoffeebrkFirebase;
+      const result = await getRedirectResult(auth);
 
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const token = await user.getIdToken();
-          if (token) {
-            await finalizeWithToken(token);
-          }
-        } catch (e) {
-          console.error('Error getting token:', e);
+      if (result && result.user) {
+        const token = await result.user.getIdToken();
+        if (token) {
+          await finalizeWithToken(token);
         }
       }
-    });
+    } catch (e) {
+      // No redirect result or error - this is normal if user didn't come from redirect
+      if (e.code !== 'auth/popup-closed-by-user') {
+        console.log('No redirect result:', e.code || e.message);
+      }
+    }
   }
 
   // Wire up Google sign-in button
@@ -90,39 +99,67 @@
     const btn = document.getElementById('coffeebrk-google-btn');
     if (!btn) return;
 
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+
+      if (isProcessing) return;
+
+      // Show loading state
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<span class="cbk-google-icon" aria-hidden="true"></span> Signing in...';
+      btn.disabled = true;
+
       if (!await loadFirebaseSDK()) {
         console.error('Firebase SDK not loaded');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
         return;
       }
 
-      const { auth, signInWithPopup, GoogleAuthProvider } = window.CoffeebrkFirebase;
+      const { auth, signInWithPopup, signInWithRedirect, GoogleAuthProvider } = window.CoffeebrkFirebase;
 
       try {
         const provider = new GoogleAuthProvider();
         provider.addScope('email');
         provider.addScope('profile');
 
+        // Try popup first
         const result = await signInWithPopup(auth, provider);
-        const user = result.user;
 
-        if (user) {
-          const token = await user.getIdToken();
+        if (result && result.user) {
+          const token = await result.user.getIdToken();
           await finalizeWithToken(token);
         }
       } catch (e) {
-        console.error('Google sign-in error:', e);
-        if (e.code === 'auth/popup-closed-by-user') {
-          // User closed the popup, no action needed
-        } else if (e.code === 'auth/popup-blocked') {
-          alert('Please allow popups for this site to sign in with Google.');
+        console.error('Google sign-in error:', e.code, e.message);
+
+        if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+          // Popup was blocked or closed, try redirect method
+          try {
+            const provider = new GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+            await signInWithRedirect(auth, provider);
+            return; // Will redirect away
+          } catch (redirectError) {
+            console.error('Redirect sign-in error:', redirectError);
+          }
+        } else if (e.code === 'auth/unauthorized-domain') {
+          alert('Error: This domain is not authorized in Firebase. Please add "' + window.location.hostname + '" to your Firebase Authentication authorized domains.');
         }
+
+        // Reset button on error
+        btn.innerHTML = originalText;
+        btn.disabled = false;
       }
     });
   }
 
+  // Initialize on DOM ready
   document.addEventListener('DOMContentLoaded', function() {
-    checkExistingSession();
+    // Check for redirect result first (in case coming back from redirect auth)
+    checkRedirectResult();
+    // Wire up the button
     wireGoogleButton();
   });
 })();

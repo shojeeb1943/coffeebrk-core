@@ -33,7 +33,7 @@ add_action('admin_init', function() {
     // Allowed Origins
     add_settings_field('allowed_origins', 'Allowed Origins (one per line)', function(){
         $opt = get_option('coffeebrk_core_settings', []);
-        printf('<textarea name="coffeebrk_core_settings[allowed_origins]" rows="3" style="width:100%%;" placeholder="https://wp.coffeebrk.ai\nhttps://app.coffeebrk.ai">%s</textarea>', esc_textarea($opt['allowed_origins'] ?? ''));
+        printf('<textarea name="coffeebrk_core_settings[allowed_origins]" rows="3" style="width:100%%;" placeholder="https://app.coffeebrk.ai\nhttps://coffeebrk.ai">%s</textarea>', esc_textarea($opt['allowed_origins'] ?? ''));
     }, 'coffeebrk_auth_options', 'coffeebrk_general_section');
 
     // Supabase Settings Section
