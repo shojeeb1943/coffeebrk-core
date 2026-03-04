@@ -110,6 +110,16 @@ function coffeebrk_register_public_routes() {
             'limit' => [ 'type' => 'integer', 'default' => 10, 'minimum' => 1, 'maximum' => 20 ],
         ],
     ]);
+
+    // GET /public/embed — video embed page for Chrome extension
+    register_rest_route( $ns, '/public/embed', [
+        'methods'             => 'GET',
+        'permission_callback' => '__return_true',
+        'callback'            => 'coffeebrk_public_video_embed',
+        'args'                => [
+            'url' => [ 'type' => 'string', 'required' => true ],
+        ],
+    ]);
 }
 
 /**
@@ -257,4 +267,53 @@ function coffeebrk_public_get_stories( WP_REST_Request $req ) {
         'total' => (int) $query->found_posts,
         'items' => $items,
     ], 200 );
+}
+
+/**
+ * GET /public/embed — serves HTML page with embedded video
+ */
+function coffeebrk_public_video_embed( WP_REST_Request $req ) {
+    $url = esc_url_raw( $req->get_param( 'url' ) );
+    if ( empty( $url ) ) {
+        return new WP_REST_Response( [ 'error' => 'Missing url' ], 400 );
+    }
+
+    $embed_url = '';
+
+    // YouTube Shorts
+    if ( preg_match( '/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/', $url, $m ) ) {
+        $embed_url = 'https://www.youtube.com/embed/' . $m[1] . '?autoplay=1&rel=0';
+    }
+    // YouTube standard
+    elseif ( preg_match( '/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/', $url, $m ) ) {
+        $embed_url = 'https://www.youtube.com/embed/' . $m[1] . '?autoplay=1&rel=0';
+    }
+    // Vimeo
+    elseif ( preg_match( '/vimeo\.com\/(\d+)/', $url, $m ) ) {
+        $embed_url = 'https://player.vimeo.com/video/' . $m[1] . '?autoplay=1';
+    }
+
+    if ( empty( $embed_url ) ) {
+        return new WP_REST_Response( [ 'error' => 'Unsupported video URL' ], 400 );
+    }
+
+    // Output HTML page directly
+    header( 'Content-Type: text/html; charset=utf-8' );
+    echo '<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#000}
+iframe{width:100%;height:100%;border:none}
+</style>
+</head>
+<body>
+<iframe src="' . esc_url( $embed_url ) . '" allow="autoplay;encrypted-media;picture-in-picture" allowfullscreen></iframe>
+</body>
+</html>';
+    exit;
 }
