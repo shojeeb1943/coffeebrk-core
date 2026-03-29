@@ -49,6 +49,27 @@ function coffeebrk_core_page_url($slug){
     return home_url('/' . $slug . '/');
 }
 
+// Get the configured App URL (where users go after onboarding), fallback to home
+function coffeebrk_core_app_url(){
+    $app_url = coffeebrk_core_get_option('app_url', '');
+    if ( ! empty($app_url) ) {
+        return esc_url_raw( rtrim($app_url, '/') . '/' );
+    }
+    return home_url('/');
+}
+
+// Allow redirects to the configured App URL domain
+add_filter('allowed_redirect_hosts', function($hosts){
+    $app_url = coffeebrk_core_get_option('app_url', '');
+    if ( ! empty($app_url) ) {
+        $parsed = wp_parse_url($app_url);
+        if ( ! empty($parsed['host']) ) {
+            $hosts[] = $parsed['host'];
+        }
+    }
+    return $hosts;
+});
+
 // Safe redirect that falls back to JS if headers already sent (prevents warnings)
 function coffeebrk_safe_redirect($url){
     $url = esc_url_raw($url);
@@ -71,12 +92,12 @@ add_action('template_redirect', function(){
             $has_name = (bool) ($u->first_name);
             $has_aspire = ! empty( get_user_meta($u->ID, 'aspire', true) );
             if ( $has_name && $has_aspire ) {
-                coffeebrk_safe_redirect( home_url('/') );
+                coffeebrk_safe_redirect( coffeebrk_core_app_url() );
             }
             return; // let incomplete users finish onboarding
         }
         if ( is_page( [ (int)($ids['coffeebrk-hello'] ?? 0), (int)($ids['coffeebrk-login'] ?? 0), (int)($ids['coffeebrk-signup'] ?? 0) ] ) ) {
-            coffeebrk_safe_redirect( home_url('/') );
+            coffeebrk_safe_redirect( coffeebrk_core_app_url() );
         }
         return;
     }
@@ -116,14 +137,88 @@ add_action('rest_api_init', function(){
                 wp_set_current_user($user->ID);
                 wp_set_auth_cookie($user->ID, true);
                 do_action('wp_login', $user->user_login, $user);
-                return new WP_REST_Response(['success'=>true, 'redirect'=> coffeebrk_core_page_url('coffeebrk-onboarding') ], 200);
+                // Check if onboarding is complete - if so, go to app; otherwise onboarding
+                $has_name = (bool) $user->first_name;
+                $has_aspire = ! empty( get_user_meta($user->ID, 'aspire', true) );
+                $redirect = ($has_name && $has_aspire) ? coffeebrk_core_app_url() : coffeebrk_core_page_url('coffeebrk-onboarding');
+                return new WP_REST_Response(['success'=>true, 'redirect'=> $redirect ], 200);
             }
             return new WP_REST_Response(['error'=>'login_failed'], 500);
         }
     ]);
 });
 
-// ---- CORS for finalize endpoint (supports multiple domains) ----
+// -------- Firebase OAuth finalize endpoint --------
+add_action('rest_api_init', function(){
+    register_rest_route('coffeebrk/v1', '/firebase/login', [
+        'methods' => 'POST',
+        'permission_callback' => '__return_true',
+        'callback' => function( WP_REST_Request $req ){
+            $token = sanitize_text_field( $req->get_param('access_token') );
+            if ( ! $token ) return new WP_REST_Response(['error'=>'missing_access_token'], 400);
+
+            // Verify Firebase ID token
+            $project_id = coffeebrk_core_get_option('firebase_project_id');
+            if ( ! $project_id ) return new WP_REST_Response(['error'=>'firebase_not_configured'], 500);
+
+            // Decode JWT to get user info (Firebase tokens are JWTs)
+            $parts = explode('.', $token);
+            if ( count($parts) !== 3 ) return new WP_REST_Response(['error'=>'invalid_token_format'], 400);
+
+            $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);
+            if ( ! $payload ) return new WP_REST_Response(['error'=>'invalid_token_payload'], 400);
+
+            // Verify token issuer and audience
+            $expected_iss = 'https://securetoken.google.com/' . $project_id;
+            if ( ($payload['iss'] ?? '') !== $expected_iss ) {
+                coffeebrk_log_error('firebase token invalid issuer', ['expected'=>$expected_iss, 'got'=>$payload['iss'] ?? '']);
+                return new WP_REST_Response(['error'=>'invalid_token_issuer'], 401);
+            }
+            if ( ($payload['aud'] ?? '') !== $project_id ) {
+                coffeebrk_log_error('firebase token invalid audience', ['expected'=>$project_id, 'got'=>$payload['aud'] ?? '']);
+                return new WP_REST_Response(['error'=>'invalid_token_audience'], 401);
+            }
+
+            // Check token expiration
+            if ( isset($payload['exp']) && $payload['exp'] < time() ) {
+                return new WP_REST_Response(['error'=>'token_expired'], 401);
+            }
+
+            $email = sanitize_email( $payload['email'] ?? '' );
+            $given = sanitize_text_field( $payload['name'] ?? '' );
+            $firebase_uid = sanitize_text_field( $payload['user_id'] ?? ($payload['sub'] ?? '') );
+
+            if ( ! $email ) return new WP_REST_Response(['error'=>'no_email'], 400);
+
+            $user = get_user_by('email', $email);
+            if ( ! $user ) {
+                $login = sanitize_user( current( explode('@', $email) ), true );
+                if ( username_exists($login) ) { $login = $login . '_' . wp_generate_password(4, false); }
+                $uid = wp_create_user( $login, wp_generate_password(20), $email );
+                if ( is_wp_error($uid) ) return new WP_REST_Response(['error'=>'create_failed'], 500);
+                if ( $given ) wp_update_user([ 'ID'=>$uid, 'first_name'=>$given ]);
+                if ( $firebase_uid ) update_user_meta($uid, 'coffeebrk_firebase_uid', $firebase_uid);
+                $user = get_user_by('id', $uid);
+            } else {
+                if ( $firebase_uid ) update_user_meta($user->ID, 'coffeebrk_firebase_uid', $firebase_uid);
+            }
+
+            if ( $user instanceof WP_User ) {
+                wp_set_current_user($user->ID);
+                wp_set_auth_cookie($user->ID, true);
+                do_action('wp_login', $user->user_login, $user);
+                // Check if onboarding is complete - if so, go to app; otherwise onboarding
+                $has_name = (bool) $user->first_name;
+                $has_aspire = ! empty( get_user_meta($user->ID, 'aspire', true) );
+                $redirect = ($has_name && $has_aspire) ? coffeebrk_core_app_url() : coffeebrk_core_page_url('coffeebrk-onboarding');
+                return new WP_REST_Response(['success'=>true, 'redirect'=> $redirect ], 200);
+            }
+            return new WP_REST_Response(['error'=>'login_failed'], 500);
+        }
+    ]);
+});
+
+// ---- CORS for finalize endpoints (supports multiple domains) ----
 function coffeebrk_core_allowed_origins(): array {
     $raw = (string) coffeebrk_core_get_option('allowed_origins', '');
     $lines = array_filter(array_map('trim', preg_split('/\r?\n/', $raw)));
@@ -132,7 +227,8 @@ function coffeebrk_core_allowed_origins(): array {
 
 add_filter('rest_pre_serve_request', function($served, $result){
     $req_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
-    if ( strpos($req_uri, '/coffeebrk/v1/supabase/login') === false ) return $served;
+    // Handle both Supabase and Firebase endpoints
+    if ( strpos($req_uri, '/coffeebrk/v1/supabase/login') === false && strpos($req_uri, '/coffeebrk/v1/firebase/login') === false ) return $served;
     $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
     $allowed = coffeebrk_core_allowed_origins();
     if ( $origin && in_array($origin, $allowed, true) ) {
@@ -161,23 +257,81 @@ add_filter('show_admin_bar', function($show){
 });
 
 // -------- Shortcodes: markup + handlers --------
-function coffeebrk_enqueue_auth_styles(){
-    $file = COFFEEBRK_CORE_PATH . 'assets/css/coffeebrk-auth.css';
-    $ver = file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
-    wp_enqueue_style('coffeebrk-auth', COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-auth.css', [], $ver);
+
+// Get the configured auth provider (supabase or firebase)
+function coffeebrk_get_auth_provider(): string {
+    return coffeebrk_core_get_option('auth_provider', 'supabase');
 }
 
+function coffeebrk_enqueue_auth_styles(){
+    static $loaded = false;
+    if ($loaded) return;
+    $loaded = true;
+
+    $file = COFFEEBRK_CORE_PATH . 'assets/css/coffeebrk-auth.css';
+    $ver = file_exists( $file ) ? (string) filemtime( $file ) : '1.0.0';
+    $css_url = COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-auth.css';
+
+    // Inline critical CSS to prevent FOUC (Flash of Unstyled Content)
+    add_action('wp_head', function() use ($css_url, $ver) {
+        // Preload the full stylesheet
+        echo '<link rel="preload" href="' . esc_url($css_url) . '?ver=' . esc_attr($ver) . '" as="style">' . "\n";
+        // Inline critical CSS for immediate render
+        echo '<style id="cbk-critical-css">';
+        echo 'body.coffeebrk-auth{margin:0;padding:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8f9fa;}';
+        echo '.cbk-shell{display:flex;min-height:100vh;}.cbk-shell__left{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem;background:#fff;}';
+        echo '.cbk-shell__right{flex:1;display:none;}.cbk-left{width:100%;max-width:400px;}.cbk-logo{margin-bottom:2rem;}';
+        echo '.cbk-title{font-size:1.75rem;font-weight:700;margin-bottom:0.5rem;color:#1a1a1a;}.cbk-btn{display:inline-block;width:100%;padding:0.875rem 1.5rem;background:#1a1a1a;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;}';
+        echo '@media(min-width:768px){.cbk-shell__right{display:flex;}}';
+        echo '</style>' . "\n";
+    }, 1);
+
+    wp_enqueue_style('coffeebrk-auth', $css_url, [], $ver);
+}
+
+// Load auth assets based on configured provider
 function coffeebrk_enqueue_supabase_assets(string $context){
+    $provider = coffeebrk_get_auth_provider();
+
+    if ($provider === 'firebase') {
+        coffeebrk_enqueue_firebase_assets($context);
+    } else {
+        coffeebrk_enqueue_supabase_assets_internal($context);
+    }
+}
+
+// Supabase auth assets
+function coffeebrk_enqueue_supabase_assets_internal(string $context){
     $cfg = [
         'supabaseUrl' => rtrim( coffeebrk_core_get_option('supabase_url'), '/' ),
         'supabaseAnonKey' => coffeebrk_core_get_option('supabase_anon_key'),
         'finalizeUrl' => rest_url('coffeebrk/v1/supabase/login'),
         'redirectAfter' => coffeebrk_core_page_url('coffeebrk-onboarding'),
         'context' => $context,
+        'provider' => 'supabase',
     ];
     wp_enqueue_script('supabase-js', 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js', [], '2.47.10', true);
-    wp_enqueue_script('coffeebrk-supabase-auth', COFFEEBRK_CORE_URL . 'assets/js/supabase-auth.js', ['supabase-js'], '1.0.0', true);
+    wp_enqueue_script('coffeebrk-supabase-auth', COFFEEBRK_CORE_URL . 'assets/js/supabase-auth.js', ['supabase-js'], '1.0.1', true);
     wp_localize_script('coffeebrk-supabase-auth', 'CoffeebrkAuth', $cfg);
+}
+
+// Firebase auth assets
+function coffeebrk_enqueue_firebase_assets(string $context){
+    $cfg = [
+        'firebaseApiKey' => coffeebrk_core_get_option('firebase_api_key'),
+        'firebaseAuthDomain' => coffeebrk_core_get_option('firebase_auth_domain'),
+        'firebaseProjectId' => coffeebrk_core_get_option('firebase_project_id'),
+        'firebaseStorageBucket' => coffeebrk_core_get_option('firebase_storage_bucket'),
+        'firebaseMessagingSenderId' => coffeebrk_core_get_option('firebase_messaging_sender_id'),
+        'firebaseAppId' => coffeebrk_core_get_option('firebase_app_id'),
+        'firebaseMeasurementId' => coffeebrk_core_get_option('firebase_measurement_id'),
+        'finalizeUrl' => rest_url('coffeebrk/v1/firebase/login'),
+        'redirectAfter' => coffeebrk_core_page_url('coffeebrk-onboarding'),
+        'context' => $context,
+        'provider' => 'firebase',
+    ];
+    wp_enqueue_script('coffeebrk-firebase-auth', COFFEEBRK_CORE_URL . 'assets/js/firebase-auth.js', [], '1.0.0', true);
+    wp_localize_script('coffeebrk-firebase-auth', 'CoffeebrkAuth', $cfg);
 }
 
 function coffeebrk_auth_logo_html() : string {
@@ -334,6 +488,8 @@ add_shortcode('coffeebrk_onboarding', function(){
 // Hello step (welcome screen)
 add_shortcode('coffeebrk_hello', function(){
     coffeebrk_enqueue_auth_styles();
+    // Load Supabase auth to handle OAuth callbacks that may land here
+    coffeebrk_enqueue_supabase_assets('hello');
     $login = esc_url( coffeebrk_core_page_url('coffeebrk-login') );
     $left = '';
     $left .= '<div class="cbk-title">👋 Hey there, welcome to Coffee Break</div>';
@@ -394,7 +550,7 @@ add_action('template_redirect', function(){
                 $vals = array_values(array_unique(array_filter($vals)));
                 update_user_meta($user->ID, 'aspire', $vals );
                 update_user_meta($user->ID, 'aspire_csv', implode(', ', $vals) );
-                coffeebrk_safe_redirect( home_url('/') );
+                coffeebrk_safe_redirect( coffeebrk_core_app_url() );
             }
         }
         return;

@@ -1,14 +1,15 @@
 <?php
-/*
-Plugin Name: Coffeebrk Core
-Plugin URI: https://coffeebrk.ai
-Description: Core functionality plugin for coffeebrk.ai — adds global fields, Elementor dynamic tags, and future features.
-Version: 2.1.0
-Author: Coffeebrk
-Author URI: https://coffeebrk.ai
-License: GPL2+
-Text Domain: coffeebrk-core
-*/
+/**
+ * Plugin Name: Coffeebrk Core
+ * Plugin URI:  https://coffeebrk.ai
+ * Description: Core functionality plugin for coffeebrk.ai — adds global fields, Elementor dynamic tags, and future features.
+ * Version:     2.2.0
+ * Author:      Coffeebrk
+ * Author URI:  https://coffeebrk.ai
+ * License:     GPL-2.0+
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: coffeebrk-core
+ */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 if ( ! defined( 'COFFEEBRK_CORE_PATH' ) ) {
@@ -22,6 +23,14 @@ require_once COFFEEBRK_CORE_PATH . 'inc/logger.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rss.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/stories-cpt.php';
  
+/**
+ * Plugin activation hook.
+ *
+ * Initialises logging paths, schedules the RSS cron job, seeds default
+ * Dynamic Fields and Aspires options when the plugin is first activated.
+ *
+ * @return void
+ */
 register_activation_hook( __FILE__, function() {
     if ( function_exists( 'coffeebrk_logger_ensure_paths' ) ) {
         coffeebrk_logger_ensure_paths();
@@ -51,6 +60,13 @@ register_activation_hook( __FILE__, function() {
     flush_rewrite_rules();
 });
 
+/**
+ * Plugin deactivation hook.
+ *
+ * Clears the RSS cron schedule and flushes rewrite rules.
+ *
+ * @return void
+ */
 register_deactivation_hook( __FILE__, function() {
     if ( function_exists( 'coffeebrk_rss_clear_cron' ) ) {
         coffeebrk_rss_clear_cron();
@@ -58,6 +74,13 @@ register_deactivation_hook( __FILE__, function() {
     flush_rewrite_rules();
 });
 
+/**
+ * Appends Dashboard and Settings quick-links to the plugin row on the
+ * WordPress Plugins admin screen.
+ *
+ * @param  string[] $links Existing action links.
+ * @return string[]         Modified action links.
+ */
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function( $links ) {
     if ( ! is_array( $links ) ) {
         $links = [];
@@ -75,6 +98,14 @@ add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), function( $lin
  * --------------------------------------------------------------
  * SECTION 1: Register Global Meta Fields
  * --------------------------------------------------------------
+ */
+/**
+ * --------------------------------------------------------------
+ * SECTION 1: Register Global Meta Fields
+ * --------------------------------------------------------------
+ * Exposes _source_name and _source_url post meta keys in the
+ * WordPress REST API so they can be read by Elementor dynamic tags
+ * and third-party integrations.
  */
 add_action( 'init', function() {
     $fields = [
@@ -97,6 +128,14 @@ add_action( 'init', function() {
  * SECTION 2: Add Meta Box in Post Editor (Source Information)
  * --------------------------------------------------------------
  */
+/**
+ * --------------------------------------------------------------
+ * SECTION 2: Add Meta Box in Post Editor (Source Information)
+ * --------------------------------------------------------------
+ * Registers a Source Information meta box on the post edit screen.
+ * Skipped automatically when both source fields already exist as
+ * Dynamic Fields, preventing duplicate UI.
+ */
 add_action( 'add_meta_boxes', function() {
     // Hide legacy box if Dynamic Fields contains Source Name & URL
     $dyn = (array) get_option('coffeebrk_dynamic_fields', []);
@@ -113,6 +152,12 @@ add_action( 'add_meta_boxes', function() {
     );
 });
 
+/**
+ * Renders the Source Information meta box HTML.
+ *
+ * @param WP_Post $post  The current post object.
+ * @return void
+ */
 function coffeebrk_source_meta_callback( $post ) {
     $source_name = get_post_meta( $post->ID, '_source_name', true );
     $source_url  = get_post_meta( $post->ID, '_source_url', true );
@@ -129,6 +174,15 @@ function coffeebrk_source_meta_callback( $post ) {
     <?php
 }
 
+/**
+ * Saves the Source Information meta box values on post save.
+ *
+ * Validates the nonce, skips autosaves, and checks user capabilities
+ * before sanitising and persisting the submitted field values.
+ *
+ * @param  int $post_id  The ID of the post being saved.
+ * @return void
+ */
 add_action( 'save_post', function( $post_id ) {
     if ( ! isset( $_POST['coffeebrk_source_meta_nonce'] ) ||
          ! wp_verify_nonce( $_POST['coffeebrk_source_meta_nonce'], 'coffeebrk_save_source_meta' ) )
@@ -146,6 +200,15 @@ add_action( 'save_post', function( $post_id ) {
  * SECTION 3: Load Elementor Integration
  * --------------------------------------------------------------
  */
+/**
+ * --------------------------------------------------------------
+ * SECTION 3: Load Elementor Integration
+ * --------------------------------------------------------------
+ * Conditionally loads the custom Elementor dynamic-tag and widget
+ * classes once Elementor has finished bootstrapping. Both files are
+ * optional and guarded by file_exists() so the plugin degrades
+ * gracefully when Elementor is not active.
+ */
 add_action( 'elementor/init', function() {
     $f = __DIR__ . '/inc/class-coffeebrk-elementor-tags.php';
     if ( file_exists( $f ) ) {
@@ -162,6 +225,13 @@ add_action( 'elementor/init', function() {
  * --------------------------------------------------------------
  * SECTION 4: Optional Frontend Display
  * --------------------------------------------------------------
+ */
+/**
+ * --------------------------------------------------------------
+ * SECTION 4: Optional Frontend Display
+ * --------------------------------------------------------------
+ * Appends a styled source attribution box to single post content
+ * when both a source name and source URL are set on the post.
  */
 add_filter( 'the_content', function( $content ) {
     if ( is_single() ) {
@@ -191,5 +261,6 @@ require_once COFFEEBRK_CORE_PATH . 'meta/meta-aspires.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/feed.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/api-tokens.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rest-api.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/public-api.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/auth.php';
 require_once COFFEEBRK_CORE_PATH . 'admin/json-articles-importer.php';
