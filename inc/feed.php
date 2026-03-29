@@ -264,8 +264,8 @@ function coffeebrk_core_do_feed(){
         echo '<link>' . esc_url( $link ) . '</link>';
         echo '<guid isPermaLink="true">' . esc_url( $link ) . '</guid>';
         echo '<pubDate>' . esc_html( $date ) . '</pubDate>';
-        echo '<description><![CDATA[' . $excerpt . ']]></description>';
-        echo '<content:encoded><![CDATA[' . (string) $content . ']]></content:encoded>';
+        echo '<description><![CDATA[' . wp_kses_post( $excerpt ) . ']]></description>';
+        echo '<content:encoded><![CDATA[' . wp_kses_post( $content ) . ']]></content:encoded>';
         echo '</item>';
     }
 

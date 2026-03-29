@@ -15,7 +15,7 @@ function coffeebrk_rss_handle_enable_all() : void {
 
     global $wpdb;
     $table = coffeebrk_rss_table_name();
-    $wpdb->query( "UPDATE {$table} SET enabled = 1" );
+    $wpdb->update( $table, [ 'enabled' => 1 ], [ 1 => 1 ], [ '%d' ], [] );
     coffeebrk_rss_admin_redirect( [ 'msg' => 'enabled_all' ] );
 }
 
@@ -29,7 +29,7 @@ function coffeebrk_rss_handle_disable_all() : void {
 
     global $wpdb;
     $table = coffeebrk_rss_table_name();
-    $wpdb->query( "UPDATE {$table} SET enabled = 0" );
+    $wpdb->update( $table, [ 'enabled' => 0 ], [ 1 => 1 ], [ '%d' ], [] );
     coffeebrk_rss_admin_redirect( [ 'msg' => 'disabled_all' ] );
 }
 
@@ -221,13 +221,6 @@ class Coffeebrk_RSS_Feeds_Table extends WP_List_Table {
             $status = 'all';
         }
 
-        $where = '1=1';
-        if ( $status === 'active' ) {
-            $where = 'enabled = 1';
-        } elseif ( $status === 'inactive' ) {
-            $where = 'enabled = 0';
-        }
-
         $per_page = 20;
         $paged = isset($_GET['paged']) ? max( 1, (int) $_GET['paged'] ) : 1;
         $offset = ( $paged - 1 ) * $per_page;
@@ -243,12 +236,39 @@ class Coffeebrk_RSS_Feeds_Table extends WP_List_Table {
             $order = 'DESC';
         }
 
-        $total_items = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE {$where}" );
+        // Build WHERE clause based on status filter
+        $where_sql = '1=1';
+        $where_params = [];
+        if ( $status === 'active' ) {
+            $where_sql = 'enabled = %d';
+            $where_params[] = 1;
+        } elseif ( $status === 'inactive' ) {
+            $where_sql = 'enabled = %d';
+            $where_params[] = 0;
+        }
 
-        $items = $wpdb->get_results(
-            $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where} ORDER BY {$orderby} {$order} LIMIT %d OFFSET %d", $per_page, $offset ),
-            ARRAY_A
-        );
+        // Get total count
+        if ( empty( $where_params ) ) {
+            $total_items = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}" );
+        } else {
+            $total_items = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE {$where_sql}", $where_params ) );
+        }
+
+        // Build main query with proper escaping
+        $orderby_escaped = esc_sql( $orderby );
+        $order_escaped = esc_sql( $order );
+
+        if ( empty( $where_params ) ) {
+            $items = $wpdb->get_results(
+                $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY {$orderby_escaped} {$order_escaped} LIMIT %d OFFSET %d", $per_page, $offset ),
+                ARRAY_A
+            );
+        } else {
+            $items = $wpdb->get_results(
+                $wpdb->prepare( "SELECT * FROM {$table} WHERE {$where_sql} ORDER BY {$orderby_escaped} {$order_escaped} LIMIT %d OFFSET %d", array_merge( $where_params, [ $per_page, $offset ] ) ),
+                ARRAY_A
+            );
+        }
 
         $this->items = $items ? $items : [];
 

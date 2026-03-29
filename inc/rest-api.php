@@ -159,7 +159,7 @@ function coffeebrk_register_rest_routes() {
 
 /**
  * Permission callback for read operations
- * Allows: Bearer token with 'read' permission OR logged-in user
+ * Allows: Bearer token with 'read' permission OR logged-in user with explicit permission
  */
 function coffeebrk_api_permission_read( WP_REST_Request $req ) {
     // Check Bearer token first
@@ -175,8 +175,8 @@ function coffeebrk_api_permission_read( WP_REST_Request $req ) {
         }
     }
 
-    // Allow logged-in users
-    return is_user_logged_in();
+    // Allow logged-in users with specific capability
+    return is_user_logged_in() && current_user_can( 'edit_posts' );
 }
 
 /**

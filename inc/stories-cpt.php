@@ -71,6 +71,15 @@ add_action( 'admin_init', function() {
 
     // Handle File Upload
     if ( ! empty( $_FILES['cbk_stories_json_file']['tmp_name'] ) ) {
+        // Validate file MIME type
+        $file_data = wp_check_filetype( $_FILES['cbk_stories_json_file']['name'] );
+        $allowed_types = [ 'application/json', 'text/plain', 'text/json' ];
+        
+        if ( ! in_array( $file_data['type'], $allowed_types, true ) ) {
+            add_settings_error( 'cbk_stories_import', 'invalid_file_type', __( 'Please upload a valid JSON file.', 'coffeebrk-core' ), 'error' );
+            return;
+        }
+        
         $json_data = file_get_contents( $_FILES['cbk_stories_json_file']['tmp_name'] );
     } elseif ( ! empty( $_POST['cbk_stories_json_text'] ) ) {
         $json_data = stripslashes( $_POST['cbk_stories_json_text'] );

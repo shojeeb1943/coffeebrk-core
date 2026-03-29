@@ -27,7 +27,12 @@ function coffeebrk_logger_ensure_paths() : void {
 function coffeebrk_log_write( string $file, array $entry ) : void {
     coffeebrk_logger_ensure_paths();
     $line = wp_json_encode( $entry ) . "\n";
-    file_put_contents( $file, $line, FILE_APPEND | LOCK_EX );
+    $result = file_put_contents( $file, $line, FILE_APPEND | LOCK_EX );
+    
+    if ( $result === false ) {
+        // Log to WordPress error log if file write fails
+        error_log( 'Coffeebrk logger failed to write to ' . $file );
+    }
 }
 
 function coffeebrk_log_error( string $message, array $context = [] ) : void {

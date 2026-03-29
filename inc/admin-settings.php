@@ -240,7 +240,7 @@ function coffeebrk_core_dashboard_page(){
     echo '    <div class="cbk-health-item__icon cbk-health-item__icon--blue"><span class="dashicons dashicons-cloud"></span></div>';
     echo '    <div><div class="cbk-health-item__label">Supabase</div><div class="cbk-health-item__detail">' . esc_html( $supabase_url_set ? $core_settings['supabase_url'] : 'Configure in Auth Settings' ) . '</div></div>';
     echo '  </div>';
-    echo '  <span class="cbk-pill ' . $supa_pill . '">' . $supa_text . '</span>';
+    echo '  <span class="cbk-pill ' . esc_attr( $supa_pill ) . '">' . esc_html( $supa_text ) . '</span>';
     echo '</li>';
 
     // RSS Cron
@@ -252,7 +252,7 @@ function coffeebrk_core_dashboard_page(){
     echo '    <div class="cbk-health-item__icon cbk-health-item__icon--green"><span class="dashicons dashicons-clock"></span></div>';
     echo '    <div><div class="cbk-health-item__label">RSS Cron</div><div class="cbk-health-item__detail">Next: ' . esc_html( $rss_next_str ) . '</div></div>';
     echo '  </div>';
-    echo '  <span class="cbk-pill ' . $cron_pill . '">' . $cron_text . '</span>';
+    echo '  <span class="cbk-pill ' . esc_attr( $cron_pill ) . '">' . esc_html( $cron_text ) . '</span>';
     echo '</li>';
 
     // API Token
@@ -263,7 +263,7 @@ function coffeebrk_core_dashboard_page(){
     echo '    <div class="cbk-health-item__icon cbk-health-item__icon--amber"><span class="dashicons dashicons-admin-network"></span></div>';
     echo '    <div><div class="cbk-health-item__label">API Token</div><div class="cbk-health-item__detail">' . ( $has_token ? 'Token is configured' : 'Generate in API page' ) . '</div></div>';
     echo '  </div>';
-    echo '  <span class="cbk-pill ' . $tok_pill . '">' . $tok_text . '</span>';
+    echo '  <span class="cbk-pill ' . esc_attr( $tok_pill ) . '">' . esc_html( $tok_text ) . '</span>';
     echo '</li>';
 
     // RSS Activity
@@ -481,6 +481,17 @@ function coffeebrk_core_api_page(){
 
 /**
  * Overview Tab
+ */
+/**
+ * Display API tokens overview tab
+ * 
+ * @param string $rest_base The REST API base URL
+ * @param string $plain_token The plain token (kept for consistency, unused in this tab)
+ * @param string $token_hash The token hash
+ * @param string $token_last4 The last 4 characters of token
+ * @param string $token_updated The timestamp of last update
+ * @param int $token_user_id The ID of token owner
+ * @param int $uid The current user ID
  */
 function coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $token_last4, $token_updated, $token_user_id, $uid ) {
     // Get all tokens using new multi-token system

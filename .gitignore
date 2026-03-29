@@ -8,3 +8,5 @@ Thumbs.db
 .env
 .idea/
 .vscode/
+CODEBASE_AUDIT_REPORT.md
+SECURITY_FIXES_APPLIED.md
