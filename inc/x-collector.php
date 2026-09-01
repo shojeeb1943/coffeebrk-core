@@ -76,7 +76,7 @@ function coffeebrk_x_default_settings() : array {
         'apify_api_token'          => '',
         'apify_actor_id'           => 'feedminer/x-tweet-scraper',
         'sync_interval'            => 'coffeebrk_x_6h',
-        'default_max_items'        => 20,
+        'default_max_items'        => 1,
         'default_include_replies'  => 0,
     ];
 }

@@ -17,6 +17,9 @@ function coffeebrk_x_release_sync_lock() : void {
     delete_transient( 'coffeebrk_x_sync_lock' );
 }
 
+// Builds feedminer/x-tweet-scraper's native input fields (twitterHandles,
+// maxItems, includeReplies, start) rather than hand-rolled search operators
+// — the actor documents these as first-class, reliable filters.
 function coffeebrk_x_build_apify_input( array $profile, array $settings ) : array {
     $max_items = (int) ( $profile['max_items'] ?? 0 );
     if ( $max_items <= 0 ) {
@@ -30,19 +33,17 @@ function coffeebrk_x_build_apify_input( array $profile, array $settings ) : arra
         ? (bool) $settings['default_include_replies']
         : (bool) $include_replies;
 
-    $query = 'from:' . $profile['username'];
-    if ( ! $include_replies ) {
-        $query .= ' -filter:replies';
-    }
+    $input = [
+        'twitterHandles' => [ (string) $profile['username'] ],
+        'maxItems'       => $max_items,
+        'includeReplies' => $include_replies,
+    ];
+
     if ( ! empty( $profile['last_synced_at'] ) ) {
-        $since = gmdate( 'Y-m-d', strtotime( (string) $profile['last_synced_at'] ) );
-        $query .= ' since:' . $since;
+        $input['start'] = gmdate( 'Y-m-d', strtotime( (string) $profile['last_synced_at'] ) );
     }
 
-    return [
-        'searchTerms' => [ $query ],
-        'maxItems'    => $max_items,
-    ];
+    return $input;
 }
 
 // Actual sync body, no lock handling — callers below own the lock.
