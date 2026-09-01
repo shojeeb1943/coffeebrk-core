@@ -45,7 +45,8 @@
 * **Public Endpoints (`/coffeebrk/v1/public/*`)**: High-speed, cached endpoints serving posts, categories, web stories, and rich video embeds to frontend clients and mobile apps.
 * **Secured Ingestion Endpoints (`/coffeebrk/v1/*`)**: Token-authenticated endpoints for programmatic post creation, bulk updates, and external webhook integrations.
 
-### 🛠️ Developer & Admin Tools
+### 🛠️ Developer, AI Agent & Admin Tools
+* **Model Context Protocol (MCP) Server**: Full [MCP Server](mcp-server/README.md) support enabling AI agents (Claude, Antigravity, Cursor, Windsurf) to draft, publish, search, and manage WordPress posts and metadata directly via natural language.
 * **Central Dashboard Hub**: Multi-tab management interface for API keys, RSS feeds, X Collector, Aspires taxonomies, and Dynamic Fields.
 * **Centralized File Logger**: High-performance, rolling JSON file logger with real-time log tailing in the admin area.
 
@@ -79,6 +80,7 @@ coffeebrk-core/
 │   ├── widgets/               # Elementor custom widget implementations
 │   └── x-collector*.php       # X / Twitter ingestion subsystem
 ├── includes/                  # Utility classes & importers
+├── mcp-server/                # Model Context Protocol (MCP) server for AI agents
 ├── meta/                      # Meta boxes and post attribute handlers
 └── coffeebrk-core.php         # Main plugin bootstrap & activation hooks
 ```
