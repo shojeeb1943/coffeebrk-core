@@ -6,7 +6,7 @@
 [![PHP](https://img.shields.io/badge/PHP-8.0%2B-777BB4.svg?logo=php&logoColor=white)](https://www.php.net/)
 [![Elementor](https://img.shields.io/badge/Elementor-Compatible-92003B.svg?logo=elementor&logoColor=white)](https://elementor.com/)
 [![License: GPL v2+](https://img.shields.io/badge/License-GPL--2.0%2B-green.svg)](https://www.gnu.org/licenses/gpl-2.0.html)
-[![Version](https://img.shields.io/badge/Version-2.2.1-orange.svg)](https://coffeebrk.ai)
+[![Version](https://img.shields.io/badge/Version-2.2.2-orange.svg)](https://coffeebrk.ai)
 
 **The core engine powering [coffeebrk.ai](https://coffeebrk.ai) — bringing automated content ingestion, dynamic Elementor widgets, multi-provider authentication, and developer-friendly REST APIs to WordPress.**
 
