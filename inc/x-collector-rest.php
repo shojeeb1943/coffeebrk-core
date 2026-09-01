@@ -36,6 +36,33 @@ function coffeebrk_x_register_rest_routes() {
             'enabled' => [ 'type' => 'boolean', 'default' => true ],
         ],
     ]);
+
+    register_rest_route( $namespace, '/x-profiles', [
+        'methods'             => 'POST',
+        'permission_callback' => 'coffeebrk_api_permission_write',
+        'callback'            => 'coffeebrk_x_api_create_profile',
+        'args'                => [
+            'username'     => [ 'type' => 'string', 'required' => true ],
+            'display_name' => [ 'type' => 'string', 'default' => '' ],
+            'enabled'      => [ 'type' => 'boolean', 'default' => true ],
+            'category_id'  => [ 'type' => 'integer', 'default' => 0 ],
+            'max_items'    => [ 'type' => 'integer' ],
+            'include_replies' => [ 'type' => 'boolean' ],
+        ],
+    ]);
+
+    register_rest_route( $namespace, '/x-profiles/bulk', [
+        'methods'             => 'POST',
+        'permission_callback' => 'coffeebrk_api_permission_write',
+        'callback'            => 'coffeebrk_x_api_bulk_create_profiles',
+        'args'                => [
+            'profiles' => [
+                'type'     => 'array',
+                'required' => true,
+                'items'    => [ 'type' => 'object' ],
+            ],
+        ],
+    ]);
 }
 
 // -- response formatting -------------------------------------------------
@@ -147,4 +174,94 @@ function coffeebrk_x_api_get_profiles( WP_REST_Request $req ) {
     }
 
     return new WP_REST_Response( [ 'success' => true, 'total' => count( $items ), 'items' => $items ], 200 );
+}
+
+function coffeebrk_x_api_create_profile( WP_REST_Request $req ) {
+    $username = coffeebrk_x_normalize_username( (string) $req->get_param( 'username' ) );
+    if ( $username === '' ) {
+        return new WP_REST_Response( [ 'success' => false, 'error' => 'missing_username' ], 400 );
+    }
+
+    $existing = coffeebrk_x_get_profile_by_username( $username );
+    $profile_id = $existing ? (int) $existing['id'] : null;
+
+    $data = [
+        'username'     => $username,
+        'display_name' => (string) ( $req->get_param( 'display_name' ) ?? ( $existing['display_name'] ?? $username ) ),
+        'enabled'      => $req->get_param( 'enabled' ) !== null ? ( (bool) $req->get_param( 'enabled' ) ? 1 : 0 ) : 1,
+    ];
+
+    if ( $req->get_param( 'category_id' ) !== null ) {
+        $data['category_id'] = (int) $req->get_param( 'category_id' );
+    }
+    if ( $req->get_param( 'max_items' ) !== null ) {
+        $data['max_items'] = (int) $req->get_param( 'max_items' );
+    }
+    if ( $req->get_param( 'include_replies' ) !== null ) {
+        $data['include_replies'] = (bool) $req->get_param( 'include_replies' ) ? 1 : 0;
+    }
+
+    $res = coffeebrk_x_save_profile( $data, $profile_id );
+    if ( empty( $res['ok'] ) ) {
+        return new WP_REST_Response( [ 'success' => false, 'error' => $res['error'] ?? 'save_failed' ], 400 );
+    }
+
+    $saved = coffeebrk_x_get_profile( (int) $res['id'] );
+    return new WP_REST_Response( [
+        'success' => true,
+        'action'  => $profile_id ? 'updated' : 'created',
+        'profile' => $saved ? coffeebrk_x_format_profile_ref( $saved ) : null,
+    ], 200 );
+}
+
+function coffeebrk_x_api_bulk_create_profiles( WP_REST_Request $req ) {
+    $profiles = $req->get_param( 'profiles' );
+    if ( ! is_array( $profiles ) || empty( $profiles ) ) {
+        return new WP_REST_Response( [ 'success' => false, 'error' => 'empty_profiles' ], 400 );
+    }
+
+    $created = 0;
+    $updated = 0;
+    $errors = [];
+
+    foreach ( $profiles as $item ) {
+        if ( ! is_array( $item ) ) continue;
+        $username = coffeebrk_x_normalize_username( (string) ( $item['username'] ?? '' ) );
+        if ( $username === '' ) continue;
+
+        $existing = coffeebrk_x_get_profile_by_username( $username );
+        $profile_id = $existing ? (int) $existing['id'] : null;
+
+        $data = [
+            'username'     => $username,
+            'display_name' => (string) ( $item['display_name'] ?? ( $existing['display_name'] ?? $username ) ),
+            'enabled'      => isset( $item['enabled'] ) ? ( (bool) $item['enabled'] ? 1 : 0 ) : 1,
+        ];
+        if ( isset( $item['category_id'] ) ) {
+            $data['category_id'] = (int) $item['category_id'];
+        }
+
+        $res = coffeebrk_save_or_update_x_profile( $data, $profile_id );
+        if ( ! empty( $res['ok'] ) ) {
+            if ( $profile_id ) {
+                $updated++;
+            } else {
+                $created++;
+            }
+        } else {
+            $errors[] = [ 'username' => $username, 'error' => $res['error'] ?? 'failed' ];
+        }
+    }
+
+    return new WP_REST_Response( [
+        'success' => true,
+        'created' => $created,
+        'updated' => $updated,
+        'total'   => $created + $updated,
+        'errors'  => $errors,
+    ], 200 );
+}
+
+function coffeebrk_save_or_update_x_profile( array $data, ?int $profile_id = null ) : array {
+    return coffeebrk_x_save_profile( $data, $profile_id );
 }

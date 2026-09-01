@@ -410,6 +410,57 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "create_x_profile",
+    description: "Add or update an X (Twitter) profile to monitor in Coffeebrk X Collector.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        username: {
+          type: "string",
+          description: "X / Twitter username without @",
+        },
+        display_name: {
+          type: "string",
+          description: "Display name / label for the profile",
+        },
+        enabled: {
+          type: "boolean",
+          default: true,
+          description: "Whether the profile is active for sync (default: true)",
+        },
+        category_id: {
+          type: "integer",
+          description: "Optional WordPress category ID to tag incoming tweets",
+        },
+      },
+      required: ["username"],
+    },
+  },
+  {
+    name: "bulk_create_x_profiles",
+    description: "Batch add or activate multiple X (Twitter) profiles at once in Coffeebrk X Collector.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        profiles: {
+          type: "array",
+          description: "Array of X profiles to add/enable",
+          items: {
+            type: "object",
+            properties: {
+              username: { type: "string" },
+              display_name: { type: "string" },
+              enabled: { type: "boolean", default: true },
+              category_id: { type: "integer" },
+            },
+            required: ["username"],
+          },
+        },
+      },
+      required: ["profiles"],
+    },
+  },
+  {
     name: "get_site_info",
     description: "Get site information, Coffeebrk Core version, and RSS feed diagnostics.",
     inputSchema: {
@@ -580,6 +631,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "list_x_profiles": {
         const res = await callApi("/x-profiles", "GET", undefined, args);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(res, null, 2),
+            },
+          ],
+          isError: res.isError,
+        };
+      }
+
+      case "create_x_profile": {
+        const res = await callApi("/x-profiles", "POST", args);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(res, null, 2),
+            },
+          ],
+          isError: res.isError,
+        };
+      }
+
+      case "bulk_create_x_profiles": {
+        const res = await callApi("/x-profiles/bulk", "POST", args);
         return {
           content: [
             {
