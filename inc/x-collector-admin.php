@@ -339,8 +339,8 @@ function coffeebrk_x_render_admin_notice( string $msg ) : void {
         $errMsg = isset( $_GET['err_msg'] ) ? sanitize_text_field( (string) $_GET['err_msg'] ) : '';
         if ( $err === 'missing_token' ) {
             $text = 'Sync failed: Apify API Token is not configured. Please add your Apify token in the Settings tab.';
-        } elseif ( $err === 'locked' ) {
-            $text = 'Sync is already in progress. Please wait a moment.';
+        } elseif ( $err === 'locked' || $err === 'sync_in_progress' ) {
+            $text = 'A sync is already in progress. Please wait a moment for it to finish.';
         } elseif ( ! empty( $errMsg ) ) {
             $text = 'Sync failed: ' . $errMsg;
         } else {
