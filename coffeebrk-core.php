@@ -3,7 +3,7 @@
  * Plugin Name: Coffeebrk Core
  * Plugin URI:  https://coffeebrk.ai
  * Description: Core functionality plugin for coffeebrk.ai — adds global fields, Elementor dynamic tags, and future features.
- * Version:     2.2.0
+ * Version:     2.2.1
  * Author:      Coffeebrk
  * Author URI:  https://coffeebrk.ai
  * License:     GPL-2.0+
@@ -21,6 +21,7 @@ if ( ! defined( 'COFFEEBRK_CORE_URL' ) ) {
  
 require_once COFFEEBRK_CORE_PATH . 'inc/logger.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rss.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/x-collector.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/stories-cpt.php';
  
 /**
@@ -40,6 +41,12 @@ register_activation_hook( __FILE__, function() {
     }
     if ( function_exists( 'coffeebrk_rss_schedule_cron' ) ) {
         coffeebrk_rss_schedule_cron();
+    }
+    if ( function_exists( 'coffeebrk_x_install' ) ) {
+        coffeebrk_x_install();
+    }
+    if ( function_exists( 'coffeebrk_x_schedule_cron' ) ) {
+        coffeebrk_x_schedule_cron();
     }
     do_action('coffeebrk_core_activate');
     // Seed default dynamic fields if empty
@@ -70,6 +77,9 @@ register_activation_hook( __FILE__, function() {
 register_deactivation_hook( __FILE__, function() {
     if ( function_exists( 'coffeebrk_rss_clear_cron' ) ) {
         coffeebrk_rss_clear_cron();
+    }
+    if ( function_exists( 'coffeebrk_x_clear_cron' ) ) {
+        coffeebrk_x_clear_cron();
     }
     flush_rewrite_rules();
 });
