@@ -205,6 +205,7 @@ function coffeebrk_core_dashboard_page(){
         [ 'url' => admin_url('admin.php?page=coffeebrk-core-rss'),           'icon' => 'dashicons-rss',             'label' => 'RSS Aggregator' ],
         [ 'url' => admin_url('admin.php?page=coffeebrk-core-json-importer'), 'icon' => 'dashicons-upload',          'label' => 'JSON Importer' ],
         [ 'url' => admin_url('admin.php?page=coffeebrk-core-api'),           'icon' => 'dashicons-rest-api',        'label' => 'API' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-api&tab=mcp'),   'icon' => 'dashicons-admin-generic',   'label' => 'MCP Server' ],
         [ 'url' => admin_url('admin.php?page=coffeebrk-core-logs'),          'icon' => 'dashicons-list-view',       'label' => 'Logs' ],
         [ 'url' => admin_url('edit.php?post_type=cbk_story'),                'icon' => 'dashicons-format-video',    'label' => 'Stories' ],
     ];
@@ -487,6 +488,7 @@ function coffeebrk_core_api_page(){
         'post-api' => 'POST API',
         'get-api'  => 'GET API',
         'rss'      => 'RSS Feeds',
+        'mcp'      => 'MCP Server',
     ];
 
     // Display notices
@@ -526,6 +528,9 @@ function coffeebrk_core_api_page(){
             break;
         case 'rss':
             coffeebrk_api_tab_rss( $rss_pretty, $rss_query, $rest_base );
+            break;
+        case 'mcp':
+            coffeebrk_api_tab_mcp( $plain_token );
             break;
         default:
             coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $token_last4, $token_updated, $token_user_id, $uid );
@@ -1377,6 +1382,86 @@ function coffeebrk_api_tab_rss( $rss_pretty, $rss_query, $rest_base ) {
             <li>For real-time notifications, consider using webhooks instead of RSS polling</li>
             <li>The feed includes full HTML content in <code>content:encoded</code> for rich formatting</li>
         </ul>
+    </div>
+    <?php
+}
+
+/**
+ * MCP Server Tab
+ */
+function coffeebrk_api_tab_mcp( $plain_token ) {
+    $server_path = COFFEEBRK_CORE_PATH . 'mcp-server/dist/index.js';
+    $has_build   = file_exists( $server_path );
+    $wp_url      = untrailingslashit( home_url( '/' ) );
+    $token_display = $plain_token !== '' ? $plain_token : 'YOUR_API_TOKEN';
+    $config = wp_json_encode( [
+        'mcpServers' => [
+            'coffeebrk' => [
+                'command' => 'node',
+                'args'    => [ str_replace( '\\', '/', $server_path ) ],
+                'env'     => [
+                    'COFFEEBRK_WP_URL'    => $wp_url,
+                    'COFFEEBRK_API_TOKEN' => $token_display,
+                ],
+            ],
+        ],
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+    ?>
+    <div style="max-width:1200px;">
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="margin-top:0;color:#0073aa;">Model Context Protocol (MCP) Server</h2>
+            <p style="color:#555;">Let AI agents (Claude Desktop, Antigravity, Cursor, Windsurf, Cline) read, create, update, and manage your posts, stories, and X collector data directly through natural language.</p>
+            <?php if ( $has_build ) : ?>
+                <span class="cbk-pill cbk-pill--green" style="display:inline-flex;align-items:center;gap:4px;"><span class="dashicons dashicons-yes-alt" style="font-size:14px;width:14px;height:14px;"></span> Server built and ready</span>
+            <?php else : ?>
+                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:12px 16px;">
+                    <strong style="color:#856404;">Not built yet.</strong>
+                    <p style="color:#856404;margin:4px 0 0;">Run <code>cd mcp-server && npm install && npm run build</code> to compile <code>dist/index.js</code> before connecting an agent.</p>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">1. Get an API Token</h3>
+            <p style="color:#555;">The MCP server authenticates as a regular API client. Generate a token (with read/write/delete as needed) on the <a href="<?php echo esc_url( add_query_arg( [ 'page' => 'coffeebrk-core-api', 'tab' => 'overview' ], admin_url( 'admin.php' ) ) ); ?>">Overview tab</a>.</p>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">2. Configure Your AI Client</h3>
+            <p style="color:#555;">Add this to your client's MCP config (Claude Desktop's <code>claude_desktop_config.json</code>, Cursor/Windsurf's <code>mcp.json</code>, or Antigravity's <code>mcp_config.json</code>):</p>
+            <pre style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:6px;overflow-x:auto;"><code style="color:#d4d4d4;"><?php echo esc_html( $config ); ?></code></pre>
+            <?php if ( $plain_token === '' ) : ?>
+                <p style="color:#888;font-size:13px;">Replace <code>YOUR_API_TOKEN</code> with the token you generated in step 1.</p>
+            <?php else : ?>
+                <p style="color:#856404;font-size:13px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;">This snippet includes the token you just generated — copy it now, it won't be shown again.</p>
+            <?php endif; ?>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h3 style="margin-top:0;">3. Restart Your AI Client</h3>
+            <p style="color:#555;">Restart Claude Desktop / your IDE so it picks up the new MCP server, then ask your agent to draft a post, list categories, or check the latest X posts.</p>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e5e5;border-radius:8px;padding:20px;">
+            <h3 style="margin-top:0;">Available Tools</h3>
+            <table class="widefat striped">
+                <thead><tr><th style="width:180px;">Tool</th><th>Description</th></tr></thead>
+                <tbody>
+                    <tr><td><code>create_post</code></td><td>Create a post with title, content, status, categories, tags, source attribution.</td></tr>
+                    <tr><td><code>list_posts</code></td><td>Search and paginate posts by category, status, meta fields, and more.</td></tr>
+                    <tr><td><code>get_post</code></td><td>Get full details for a single post by ID.</td></tr>
+                    <tr><td><code>update_post</code></td><td>Update an existing post's content, status, or metadata.</td></tr>
+                    <tr><td><code>delete_post</code></td><td>Trash or permanently delete a post.</td></tr>
+                    <tr><td><code>bulk_create_posts</code></td><td>Batch-create up to 50 posts in one call (ideal for feed ingestion).</td></tr>
+                    <tr><td><code>list_categories</code></td><td>List categories with post counts.</td></tr>
+                    <tr><td><code>get_meta_fields</code></td><td>List registered Coffeebrk Dynamic Fields.</td></tr>
+                    <tr><td><code>list_stories</code></td><td>Fetch Web Stories for display or mobile feed consumption.</td></tr>
+                    <tr><td><code>list_x_posts</code></td><td>List ingested X (Twitter) posts from the X Collector.</td></tr>
+                    <tr><td><code>list_x_profiles</code></td><td>List monitored X collector profiles.</td></tr>
+                    <tr><td><code>get_site_info</code></td><td>Get site info, plugin version, and RSS feed diagnostics.</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     <?php
 }
