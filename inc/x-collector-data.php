@@ -85,26 +85,36 @@ function coffeebrk_x_save_profile( array $data, ?int $id = null ) : array {
 
     $now = current_time( 'mysql' );
     $row = [
-        'username'         => $username,
-        'display_name'     => $display_name,
-        'enabled'          => $enabled,
-        'max_items'        => $max_items,
-        'include_replies'  => $include_replies,
-        'category_id'      => $category_id,
-        'updated_at'       => $now,
+        'username'     => $username,
+        'display_name' => $display_name,
+        'enabled'      => $enabled,
+        'updated_at'   => $now,
     ];
-    $formats = [ '%s', '%s', '%d', '%d', '%d', '%d', '%s' ];
+    $formats = [ '%s', '%s', '%d', '%s' ];
+
+    if ( $max_items !== null ) {
+        $row['max_items'] = $max_items;
+        $formats[] = '%d';
+    }
+    if ( $include_replies !== null ) {
+        $row['include_replies'] = $include_replies;
+        $formats[] = '%d';
+    }
+    if ( $category_id !== null ) {
+        $row['category_id'] = $category_id;
+        $formats[] = '%d';
+    }
 
     if ( $id ) {
         $ok = ( false !== $wpdb->update( $table, $row, [ 'id' => $id ], $formats, [ '%d' ] ) );
-        return [ 'ok' => $ok, 'id' => $id ];
+        return [ 'ok' => $ok, 'id' => $id, 'error' => $ok ? '' : $wpdb->last_error ];
     }
 
     $row['created_at'] = $now;
     $formats[] = '%s';
 
     $ok = ( false !== $wpdb->insert( $table, $row, $formats ) );
-    return [ 'ok' => $ok, 'id' => (int) $wpdb->insert_id ];
+    return [ 'ok' => $ok, 'id' => (int) $wpdb->insert_id, 'error' => $ok ? '' : $wpdb->last_error ];
 }
 
 function coffeebrk_x_delete_profile( int $id ) : bool {
