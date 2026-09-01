@@ -333,6 +333,20 @@ function coffeebrk_x_render_admin_notice( string $msg ) : void {
     if ( $msg === 'settings_saved' ) $text = 'Settings saved.';
     if ( $msg === 'post_deleted' ) $text = 'Post deleted.';
     if ( $msg === 'post_updated' ) $text = 'Post updated.';
+    if ( $msg === 'sync_failed' ) {
+        $type = 'error';
+        $err = isset( $_GET['err'] ) ? sanitize_text_field( (string) $_GET['err'] ) : '';
+        $errMsg = isset( $_GET['err_msg'] ) ? sanitize_text_field( (string) $_GET['err_msg'] ) : '';
+        if ( $err === 'missing_token' ) {
+            $text = 'Sync failed: Apify API Token is not configured. Please add your Apify token in the Settings tab.';
+        } elseif ( $err === 'locked' ) {
+            $text = 'Sync is already in progress. Please wait a moment.';
+        } elseif ( ! empty( $errMsg ) ) {
+            $text = 'Sync failed: ' . $errMsg;
+        } else {
+            $text = 'Sync failed: ' . ( $err ? $err : 'Unknown error' );
+        }
+    }
     if ( $msg === 'error' ) $text = 'Action failed.';
     if ( $msg === 'synced' ) {
         $imported = isset( $_GET['imported'] ) ? (int) $_GET['imported'] : null;
@@ -628,7 +642,11 @@ function coffeebrk_x_handle_sync_profile() : void {
     if ( ! empty( $res['ok'] ) ) {
         coffeebrk_x_admin_redirect( [ 'msg' => 'synced', 'imported' => (int) ( $res['imported'] ?? 0 ), 'skipped' => (int) ( $res['skipped'] ?? 0 ) ] );
     }
-    coffeebrk_x_admin_redirect( [ 'msg' => 'error' ] );
+    coffeebrk_x_admin_redirect( [
+        'msg'     => 'sync_failed',
+        'err'     => $res['error'] ?? 'failed',
+        'err_msg' => $res['message'] ?? '',
+    ] );
 }
 
 function coffeebrk_x_handle_sync_all() : void {
@@ -639,7 +657,11 @@ function coffeebrk_x_handle_sync_all() : void {
     if ( ! empty( $res['ok'] ) ) {
         coffeebrk_x_admin_redirect( [ 'msg' => 'synced', 'imported' => (int) ( $res['imported'] ?? 0 ), 'skipped' => (int) ( $res['skipped'] ?? 0 ) ] );
     }
-    coffeebrk_x_admin_redirect( [ 'msg' => 'error' ] );
+    coffeebrk_x_admin_redirect( [
+        'msg'     => 'sync_failed',
+        'err'     => $res['error'] ?? 'failed',
+        'err_msg' => $res['message'] ?? '',
+    ] );
 }
 
 function coffeebrk_x_handle_delete_post() : void {
