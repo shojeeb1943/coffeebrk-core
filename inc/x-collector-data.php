@@ -55,8 +55,18 @@ function coffeebrk_x_get_profiles( array $args = [] ) : array {
     return (array) $wpdb->get_results( $sql, ARRAY_A );
 }
 
+function coffeebrk_x_ensure_tables() : void {
+    static $ensured = false;
+    if ( $ensured ) return;
+    $ensured = true;
+    if ( function_exists( 'coffeebrk_x_install' ) ) {
+        coffeebrk_x_install();
+    }
+}
+
 function coffeebrk_x_save_profile( array $data, ?int $id = null ) : array {
     global $wpdb;
+    coffeebrk_x_ensure_tables();
     $table = coffeebrk_x_profiles_table_name();
 
     $username = coffeebrk_x_normalize_username( (string) ( $data['username'] ?? '' ) );
