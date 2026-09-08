@@ -12,6 +12,16 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
         'title' => __( 'Coffeebrk Meta', 'coffeebrk-core' ),
     ]);
 
+    // Register the X / Social Post group
+    $dynamic_tags_manager->register_group( 'coffeebrk-x-social', [
+        'title' => __( 'X / Social Post', 'coffeebrk-core' ),
+    ]);
+
+    require_once __DIR__ . '/class-coffeebrk-x-post-tags.php';
+
+    $dynamic_tags_manager->register( new \Coffeebrk_X_Post_Field_Tag() );
+    $dynamic_tags_manager->register( new \Coffeebrk_X_Post_Image_Tag() );
+
     // Include our legacy tag classes
     require_once __DIR__ . '/class-coffeebrk-source-name-tag.php';
     require_once __DIR__ . '/class-coffeebrk-source-url-tag.php';
