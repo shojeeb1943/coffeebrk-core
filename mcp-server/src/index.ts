@@ -474,7 +474,7 @@ const TOOLS: Tool[] = [
 const server = new Server(
   {
     name: "coffeebrk-core",
-    version: "2.2.3",
+    version: "2.2.4",
   },
   {
     capabilities: {

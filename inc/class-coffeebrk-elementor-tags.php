@@ -22,6 +22,19 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
     $dynamic_tags_manager->register( new \Coffeebrk_X_Post_Field_Tag() );
     $dynamic_tags_manager->register( new \Coffeebrk_X_Post_Image_Tag() );
 
+    // Register the YouTube Story group
+    $dynamic_tags_manager->register_group( 'coffeebrk-story', [
+        'title' => __( 'YouTube Story', 'coffeebrk-core' ),
+    ]);
+
+    require_once __DIR__ . '/class-coffeebrk-story-tags.php';
+
+    $dynamic_tags_manager->register( new \Coffeebrk_Story_Channel_Tag() );
+    $dynamic_tags_manager->register( new \Coffeebrk_Story_Views_Tag() );
+    $dynamic_tags_manager->register( new \Coffeebrk_Story_Duration_Tag() );
+    $dynamic_tags_manager->register( new \Coffeebrk_Story_Watch_Url_Tag() );
+    $dynamic_tags_manager->register( new \Coffeebrk_Story_Thumbnail_Tag() );
+
     // Include our legacy tag classes
     require_once __DIR__ . '/class-coffeebrk-source-name-tag.php';
     require_once __DIR__ . '/class-coffeebrk-source-url-tag.php';
