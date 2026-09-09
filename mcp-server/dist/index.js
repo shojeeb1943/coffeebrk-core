@@ -452,7 +452,7 @@ const TOOLS = [
 // Create MCP Server instance
 const server = new Server({
     name: "coffeebrk-core",
-    version: "2.2.4",
+    version: "2.2.5",
 }, {
     capabilities: {
         tools: {},

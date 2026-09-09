@@ -24,7 +24,8 @@ add_action( 'init', function() {
             'not_found_in_trash' => __( 'No stories found in Trash', 'coffeebrk-core' ),
             'all_items'          => __( 'All Stories', 'coffeebrk-core' ),
         ],
-        'public'              => false, // Internal usage primarily
+        'public'              => true, // Must be public for Elementor's Loop Grid to list it as a query source
+        'exclude_from_search' => true, // ...but keep it out of the site's default search results
         'show_ui'             => true,
         'show_in_menu'        => 'coffeebrk-core', // Nest under Coffeebrk Core
         'menu_position'       => 20,
