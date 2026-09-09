@@ -117,7 +117,40 @@ class Coffeebrk_Story_Watch_Url_Tag extends Tag {
 	protected function register_controls() {}
 
 	public function render() {
-		echo esc_url( (string) get_post_meta( get_the_ID(), '_cbk_story_video_url', true ) );
+		// Shorts URLs (youtube.com/shorts/xyz) aren't recognized by Elementor's
+		// video embed parser, only watch?v=/youtu.be — rebuild the canonical
+		// form from the stored video ID so the widget can actually embed it.
+		$video_id = (string) get_post_meta( get_the_ID(), '_cbk_story_yt_video_id', true );
+		$url = $video_id !== ''
+			? 'https://www.youtube.com/watch?v=' . $video_id
+			: (string) get_post_meta( get_the_ID(), '_cbk_story_video_url', true );
+
+		echo esc_url( $url );
+	}
+}
+
+class Coffeebrk_Story_Title_Tag extends Tag {
+
+	public function get_name() {
+		return 'coffeebrk-story-title';
+	}
+
+	public function get_title() {
+		return __( 'Story Title', 'coffeebrk-core' );
+	}
+
+	public function get_group() {
+		return 'coffeebrk-story';
+	}
+
+	public function get_categories() {
+		return [ DynModule::TEXT_CATEGORY ];
+	}
+
+	protected function register_controls() {}
+
+	public function render() {
+		echo esc_html( get_the_title( get_the_ID() ) );
 	}
 }
 

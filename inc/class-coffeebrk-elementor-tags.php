@@ -29,6 +29,7 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
 
     require_once __DIR__ . '/class-coffeebrk-story-tags.php';
 
+    $dynamic_tags_manager->register( new \Coffeebrk_Story_Title_Tag() );
     $dynamic_tags_manager->register( new \Coffeebrk_Story_Channel_Tag() );
     $dynamic_tags_manager->register( new \Coffeebrk_Story_Views_Tag() );
     $dynamic_tags_manager->register( new \Coffeebrk_Story_Duration_Tag() );
