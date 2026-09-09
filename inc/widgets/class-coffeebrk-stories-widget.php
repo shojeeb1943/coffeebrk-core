@@ -668,13 +668,9 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
                 </svg>
             </button>
             <div class="cbk-stories-viewer__content">
-                <div class="cbk-stories-viewer__item cbk-stories-viewer__item--prev-2"></div>
-                <div class="cbk-stories-viewer__item cbk-stories-viewer__item--prev"></div>
                 <div class="cbk-stories-viewer__item cbk-stories-viewer__item--current">
                     <div class="cbk-stories-viewer__video-container"></div>
                 </div>
-                <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next"></div>
-                <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next-2"></div>
             </div>
             <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--next" aria-label="<?php esc_attr_e( 'Next', 'coffeebrk-core' ); ?>">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

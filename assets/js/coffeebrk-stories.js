@@ -12,10 +12,10 @@
             this.currentIndex = 0;
             this.stories = [];
             this.viewer = null;
-            this.container = null;
             this.autoplay = true;
             this.loop = false;
             this.startMuted = true;
+            this.gestureLocked = false;
 
             // Singleton Player Instances
             this.ytPlayer = null;
@@ -53,14 +53,19 @@
                 this.setupContainer(container);
             });
 
+            this.setupLoopCards();
+
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') this.closeViewer();
-                if (e.key === 'ArrowLeft') this.prevStory();
-                if (e.key === 'ArrowRight') this.nextStory();
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') this.prevStory();
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') this.nextStory();
             });
         }
 
         setupContainer(container) {
+            if (container.dataset.cbkStoriesBound) return;
+            container.dataset.cbkStoriesBound = 'true';
+
             const cards = container.querySelectorAll('.cbk-stories__card');
             const wrapper = container.closest('.cbk-stories-wrapper');
 
@@ -92,15 +97,67 @@
                 }
             }
 
-            this.autoplay = container.dataset.autoplay === 'true';
-            this.loop = container.dataset.loop === 'true';
-            this.startMuted = container.dataset.muted === 'yes';
+            const widgetId = container.closest('[data-id]')?.dataset.id || 'default';
+            const viewerId = `cbk-stories-viewer-${widgetId}`;
+            const settings = {
+                autoplay: container.dataset.autoplay === 'true',
+                loop: container.dataset.loop === 'true',
+                startMuted: container.dataset.muted === 'yes',
+            };
 
             cards.forEach((card, index) => {
-                card.addEventListener('click', () => this.openViewer(container, index));
+                card.addEventListener('click', () => {
+                    const stories = Array.from(cards).map(c => ({ videoUrl: c.dataset.videoUrl }));
+                    this.openViewer(stories, index, viewerId, settings);
+                });
                 if (card.classList.contains('cbk-stories__card--auto-gradient')) {
                     this.applyAutoGradient(card);
                 }
+            });
+        }
+
+        // Handles story cards built as native Elementor Loop Grid items (Video/Heading/Image
+        // widgets bound to the cbk_story CPT via dynamic tags) rather than the Coffeebrk
+        // Stories widget markup. Overlays a click-catcher on each video iframe so a click
+        // opens our popup feed instead of playing inline inside the small card.
+        setupLoopCards() {
+            if (document.body.classList.contains('elementor-editor-active')) return;
+
+            const allItems = document.querySelectorAll('.e-loop-item.cbk_story');
+            if (!allItems.length) return;
+
+            // Only real, playable videos go into the navigable feed - skip test/placeholder
+            // cards with no video configured so scrolling never dead-ends on an empty story.
+            const stories = Array.from(allItems).map(item => {
+                const videoWidget = item.querySelector('.elementor-widget-video[data-settings]');
+                let videoUrl = '';
+                if (videoWidget) {
+                    try {
+                        const settings = JSON.parse(videoWidget.dataset.settings);
+                        videoUrl = settings.youtube_url || settings.vimeo_url || (settings.hosted_url && settings.hosted_url.url) || '';
+                    } catch (e) { /* ignore malformed settings */ }
+                }
+                return { element: item, videoUrl };
+            }).filter(story => story.videoUrl);
+
+            stories.forEach((story, index) => {
+                const item = story.element;
+                if (item.dataset.cbkLoopBound) return;
+                item.dataset.cbkLoopBound = 'true';
+
+                const wrapper = item.querySelector('.elementor-widget-video .elementor-wrapper');
+                if (!wrapper) return;
+
+                if (!wrapper.style.position) wrapper.style.position = 'relative';
+
+                const catcher = document.createElement('div');
+                catcher.className = 'cbk-story-click-catcher';
+                catcher.addEventListener('click', () => {
+                    this.openViewer(stories, index, 'cbk-stories-viewer-story-feed', {
+                        autoplay: true, loop: true, startMuted: true,
+                    });
+                });
+                wrapper.appendChild(catcher);
             });
         }
 
@@ -169,28 +226,19 @@
             return result ? `rgba(${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}, ${alpha})` : `rgba(128, 128, 128, ${alpha})`;
         }
 
-        openViewer(container, index) {
-            this.container = container;
+        // stories: array of { videoUrl }. settings: { autoplay, loop, startMuted }.
+        openViewer(stories, index, viewerId, settings = {}) {
+            this.stories = stories;
             this.currentIndex = index;
-            this.stories = Array.from(container.querySelectorAll('.cbk-stories__card'));
+            this.autoplay = settings.autoplay !== false;
+            this.loop = !!settings.loop;
+            this.startMuted = settings.startMuted !== false;
 
-            // Re-read settings from this specific container (important for multiple widgets)
-            this.autoplay = container.dataset.autoplay === 'true';
-            this.loop = container.dataset.loop === 'true';
-            this.startMuted = container.dataset.muted === 'yes';
-
-            console.log('[Stories] Opening viewer with settings:', {
-                autoplay: this.autoplay,
-                loop: this.loop,
-                startMuted: this.startMuted,
-                dataMuted: container.dataset.muted
-            });
-
-            const widgetId = container.closest('[data-id]')?.dataset.id || 'default';
-            this.viewer = document.getElementById(`cbk-stories-viewer-${widgetId}`);
+            this.viewer = document.getElementById(viewerId);
 
             if (!this.viewer) {
                 this.viewer = this.createViewer();
+                this.viewer.id = viewerId;
                 document.body.appendChild(this.viewer);
             }
 
@@ -223,13 +271,9 @@
                     </svg>
                 </button>
                 <div class="cbk-stories-viewer__content">
-                    <div class="cbk-stories-viewer__item cbk-stories-viewer__item--prev-2"></div>
-                    <div class="cbk-stories-viewer__item cbk-stories-viewer__item--prev"></div>
                     <div class="cbk-stories-viewer__item cbk-stories-viewer__item--current">
                         <div class="cbk-stories-viewer__video-container"></div>
                     </div>
-                    <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next"></div>
-                    <div class="cbk-stories-viewer__item cbk-stories-viewer__item--next-2"></div>
                 </div>
                 <button class="cbk-stories-viewer__nav cbk-stories-viewer__nav--next">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -260,15 +304,42 @@
                 };
             }
 
-            ['prev', 'next', 'prev-2', 'next-2'].forEach(type => {
-                const item = this.viewer.querySelector(`.cbk-stories-viewer__item--${type}`);
-                if (item) item.onclick = () => {
-                    if (type === 'prev') this.prevStory();
-                    if (type === 'next') this.nextStory();
-                    if (type === 'prev-2' && this.currentIndex >= 2) this.showStory(this.currentIndex - 2);
-                    if (type === 'next-2' && this.currentIndex < this.stories.length - 2) this.showStory(this.currentIndex + 2);
-                };
-            });
+            this.bindGestureEvents();
+        }
+
+        // ponytail: fixed-threshold wheel/swipe scroll, tune threshold if it feels too sensitive
+        bindGestureEvents() {
+            const content = this.viewer.querySelector('.cbk-stories-viewer__content');
+            if (!content || content.dataset.cbkGestureBound) return;
+            content.dataset.cbkGestureBound = 'true';
+
+            const GESTURE_LOCK_MS = 500;
+            const SWIPE_THRESHOLD = 50;
+
+            const navigate = (direction) => {
+                if (this.gestureLocked) return;
+                this.gestureLocked = true;
+                setTimeout(() => { this.gestureLocked = false; }, GESTURE_LOCK_MS);
+                if (direction > 0) this.nextStory();
+                else this.prevStory();
+            };
+
+            content.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                navigate(e.deltaY > 0 ? 1 : -1);
+            }, { passive: false });
+
+            let touchStartY = 0;
+            content.addEventListener('touchstart', (e) => {
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+
+            content.addEventListener('touchend', (e) => {
+                const deltaY = touchStartY - e.changedTouches[0].clientY;
+                if (Math.abs(deltaY) > SWIPE_THRESHOLD) {
+                    navigate(deltaY > 0 ? 1 : -1);
+                }
+            }, { passive: true });
         }
 
         forceUnmute() {
@@ -303,21 +374,21 @@
             }
         }
 
-        showStory(index) {
+        showStory(index, direction) {
             if (index < 0 || index >= this.stories.length) return;
 
             this.currentIndex = index;
             const story = this.stories[index];
-            const videoUrl = story.dataset.videoUrl;
+            const videoUrl = story.videoUrl;
             const videoContainer = this.viewer.querySelector('.cbk-stories-viewer__video-container');
 
-            // Set size
             const currentItem = this.viewer.querySelector('.cbk-stories-viewer__item--current');
-            if (currentItem) {
-                Object.assign(currentItem.style, {
-                    width: '380px', height: '680px', minWidth: '380px', minHeight: '680px',
-                    flexShrink: '0', position: 'relative', background: '#000', borderRadius: '12px', overflow: 'hidden'
-                });
+            if (currentItem && direction) {
+                const slideClass = direction > 0 ? 'cbk-slide-up' : 'cbk-slide-down';
+                currentItem.classList.remove('cbk-slide-up', 'cbk-slide-down');
+                // Force reflow so the animation restarts on consecutive navigations
+                void currentItem.offsetWidth;
+                currentItem.classList.add(slideClass);
             }
             if (videoContainer) {
                 Object.assign(videoContainer.style, {
@@ -343,7 +414,6 @@
                 videoContainer.appendChild(this.createPlaceholder());
             }
 
-            this.updateSideItems(index);
             this.updateNavigation();
         }
 
@@ -613,55 +683,6 @@
             return placeholder;
         }
 
-        updateSideItems(index) {
-            const len = this.stories.length;
-            const update = (cls, idx, opacity) => {
-                const el = this.viewer.querySelector(cls);
-                this.updateSideItem(el, idx, opacity);
-            };
-
-            let prev = index - 1;
-            if (this.loop && prev < 0) prev = len - 1;
-            update('.cbk-stories-viewer__item--prev', prev, 0.7);
-
-            let next = index + 1;
-            if (this.loop && next >= len) next = 0;
-            update('.cbk-stories-viewer__item--next', next, 0.7);
-
-            let prev2 = index - 2;
-            if (this.loop) prev2 = (index - 2 + len) % len;
-            update('.cbk-stories-viewer__item--prev-2', prev2, 0.5);
-
-            let next2 = index + 2;
-            if (this.loop) next2 = (index + 2) % len;
-            update('.cbk-stories-viewer__item--next-2', next2, 0.5);
-        }
-
-        updateSideItem(element, storyIndex, opacity) {
-            if (!element) return;
-            const url = this.getThumbnailUrl(storyIndex);
-
-            if (url) {
-                element.style.backgroundImage = `url('${url}')`;
-                element.style.opacity = opacity;
-                element.style.pointerEvents = 'auto';
-                element.style.display = 'block';
-                if (element.className.includes('prev-2') || element.className.includes('next-2')) {
-                    element.style.width = '120px'; element.style.height = '215px';
-                } else {
-                    element.style.width = '150px'; element.style.height = '270px';
-                }
-            } else {
-                element.style.display = 'none';
-            }
-        }
-
-        getThumbnailUrl(index) {
-            if (index < 0 || index >= this.stories.length) return null;
-            const card = this.stories[index];
-            return card.dataset.thumbUrl || (card.querySelector('.cbk-stories__thumbnail')?.dataset.src) || '';
-        }
-
         updateNavigation() {
             const prevBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--prev');
             const nextBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--next');
@@ -675,17 +696,17 @@
 
         prevStory() {
             if (this.currentIndex > 0) {
-                this.showStory(this.currentIndex - 1);
+                this.showStory(this.currentIndex - 1, -1);
             } else if (this.loop) {
-                this.showStory(this.stories.length - 1);
+                this.showStory(this.stories.length - 1, -1);
             }
         }
 
         nextStory() {
             if (this.currentIndex < this.stories.length - 1) {
-                this.showStory(this.currentIndex + 1);
+                this.showStory(this.currentIndex + 1, 1);
             } else if (this.loop) {
-                this.showStory(0);
+                this.showStory(0, 1);
             }
         }
 

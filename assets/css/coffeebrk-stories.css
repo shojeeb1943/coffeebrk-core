@@ -228,6 +228,17 @@
     opacity: 1;
 }
 
+/* Overlay that intercepts clicks on native Elementor Video widgets used by
+   the "Fresh AI Stories" loop grid, so they open the popup feed instead of
+   playing inline inside the small card. */
+.cbk-story-click-catcher {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    cursor: pointer;
+    background: transparent;
+}
+
 /* ============================================
    Story Viewer Modal
    ============================================ */
@@ -267,61 +278,56 @@
     max-width: 1200px;
     height: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    padding: 40px 80px;
+    padding: 80px 20px;
     box-sizing: border-box;
+    overflow: hidden;
+    touch-action: none;
 }
 
-/* Side Story Previews - Like Instagram */
+/* Vertical feed - single full-bleed video, TikTok/Shorts style */
 .cbk-stories-viewer__item {
     border-radius: 12px;
     overflow: hidden;
     position: relative;
-    cursor: pointer;
     background: #1a1a1a;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    transition: all 0.3s ease;
+    transition: transform 0.3s ease, opacity 0.3s ease;
     flex-shrink: 0;
 }
 
-.cbk-stories-viewer__item--prev,
-.cbk-stories-viewer__item--next {
-    width: 150px;
-    height: 270px;
-    opacity: 0.7;
-}
-
-.cbk-stories-viewer__item--prev-2,
-.cbk-stories-viewer__item--next-2 {
-    width: 120px;
-    height: 215px;
-    opacity: 0.5;
-}
-
-.cbk-stories-viewer__item--prev:hover,
-.cbk-stories-viewer__item--next:hover {
-    opacity: 0.9;
-    transform: scale(1.02);
-}
-
-/* Current Story (Center) - Full Height Like Instagram */
 .cbk-stories-viewer__item--current {
-    width: 380px !important;
-    min-width: 380px !important;
-    height: 680px !important;
-    min-height: 680px !important;
+    width: min(420px, calc((100vh - 160px) * 9 / 16)) !important;
+    height: min(100vh - 160px, 780px) !important;
     box-shadow: 0 25px 100px rgba(0, 0, 0, 0.9);
     background: #000 !important;
+}
+
+@keyframes cbk-slide-up {
+    from { transform: translateY(40px); opacity: 0.4; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes cbk-slide-down {
+    from { transform: translateY(-40px); opacity: 0.4; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.cbk-stories-viewer__item--current.cbk-slide-up {
+    animation: cbk-slide-up 0.3s ease;
+}
+
+.cbk-stories-viewer__item--current.cbk-slide-down {
+    animation: cbk-slide-down 0.3s ease;
 }
 
 .cbk-stories-viewer__video-container {
     width: 100% !important;
     height: 100% !important;
-    min-height: 680px !important;
     background: #000 !important;
     position: relative !important;
     border-radius: 12px;
@@ -335,7 +341,6 @@
     left: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    min-height: 680px !important;
     object-fit: cover !important;
     border: none !important;
 }
@@ -364,11 +369,11 @@
     transform: scale(1.1);
 }
 
-/* Navigation Buttons */
+/* Navigation Buttons - stacked top/bottom for the vertical feed */
 .cbk-stories-viewer__nav {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 10;
     width: 48px;
     height: 48px;
@@ -383,6 +388,10 @@
     transition: background 0.3s ease, opacity 0.3s ease;
 }
 
+.cbk-stories-viewer__nav svg {
+    transform: rotate(90deg);
+}
+
 .cbk-stories-viewer__nav:hover {
     background: rgba(255, 255, 255, 0.2);
 }
@@ -393,11 +402,11 @@
 }
 
 .cbk-stories-viewer__nav--prev {
-    left: 20px;
+    top: 20px;
 }
 
 .cbk-stories-viewer__nav--next {
-    right: 20px;
+    bottom: 20px;
 }
 
 /* ============================================
@@ -423,11 +432,11 @@
     }
 
     .cbk-stories-viewer__nav--prev {
-        left: 10px;
+        top: 10px;
     }
 
     .cbk-stories-viewer__nav--next {
-        right: 10px;
+        bottom: 10px;
     }
 
     .cbk-stories-viewer__close {
