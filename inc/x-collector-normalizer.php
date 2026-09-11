@@ -60,10 +60,21 @@ function coffeebrk_x_normalize_apify_item( array $item, int $profile_id ) : ?arr
     $like_count    = $to_int( $item['likeCount'] ?? $item['favorite_count'] ?? null );
     $retweet_count = $to_int( $item['retweetCount'] ?? $item['retweet_count'] ?? null );
     $reply_count   = $to_int( $item['replyCount'] ?? $item['reply_count'] ?? null );
+    $view_count    = $to_int( $item['viewCount'] ?? $item['view_count'] ?? null );
+    $quote_count   = $to_int( $item['quoteCount'] ?? $item['quote_count'] ?? null );
+    $bookmark_count = $to_int( $item['bookmarkCount'] ?? $item['bookmark_count'] ?? null );
 
     $is_reply = 0;
     if ( ! empty( $item['isReply'] ) || ! empty( $item['in_reply_to_status_id'] ) || ! empty( $item['inReplyToId'] ) ) {
         $is_reply = 1;
+    }
+
+    $is_retweet = ! empty( $item['isRetweet'] ) ? 1 : 0;
+    $is_quote   = ! empty( $item['isQuote'] ) ? 1 : 0;
+
+    $lang = '';
+    if ( isset( $item['lang'] ) && is_string( $item['lang'] ) ) {
+        $lang = sanitize_text_field( $item['lang'] );
     }
 
     $media = [];
@@ -91,10 +102,48 @@ function coffeebrk_x_normalize_apify_item( array $item, int $profile_id ) : ?arr
         'like_count'      => $like_count,
         'retweet_count'   => $retweet_count,
         'reply_count'     => $reply_count,
+        'view_count'      => $view_count,
+        'quote_count'     => $quote_count,
+        'bookmark_count'  => $bookmark_count,
+        'is_retweet'      => $is_retweet,
+        'is_quote'        => $is_quote,
+        'lang'            => $lang,
         'media_json'      => wp_json_encode( $media ),
         'status'          => 'published',
         'is_featured'     => 0,
         'raw_synced_at'   => current_time( 'mysql' ),
         'created_at'      => current_time( 'mysql' ),
+    ];
+}
+
+// Pulls a snapshot of the tweet's author out of an Apify item, for updating
+// the profile row's avatar/followers/verified fields. Pure + defensive like
+// coffeebrk_x_normalize_apify_item() — returns an all-empty shape rather
+// than throwing when the author object is missing or malformed.
+function coffeebrk_x_extract_apify_author( array $item ) : array {
+    $author = ( isset( $item['author'] ) && is_array( $item['author'] ) ) ? $item['author'] : [];
+
+    $display_name = '';
+    foreach ( [ 'name', 'displayName' ] as $k ) {
+        if ( ! empty( $author[ $k ] ) && is_string( $author[ $k ] ) ) { $display_name = sanitize_text_field( $author[ $k ] ); break; }
+    }
+
+    $avatar_url = '';
+    foreach ( [ 'profilePicture', 'profile_image_url', 'avatar' ] as $k ) {
+        if ( ! empty( $author[ $k ] ) && is_string( $author[ $k ] ) ) { $avatar_url = esc_url_raw( $author[ $k ] ); break; }
+    }
+
+    $followers = 0;
+    foreach ( [ 'followers', 'followersCount', 'followers_count' ] as $k ) {
+        if ( isset( $author[ $k ] ) && is_numeric( $author[ $k ] ) ) { $followers = (int) $author[ $k ]; break; }
+    }
+
+    $is_verified = ( ! empty( $author['isVerified'] ) || ! empty( $author['isBlueVerified'] ) ) ? 1 : 0;
+
+    return [
+        'display_name'    => $display_name,
+        'avatar_url'      => $avatar_url,
+        'followers_count' => $followers,
+        'is_verified'     => $is_verified,
     ];
 }

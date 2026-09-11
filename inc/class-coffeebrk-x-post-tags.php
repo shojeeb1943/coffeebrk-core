@@ -102,13 +102,22 @@ class Coffeebrk_X_Post_Field_Tag extends Tag {
 			'type'    => Controls_Manager::SELECT,
 			'default' => 'text',
 			'options' => [
-				'text'          => __( 'Text', 'coffeebrk-core' ),
-				'author'        => __( 'Author (@handle)', 'coffeebrk-core' ),
-				'permalink'     => __( 'Permalink URL', 'coffeebrk-core' ),
-				'posted_at'     => __( 'Posted Date', 'coffeebrk-core' ),
-				'like_count'    => __( 'Likes', 'coffeebrk-core' ),
-				'retweet_count' => __( 'Retweets', 'coffeebrk-core' ),
-				'reply_count'   => __( 'Replies', 'coffeebrk-core' ),
+				'text'                => __( 'Text', 'coffeebrk-core' ),
+				'author'              => __( 'Author (@handle)', 'coffeebrk-core' ),
+				'author_display_name' => __( 'Author (display name)', 'coffeebrk-core' ),
+				'author_followers'    => __( 'Author Followers', 'coffeebrk-core' ),
+				'permalink'           => __( 'Permalink URL', 'coffeebrk-core' ),
+				'posted_at'           => __( 'Posted Date', 'coffeebrk-core' ),
+				'lang'                => __( 'Language', 'coffeebrk-core' ),
+				'like_count'          => __( 'Likes', 'coffeebrk-core' ),
+				'retweet_count'       => __( 'Retweets', 'coffeebrk-core' ),
+				'reply_count'         => __( 'Replies', 'coffeebrk-core' ),
+				'view_count'          => __( 'Views', 'coffeebrk-core' ),
+				'quote_count'         => __( 'Quotes', 'coffeebrk-core' ),
+				'bookmark_count'      => __( 'Bookmarks', 'coffeebrk-core' ),
+				'is_reply'            => __( 'Is Reply (Yes/No)', 'coffeebrk-core' ),
+				'is_retweet'          => __( 'Is Retweet (Yes/No)', 'coffeebrk-core' ),
+				'is_quote'            => __( 'Is Quote (Yes/No)', 'coffeebrk-core' ),
 			],
 		] );
 	}
@@ -129,13 +138,36 @@ class Coffeebrk_X_Post_Field_Tag extends Tag {
 			case 'author':
 				echo esc_html( '@' . (string) $post['author_username'] );
 				break;
+			case 'author_display_name':
+			case 'author_followers':
+				$profile = coffeebrk_x_get_profile( (int) $post['profile_id'] );
+				if ( ! $profile ) {
+					break;
+				}
+				if ( $field === 'author_display_name' ) {
+					echo esc_html( (string) ( $profile['display_name'] ?? '' ) );
+				} else {
+					echo esc_html( (string) (int) ( $profile['followers_count'] ?? 0 ) );
+				}
+				break;
 			case 'posted_at':
 				echo esc_html( (string) $post['posted_at'] );
+				break;
+			case 'lang':
+				echo esc_html( (string) ( $post['lang'] ?? '' ) );
 				break;
 			case 'like_count':
 			case 'retweet_count':
 			case 'reply_count':
-				echo esc_html( (string) (int) $post[ $field ] );
+			case 'view_count':
+			case 'quote_count':
+			case 'bookmark_count':
+				echo esc_html( (string) (int) ( $post[ $field ] ?? 0 ) );
+				break;
+			case 'is_reply':
+			case 'is_retweet':
+			case 'is_quote':
+				echo esc_html( ! empty( $post[ $field ] ) ? __( 'Yes', 'coffeebrk-core' ) : __( 'No', 'coffeebrk-core' ) );
 				break;
 			case 'text':
 			default:
@@ -188,6 +220,50 @@ class Coffeebrk_X_Post_Image_Tag extends Data_Tag {
 		if ( ! empty( $media[0]['url'] ) && is_string( $media[0]['url'] ) ) {
 			$url = $media[0]['url'];
 		}
+
+		return [
+			'id'  => 0,
+			'url' => $url ? esc_url( $url ) : '',
+		];
+	}
+}
+
+class Coffeebrk_X_Post_Author_Image_Tag extends Data_Tag {
+
+	public function get_name() {
+		return 'coffeebrk-x-post-author-image';
+	}
+
+	public function get_title() {
+		return __( 'X Post Author Image', 'coffeebrk-core' );
+	}
+
+	public function get_group() {
+		return 'coffeebrk-x-social';
+	}
+
+	public function get_categories() {
+		return [ DynModule::IMAGE_CATEGORY ];
+	}
+
+	protected function register_controls() {
+		$this->add_control( 'tweet', [
+			'label'   => __( 'Tweet', 'coffeebrk-core' ),
+			'type'    => Controls_Manager::SELECT,
+			'default' => 'latest',
+			'options' => coffeebrk_x_get_tweet_select_options(),
+		] );
+	}
+
+	public function get_value( array $options = [] ) {
+		$settings = $this->get_settings();
+		$post = coffeebrk_x_resolve_selected_post( $settings );
+		if ( ! $post ) {
+			return [ 'id' => 0, 'url' => '' ];
+		}
+
+		$profile = coffeebrk_x_get_profile( (int) $post['profile_id'] );
+		$url = ( $profile && ! empty( $profile['avatar_url'] ) ) ? (string) $profile['avatar_url'] : '';
 
 		return [
 			'id'  => 0,

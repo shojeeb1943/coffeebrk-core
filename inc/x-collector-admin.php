@@ -26,6 +26,29 @@ add_action( 'admin_post_coffeebrk_x_toggle_post_status', 'coffeebrk_x_handle_tog
 add_action( 'admin_post_coffeebrk_x_toggle_post_featured', 'coffeebrk_x_handle_toggle_post_featured' );
 add_action( 'admin_post_coffeebrk_x_save_settings', 'coffeebrk_x_handle_save_settings' );
 add_action( 'wp_ajax_coffeebrk_x_test_connection', 'coffeebrk_x_ajax_test_connection' );
+add_action( 'admin_init', 'coffeebrk_x_maybe_handle_bulk_delete_posts' );
+
+// Bulk actions on a WP_List_Table submit back to admin.php (not
+// admin-post.php), so this has to run early enough (admin_init) to redirect
+// before the page starts echoing output.
+function coffeebrk_x_maybe_handle_bulk_delete_posts() : void {
+    if ( ( $_REQUEST['page'] ?? '' ) !== 'coffeebrk-core-x' || ( $_REQUEST['tab'] ?? '' ) !== 'posts' ) return;
+
+    $action = (string) ( $_REQUEST['action'] ?? '-1' );
+    $action2 = (string) ( $_REQUEST['action2'] ?? '-1' );
+    if ( $action !== 'bulk-delete' && $action2 !== 'bulk-delete' ) return;
+
+    if ( ! current_user_can( 'manage_options' ) ) coffeebrk_x_admin_redirect( [ 'tab' => 'posts', 'msg' => 'error' ] );
+    check_admin_referer( 'bulk-posts' );
+
+    $ids = isset( $_REQUEST['post'] ) ? array_map( 'intval', (array) $_REQUEST['post'] ) : [];
+    $deleted = 0;
+    foreach ( $ids as $id ) {
+        if ( $id > 0 && coffeebrk_x_delete_post( $id ) ) $deleted++;
+    }
+
+    coffeebrk_x_admin_redirect( [ 'tab' => 'posts', 'msg' => $deleted ? 'post_deleted' : 'error' ] );
+}
 
 function coffeebrk_x_admin_url( array $args = [] ) : string {
     return add_query_arg( $args, admin_url( 'admin.php?page=coffeebrk-core-x' ) );
@@ -192,21 +215,35 @@ class Coffeebrk_X_Profiles_Table extends WP_List_Table {
 // ===========================================================================
 
 class Coffeebrk_X_Posts_Table extends WP_List_Table {
+    public function __construct() {
+        parent::__construct([ 'singular' => 'post', 'plural' => 'posts', 'ajax' => false ]);
+    }
+
     public function get_columns() {
         return [
+            'cb'               => '<input type="checkbox" />',
             'author_username' => 'Author',
             'text'             => 'Text',
             'posted_at'        => 'Posted',
+            'created_at'       => 'Imported',
             'engagement'       => 'Engagement',
             'status'           => 'Status',
             'permalink'        => 'Link',
         ];
     }
 
+    protected function get_bulk_actions() {
+        return [ 'bulk-delete' => 'Delete' ];
+    }
+
+    public function column_cb( $item ) {
+        return sprintf( '<input type="checkbox" name="post[]" value="%d" />', (int) $item['id'] );
+    }
+
     protected function get_sortable_columns() {
         return [
-            'posted_at' => [ 'posted_at', true ],
-            'created_at' => [ 'created_at', false ],
+            'posted_at' => [ 'posted_at', false ],
+            'created_at' => [ 'created_at', true ],
         ];
     }
 
@@ -267,7 +304,10 @@ class Coffeebrk_X_Posts_Table extends WP_List_Table {
         $args = [
             'page'     => $paged,
             'per_page' => $per_page,
-            'orderby'  => isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : 'posted_at',
+            // Default to import order (created_at), not the tweet's original
+            // posted_at — with n8n backfilling old tweets, "just imported"
+            // is what admins actually want to see first.
+            'orderby'  => isset( $_GET['orderby'] ) ? sanitize_key( (string) $_GET['orderby'] ) : 'created_at',
             'order'    => isset( $_GET['order'] ) ? strtoupper( sanitize_key( (string) $_GET['order'] ) ) : 'DESC',
         ];
 
@@ -499,7 +539,7 @@ function coffeebrk_x_render_posts_tab() : void {
     $table = new Coffeebrk_X_Posts_Table();
     $table->prepare_items();
 
-    echo '<form method="get">';
+    echo '<form method="post">';
     echo '<input type="hidden" name="page" value="coffeebrk-core-x" />';
     echo '<input type="hidden" name="tab" value="posts" />';
     $table->display();

@@ -396,6 +396,31 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: "create_x_post",
+    description: "Ingest a single already-scraped X (Twitter) post (e.g. from an Apify/n8n pipeline) into Coffeebrk X Collector. Pass the raw tweet object (id, text, author, likeCount, retweetCount, viewCount, media, etc.) — all fields are captured. Idempotent by tweet id.",
+    inputSchema: {
+      type: "object",
+      description: "The raw tweet object as scraped (Apify feedminer/x-tweet-scraper shape or compatible).",
+      properties: {},
+      additionalProperties: true,
+    },
+  },
+  {
+    name: "bulk_create_x_posts",
+    description: "Batch-ingest multiple already-scraped X (Twitter) posts into Coffeebrk X Collector in one call. Idempotent by tweet id.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        posts: {
+          type: "array",
+          description: "Array of raw tweet objects to import",
+          items: { type: "object", additionalProperties: true },
+        },
+      },
+      required: ["posts"],
+    },
+  },
+  {
     name: "list_x_profiles",
     description: "List all monitored X (Twitter) collector profiles.",
     inputSchema: {
@@ -474,7 +499,7 @@ const TOOLS: Tool[] = [
 const server = new Server(
   {
     name: "coffeebrk-core",
-    version: "2.2.7",
+    version: "2.3.0",
   },
   {
     capabilities: {
@@ -618,6 +643,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "list_x_posts": {
         const res = await callApi("/x-posts", "GET", undefined, args);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(res, null, 2),
+            },
+          ],
+          isError: res.isError,
+        };
+      }
+
+      case "create_x_post": {
+        const res = await callApi("/x-posts", "POST", args);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(res, null, 2),
+            },
+          ],
+          isError: res.isError,
+        };
+      }
+
+      case "bulk_create_x_posts": {
+        const res = await callApi("/x-posts/bulk", "POST", args);
         return {
           content: [
             {

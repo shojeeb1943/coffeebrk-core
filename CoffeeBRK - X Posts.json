@@ -1,0 +1,1882 @@
+{
+  "name": "CoffeeBRK - X Posts",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        432
+      ],
+      "id": "ff883e75-6ee9-4283-ba27-ef486ea3a0be",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-5",
+          "mode": "list",
+          "cachedResultName": "GPT-5"
+        },
+        "responses": {
+          "values": [
+            {
+              "content": "Generate a fresh YouTube boolean search query for discovering viral AI Shorts from recent developments.\n"
+            },
+            {
+              "role": "system",
+              "content": "First search internet about latest ai news from google news, publisher, the gathering those data You generate YouTube boolean search queries for discovering recent viral AI Shorts, not AI generated shorts, but AI news and updates, viral ai topics, like vibe coding, jobs, development, design, coding, ai model, new launches, ai trend, ai market share and finance future of ai, ai companies, AI VC, silicon valley, tech giant news. \n\nSTRICT RULES:\n\n• Output ONLY a boolean query\n• Format: (term OR term OR term OR term)\n• Include 10–15 terms\n• Always vary terms on every generation\n• Never repeat the same exact combination\n• Include mix of:\n\n- AI companies\n- AI tools\n- AI models\n- AI topics\n- AI breakthroughs\n\n• Use quotes for multi-word terms\n\nExample format:\n\n(OpenAI OR ChatGPT OR Claude OR Gemini OR Anthropic OR \"AI agents\" OR \"AI tools\")\n\nDO NOT output explanations.\nONLY output the query.\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1952,
+        400
+      ],
+      "id": "c2674564-9f06-4d6e-bade-77931cd68905",
+      "name": "Message a model4",
+      "credentials": {
+        "openAiApi": {
+          "id": "ckPs9UQmjdMXBgHo",
+          "name": "n8n SEO - Talk"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2560,
+        416
+      ],
+      "id": "ab2b0b33-3a88-4266-adef-40e761a949ff",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2912,
+        432
+      ],
+      "id": "6fcbb3fd-6478-49ec-9eb5-cad0f4ed8d5f",
+      "name": "Loop Over Items4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/feedminer~x-tweet-scraper/run-sync-get-dataset-items",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "REPLACE_WITH_APIFY_TOKEN_VIA_N8N_CREDENTIAL"
+            },
+            {
+              "name": "limit",
+              "value": "25"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"debugMode\": false,\n  \"includeReplies\": false,\n  \"includeSearchTerms\": false,\n  \"maxItems\": 1000,\n  \"onlyImage\": false,\n  \"onlyQuote\": false,\n  \"onlyTwitterBlue\": false,\n  \"onlyVerifiedUsers\": false,\n  \"onlyVideo\": false,\n  \"searchTerms\": [\n    \"web scraping\"\n  ],\n  \"sort\": \"Latest\",\n  \"startUrls\": [\n    \"https://x.com/apify\"\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2352,
+        416
+      ],
+      "id": "cfd9c112-b212-4dc9-8ddd-a567c8337bd9",
+      "name": "Twitter"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass the raw Apify tweet through as-is (all fields — likes, retweets,\n// views, author, media, etc.) so the WordPress endpoint gets everything.\n// Only drops items with no usable tweet id/text.\nreturn items\n  .filter(item => item.json && item.json.id && (item.json.text || item.json.fullText))\n  .map(item => ({ json: item.json }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        528
+      ],
+      "id": "7d5896a9-13dc-40cd-a535-6e53bbe7edda",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-SITE.example.com/wp-json/coffeebrk/v1/x-posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_COFFEEBRK_API_WRITE_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3392,
+        528
+      ],
+      "id": "b2f6e3c1-7a9d-4b5e-8c2f-3d4e5f6a7b8c",
+      "name": "Import to WordPress"
+    }
+  ],
+  "pinData": {
+    "Message a model4": [
+      {
+        "json": {
+          "output": [
+            {
+              "id": "msg_0076d7f5c2c540370069937737f4e0819fb94c1d3a1f28059e",
+              "type": "message",
+              "status": "completed",
+              "content": [
+                {
+                  "type": "output_text",
+                  "annotations": [],
+                  "logprobs": [],
+                  "text": "(OpenAI OR Anthropic OR xAI OR \"Google DeepMind\" OR \"Microsoft Copilot\" OR \"Apple Intelligence\" OR \"GPT-4o\" OR \"Claude 3.5\" OR \"Gemini 1.5\" OR \"Llama 3\" OR \"AI agents\" OR \"vibe coding\" OR \"NVIDIA Blackwell\" OR Sora OR \"AlphaFold 3\")"
+                }
+              ],
+              "role": "assistant"
+            }
+          ]
+        }
+      }
+    ],
+    "Twitter": [
+      {
+        "json": {
+          "id": "2087572956683567110",
+          "url": "https://x.com/apify/status/2087572956683567110",
+          "twitterUrl": "https://twitter.com/apify/status/2087572956683567110",
+          "text": "Everything runs on Apify. One day. San Francisco.\nThe builders and teams already winning on Apify, in one room. Apify's first flagship conference: Run.\n\n📆 November 10, at The Pearl, SF.\nSpeakers and agenda coming soon.\nGet your tickets now → https://t.co/35pPERakXr https://t.co/zmfgc6ziWr",
+          "fullText": "Everything runs on Apify. One day. San Francisco.\nThe builders and teams already winning on Apify, in one room. Apify's first flagship conference: Run.\n\n📆 November 10, at The Pearl, SF.\nSpeakers and agenda coming soon.\nGet your tickets now → https://t.co/35pPERakXr https://t.co/zmfgc6ziWr",
+          "createdAt": "2026-08-12T16:12:32Z",
+          "lang": "en",
+          "source": "<a href=\"https://app.agorapulse.com\" rel=\"nofollow\">Agorapulse app</a>",
+          "likeCount": 26,
+          "retweetCount": 5,
+          "replyCount": 3,
+          "quoteCount": 0,
+          "bookmarkCount": 3,
+          "viewCount": 7786,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2087572956683567110",
+          "hashtags": [],
+          "mentions": [],
+          "links": [
+            "http://apify.it/X054l"
+          ],
+          "media": [
+            "https://pbs.twimg.com/media/HPiMidvXgAEpJ53.jpg"
+          ],
+          "mediaType": "photo",
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2098004379588501723",
+          "url": "https://x.com/apify/status/2098004379588501723",
+          "twitterUrl": "https://twitter.com/apify/status/2098004379588501723",
+          "text": "RT @troyaitken_: Most people stop at Apollo.\n\nHere's the full waterfall to find any business contact in the US:\n\n1. QuickEnrich\n2. AI.ARK\n3. Apollo Apify Scraper\n4. LeadMagic\n5. IcyPeas\n6. Hunter\n7. Crawl the website, guess 100 email variations\n8. MillionVerifier\n9. TryKitt\n10. BounceBan\n\n10 layers deep. Most lists stop at 2.",
+          "fullText": "RT @troyaitken_: Most people stop at Apollo.\n\nHere's the full waterfall to find any business contact in the US:\n\n1. QuickEnrich\n2. AI.ARK\n3. Apollo Apify Scraper\n4. LeadMagic\n5. IcyPeas\n6. Hunter\n7. Crawl the website, guess 100 email variations\n8. MillionVerifier\n9. TryKitt\n10. BounceBan\n\n10 layers deep. Most lists stop at 2.",
+          "createdAt": "2026-09-10T11:03:17Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 0,
+          "retweetCount": 5,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 88,
+          "isRetweet": true,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2098004379588501723",
+          "hashtags": [],
+          "mentions": [
+            "troyaitken_"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "retweet": {
+            "id": "2092298458577473545",
+            "url": "https://x.com/troyaitken_/status/2092298458577473545",
+            "twitterUrl": "https://twitter.com/troyaitken_/status/2092298458577473545",
+            "text": "Most people stop at Apollo.\n\nHere's the full waterfall to find any business contact in the US:\n\n1. QuickEnrich\n2. AI.ARK\n3. Apollo Apify Scraper\n4. LeadMagic\n5. IcyPeas\n6. Hunter\n7. Crawl the website, guess 100 email variations\n8. MillionVerifier\n9. TryKitt\n10. BounceBan\n\n10 layers deep. Most lists stop at 2.",
+            "fullText": "Most people stop at Apollo.\n\nHere's the full waterfall to find any business contact in the US:\n\n1. QuickEnrich\n2. AI.ARK\n3. Apollo Apify Scraper\n4. LeadMagic\n5. IcyPeas\n6. Hunter\n7. Crawl the website, guess 100 email variations\n8. MillionVerifier\n9. TryKitt\n10. BounceBan\n\n10 layers deep. Most lists stop at 2.",
+            "createdAt": "2026-08-25T17:10:00Z",
+            "lang": "en",
+            "source": "<a href=\"http://twitter.com\" rel=\"nofollow\">Twitter Web Client</a>",
+            "likeCount": 69,
+            "retweetCount": 5,
+            "replyCount": 8,
+            "quoteCount": 0,
+            "bookmarkCount": 116,
+            "viewCount": 4237,
+            "isRetweet": false,
+            "isQuote": false,
+            "isReply": false,
+            "isPinned": false,
+            "conversationId": "2092298458577473545",
+            "hashtags": [],
+            "mentions": [],
+            "links": [],
+            "media": [
+              "https://pbs.twimg.com/media/HQkpcqTWIAARw2L.png"
+            ],
+            "mediaType": "photo",
+            "author": {
+              "id": "1554519095428669443",
+              "userName": "troyaitken_",
+              "name": "Troy",
+              "followers": 7074,
+              "following": 614,
+              "isVerified": false,
+              "isBlueVerified": true,
+              "description": "",
+              "location": "Washington, D.C.",
+              "twitterUrl": "https://x.com/troyaitken_",
+              "profilePicture": "https://pbs.twimg.com/profile_images/2062999437622845440/TvWTb_7F_normal.jpg",
+              "statusesCount": 4465,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2022-08-02T17:27:04Z"
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2092298458577473545",
+          "url": "https://x.com/troyaitken_/status/2092298458577473545",
+          "twitterUrl": "https://twitter.com/troyaitken_/status/2092298458577473545",
+          "text": "Most people stop at Apollo.\n\nHere's the full waterfall to find any business contact in the US:\n\n1. QuickEnrich\n2. AI.ARK\n3. Apollo Apify Scraper\n4. LeadMagic\n5. IcyPeas\n6. Hunter\n7. Crawl the website, guess 100 email variations\n8. MillionVerifier\n9. TryKitt\n10. BounceBan\n\n10 layers deep. Most lists stop at 2.",
+          "fullText": "Most people stop at Apollo.\n\nHere's the full waterfall to find any business contact in the US:\n\n1. QuickEnrich\n2. AI.ARK\n3. Apollo Apify Scraper\n4. LeadMagic\n5. IcyPeas\n6. Hunter\n7. Crawl the website, guess 100 email variations\n8. MillionVerifier\n9. TryKitt\n10. BounceBan\n\n10 layers deep. Most lists stop at 2.",
+          "createdAt": "2026-08-25T17:10:00Z",
+          "lang": "en",
+          "source": "<a href=\"http://twitter.com\" rel=\"nofollow\">Twitter Web Client</a>",
+          "likeCount": 69,
+          "retweetCount": 5,
+          "replyCount": 8,
+          "quoteCount": 0,
+          "bookmarkCount": 116,
+          "viewCount": 4237,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2092298458577473545",
+          "hashtags": [],
+          "mentions": [],
+          "links": [],
+          "media": [
+            "https://pbs.twimg.com/media/HQkpcqTWIAARw2L.png"
+          ],
+          "mediaType": "photo",
+          "author": {
+            "id": "1554519095428669443",
+            "userName": "troyaitken_",
+            "name": "Troy",
+            "followers": 7074,
+            "following": 614,
+            "isVerified": false,
+            "isBlueVerified": true,
+            "description": "",
+            "location": "Washington, D.C.",
+            "twitterUrl": "https://x.com/troyaitken_",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2062999437622845440/TvWTb_7F_normal.jpg",
+            "statusesCount": 4465,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2022-08-02T17:27:04Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097985943026167955",
+          "url": "https://x.com/apify/status/2097985943026167955",
+          "twitterUrl": "https://twitter.com/apify/status/2097985943026167955",
+          "text": "Live product data yourself = one scraper per retailer, each one different. Field names differ, types differ, plus anti-bot and a redesign that breaks you on a Tuesday.\n\nE-commerce Scraping Tool handles the hard part. We open-sourced the rest, link in thread ↓ https://t.co/Qoo6nhosGS",
+          "fullText": "Live product data yourself = one scraper per retailer, each one different. Field names differ, types differ, plus anti-bot and a redesign that breaks you on a Tuesday.\n\nE-commerce Scraping Tool handles the hard part. We open-sourced the rest, link in thread ↓ https://t.co/Qoo6nhosGS",
+          "createdAt": "2026-09-10T09:50:02Z",
+          "lang": "en",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 1,
+          "retweetCount": 0,
+          "replyCount": 1,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 236,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097985943026167955",
+          "hashtags": [],
+          "mentions": [],
+          "links": [],
+          "media": [
+            "https://pbs.twimg.com/media/HR2LGD0XkAAOR4c.jpg"
+          ],
+          "mediaType": "photo",
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097985946071220707",
+          "url": "https://x.com/apify/status/2097985946071220707",
+          "twitterUrl": "https://twitter.com/apify/status/2097985946071220707",
+          "text": "🔗 Repo ↓\nhttps://t.co/DOBODb7Ggc",
+          "fullText": "🔗 Repo ↓\nhttps://t.co/DOBODb7Ggc",
+          "createdAt": "2026-09-10T09:50:02Z",
+          "lang": "es",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 1,
+          "retweetCount": 0,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 60,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": true,
+          "isPinned": false,
+          "conversationId": "2097985943026167955",
+          "inReplyToId": "2097985943026167955",
+          "inReplyToUsername": "apify",
+          "hashtags": [],
+          "mentions": [],
+          "links": [
+            "https://apify.it/X120e"
+          ],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097690612317216795",
+          "url": "https://x.com/apify/status/2097690612317216795",
+          "twitterUrl": "https://twitter.com/apify/status/2097690612317216795",
+          "text": "RT @FabianMaume: 604 people are showing up for the Salesforge × Apify webinar today. (369 via LinkedIn. 235 via Luma.)\n\nFrank, Hlib, Jānis, and I are lighting the last beacon.\n\nJoin at 5PM CET: https://t.co/qcds2ScFU0",
+          "fullText": "RT @FabianMaume: 604 people are showing up for the Salesforge × Apify webinar today. (369 via LinkedIn. 235 via Luma.)\n\nFrank, Hlib, Jānis, and I are lighting the last beacon.\n\nJoin at 5PM CET: https://t.co/qcds2ScFU0",
+          "createdAt": "2026-09-09T14:16:29Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 0,
+          "retweetCount": 1,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 99,
+          "isRetweet": true,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097690612317216795",
+          "hashtags": [],
+          "mentions": [
+            "FabianMaume"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "retweet": {
+            "id": "2097558195589820496",
+            "url": "https://x.com/FabianMaume/status/2097558195589820496",
+            "twitterUrl": "https://twitter.com/FabianMaume/status/2097558195589820496",
+            "text": "604 people are showing up for the Salesforge × Apify webinar today. (369 via LinkedIn. 235 via Luma.)\n\nFrank, Hlib, Jānis, and I are lighting the last beacon.\n\nJoin at 5PM CET: https://t.co/qcds2ScFU0",
+            "fullText": "604 people are showing up for the Salesforge × Apify webinar today. (369 via LinkedIn. 235 via Luma.)\n\nFrank, Hlib, Jānis, and I are lighting the last beacon.\n\nJoin at 5PM CET: https://t.co/qcds2ScFU0",
+            "createdAt": "2026-09-09T05:30:19Z",
+            "lang": "en",
+            "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+            "likeCount": 1,
+            "retweetCount": 1,
+            "replyCount": 0,
+            "quoteCount": 0,
+            "bookmarkCount": 0,
+            "viewCount": 158,
+            "isRetweet": false,
+            "isQuote": false,
+            "isReply": false,
+            "isPinned": false,
+            "conversationId": "2097558195589820496",
+            "hashtags": [],
+            "mentions": [],
+            "links": [
+              "https://luma.com/grdw98ks"
+            ],
+            "media": [],
+            "author": {
+              "id": "476857931",
+              "userName": "FabianMaume",
+              "name": "Maume Fabian",
+              "followers": 437,
+              "following": 359,
+              "isVerified": false,
+              "isBlueVerified": false,
+              "description": "",
+              "location": "Brno",
+              "twitterUrl": "https://x.com/FabianMaume",
+              "profilePicture": "https://pbs.twimg.com/profile_images/1120588151834206208/EyXau0Em_normal.png",
+              "statusesCount": 1291,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2012-01-28T15:32:10Z"
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097558195589820496",
+          "url": "https://x.com/FabianMaume/status/2097558195589820496",
+          "twitterUrl": "https://twitter.com/FabianMaume/status/2097558195589820496",
+          "text": "604 people are showing up for the Salesforge × Apify webinar today. (369 via LinkedIn. 235 via Luma.)\n\nFrank, Hlib, Jānis, and I are lighting the last beacon.\n\nJoin at 5PM CET: https://t.co/qcds2ScFU0",
+          "fullText": "604 people are showing up for the Salesforge × Apify webinar today. (369 via LinkedIn. 235 via Luma.)\n\nFrank, Hlib, Jānis, and I are lighting the last beacon.\n\nJoin at 5PM CET: https://t.co/qcds2ScFU0",
+          "createdAt": "2026-09-09T05:30:19Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 1,
+          "retweetCount": 1,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 158,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097558195589820496",
+          "hashtags": [],
+          "mentions": [],
+          "links": [
+            "https://luma.com/grdw98ks"
+          ],
+          "media": [],
+          "author": {
+            "id": "476857931",
+            "userName": "FabianMaume",
+            "name": "Maume Fabian",
+            "followers": 437,
+            "following": 359,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "Brno",
+            "twitterUrl": "https://x.com/FabianMaume",
+            "profilePicture": "https://pbs.twimg.com/profile_images/1120588151834206208/EyXau0Em_normal.png",
+            "statusesCount": 1291,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2012-01-28T15:32:10Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097657279998820602",
+          "url": "https://x.com/apify/status/2097657279998820602",
+          "twitterUrl": "https://twitter.com/apify/status/2097657279998820602",
+          "text": "Agents are only as capable as the tools you give them. \n@jancurn opens Run with a keynote on that - plus a product launch.\n\n📆 Nov 10, The Pearl, San Francisco. Link in thread ↓ https://t.co/YDfBaiX276",
+          "fullText": "Agents are only as capable as the tools you give them. \n@jancurn opens Run with a keynote on that - plus a product launch.\n\n📆 Nov 10, The Pearl, San Francisco. Link in thread ↓ https://t.co/YDfBaiX276",
+          "createdAt": "2026-09-09T12:04:02Z",
+          "lang": "en",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 2,
+          "retweetCount": 0,
+          "replyCount": 1,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 456,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097657279998820602",
+          "hashtags": [],
+          "mentions": [
+            "jancurn"
+          ],
+          "links": [],
+          "media": [
+            "https://pbs.twimg.com/media/HRxgLVlWEAAhnSg.jpg"
+          ],
+          "mediaType": "photo",
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097657281944932394",
+          "url": "https://x.com/apify/status/2097657281944932394",
+          "twitterUrl": "https://twitter.com/apify/status/2097657281944932394",
+          "text": "@jancurn 🔗 Get your ticket ↓\nhttps://t.co/3VL7XndnCK",
+          "fullText": "@jancurn 🔗 Get your ticket ↓\nhttps://t.co/3VL7XndnCK",
+          "createdAt": "2026-09-09T12:04:03Z",
+          "lang": "en",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 0,
+          "retweetCount": 0,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 133,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": true,
+          "isPinned": false,
+          "conversationId": "2097657279998820602",
+          "inReplyToId": "2097657279998820602",
+          "inReplyToUsername": "apify",
+          "hashtags": [],
+          "mentions": [
+            "jancurn"
+          ],
+          "links": [
+            "https://apify.it/X054l"
+          ],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097617884981649545",
+          "url": "https://x.com/apify/status/2097617884981649545",
+          "twitterUrl": "https://twitter.com/apify/status/2097617884981649545",
+          "text": "Researching Instagram manually - local businesses, niche creators, hashtags - takes forever.\n\n𝗜𝗻𝘀𝘁𝗮𝗴𝗿𝗮𝗺 𝗦𝗲𝗮𝗿𝗰𝗵 𝗦𝗰𝗿𝗮𝗽𝗲𝗿 on Apify: enter a keyword, get back places, profiles, or hashtags as a structured dataset. Link in thread ↓ https://t.co/n0oIe45R9D",
+          "fullText": "Researching Instagram manually - local businesses, niche creators, hashtags - takes forever.\n\n𝗜𝗻𝘀𝘁𝗮𝗴𝗿𝗮𝗺 𝗦𝗲𝗮𝗿𝗰𝗵 𝗦𝗰𝗿𝗮𝗽𝗲𝗿 on Apify: enter a keyword, get back places, profiles, or hashtags as a structured dataset. Link in thread ↓ https://t.co/n0oIe45R9D",
+          "createdAt": "2026-09-09T09:27:30Z",
+          "lang": "en",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 3,
+          "retweetCount": 0,
+          "replyCount": 1,
+          "quoteCount": 0,
+          "bookmarkCount": 1,
+          "viewCount": 484,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097617884981649545",
+          "hashtags": [],
+          "mentions": [],
+          "links": [],
+          "media": [
+            "https://pbs.twimg.com/ext_tw_video_thumb/2097617775657172992/pu/img/7E5EKaDbgOfogTSY.jpg"
+          ],
+          "mediaType": "video",
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097617886265176198",
+          "url": "https://x.com/apify/status/2097617886265176198",
+          "twitterUrl": "https://twitter.com/apify/status/2097617886265176198",
+          "text": "🔗 Instagram Search Scraper ↓\nhttps://t.co/mkJZLv21uo",
+          "fullText": "🔗 Instagram Search Scraper ↓\nhttps://t.co/mkJZLv21uo",
+          "createdAt": "2026-09-09T09:27:30Z",
+          "lang": "en",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 0,
+          "retweetCount": 0,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 146,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": true,
+          "isPinned": false,
+          "conversationId": "2097617884981649545",
+          "inReplyToId": "2097617884981649545",
+          "inReplyToUsername": "apify",
+          "hashtags": [],
+          "mentions": [],
+          "links": [
+            "https://apify.it/3SZKubU"
+          ],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097617759006060992",
+          "url": "https://x.com/apify/status/2097617759006060992",
+          "twitterUrl": "https://twitter.com/apify/status/2097617759006060992",
+          "text": "Researching Instagram manually - local businesses, niche creators, hashtags - takes forever.\n\nInstagram Search Scraper on Apify: enter a keyword, get back places, profiles, or hashtags as a structured dataset. No login, no scrolling ↓\n\n🔗 Instagram Search Scraper → https://t.co/gW5jA7t1nx",
+          "fullText": "Researching Instagram manually - local businesses, niche creators, hashtags - takes forever.\n\nInstagram Search Scraper on Apify: enter a keyword, get back places, profiles, or hashtags as a structured dataset. No login, no scrolling ↓\n\n🔗 Instagram Search Scraper → https://t.co/gW5jA7t1nx",
+          "createdAt": "2026-09-09T09:27:00Z",
+          "lang": "en",
+          "source": "<a href=\"http://twitter.com\" rel=\"nofollow\">Twitter Web Client</a>",
+          "likeCount": 5,
+          "retweetCount": 0,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 1,
+          "viewCount": 474,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097617759006060992",
+          "hashtags": [],
+          "mentions": [],
+          "links": [],
+          "media": [
+            "https://pbs.twimg.com/amplify_video_thumb/2092923588219203584/img/tZRZWA128Ff-Vo2k.jpg"
+          ],
+          "mediaType": "video",
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097341512317083656",
+          "url": "https://x.com/apify/status/2097341512317083656",
+          "twitterUrl": "https://twitter.com/apify/status/2097341512317083656",
+          "text": "RT @FabianMaume: $1M+ in monthly pipeline. Two agencies. One stack.\n\nSept 9: Hlib Storchak and Jānis Plūme break down the exact setup, Apify for signal discovery + enrichment, Salesforge for AI SDR sending. \n\nhttps://t.co/qcds2ScFU0",
+          "fullText": "RT @FabianMaume: $1M+ in monthly pipeline. Two agencies. One stack.\n\nSept 9: Hlib Storchak and Jānis Plūme break down the exact setup, Apify for signal discovery + enrichment, Salesforge for AI SDR sending. \n\nhttps://t.co/qcds2ScFU0",
+          "createdAt": "2026-09-08T15:09:17Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 0,
+          "retweetCount": 1,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 88,
+          "isRetweet": true,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097341512317083656",
+          "hashtags": [],
+          "mentions": [
+            "FabianMaume"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "retweet": {
+            "id": "2097339639396774215",
+            "url": "https://x.com/FabianMaume/status/2097339639396774215",
+            "twitterUrl": "https://twitter.com/FabianMaume/status/2097339639396774215",
+            "text": "$1M+ in monthly pipeline. Two agencies. One stack.\n\nSept 9: Hlib Storchak and Jānis Plūme break down the exact setup, Apify for signal discovery + enrichment, Salesforge for AI SDR sending. \n\nhttps://t.co/qcds2ScFU0",
+            "fullText": "$1M+ in monthly pipeline. Two agencies. One stack.\n\nSept 9: Hlib Storchak and Jānis Plūme break down the exact setup, Apify for signal discovery + enrichment, Salesforge for AI SDR sending. \n\nhttps://t.co/qcds2ScFU0",
+            "createdAt": "2026-09-08T15:01:51Z",
+            "lang": "en",
+            "source": "<a href=\"https://buffer.com\" rel=\"nofollow\">Buffer</a>",
+            "likeCount": 2,
+            "retweetCount": 1,
+            "replyCount": 0,
+            "quoteCount": 0,
+            "bookmarkCount": 0,
+            "viewCount": 180,
+            "isRetweet": false,
+            "isQuote": false,
+            "isReply": false,
+            "isPinned": false,
+            "conversationId": "2097339639396774215",
+            "hashtags": [],
+            "mentions": [],
+            "links": [
+              "https://luma.com/grdw98ks"
+            ],
+            "media": [],
+            "author": {
+              "id": "476857931",
+              "userName": "FabianMaume",
+              "name": "Maume Fabian",
+              "followers": 437,
+              "following": 359,
+              "isVerified": false,
+              "isBlueVerified": false,
+              "description": "",
+              "location": "Brno",
+              "twitterUrl": "https://x.com/FabianMaume",
+              "profilePicture": "https://pbs.twimg.com/profile_images/1120588151834206208/EyXau0Em_normal.png",
+              "statusesCount": 1291,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2012-01-28T15:32:10Z"
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097339639396774215",
+          "url": "https://x.com/FabianMaume/status/2097339639396774215",
+          "twitterUrl": "https://twitter.com/FabianMaume/status/2097339639396774215",
+          "text": "$1M+ in monthly pipeline. Two agencies. One stack.\n\nSept 9: Hlib Storchak and Jānis Plūme break down the exact setup, Apify for signal discovery + enrichment, Salesforge for AI SDR sending. \n\nhttps://t.co/qcds2ScFU0",
+          "fullText": "$1M+ in monthly pipeline. Two agencies. One stack.\n\nSept 9: Hlib Storchak and Jānis Plūme break down the exact setup, Apify for signal discovery + enrichment, Salesforge for AI SDR sending. \n\nhttps://t.co/qcds2ScFU0",
+          "createdAt": "2026-09-08T15:01:51Z",
+          "lang": "en",
+          "source": "<a href=\"https://buffer.com\" rel=\"nofollow\">Buffer</a>",
+          "likeCount": 2,
+          "retweetCount": 1,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 180,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097339639396774215",
+          "hashtags": [],
+          "mentions": [],
+          "links": [
+            "https://luma.com/grdw98ks"
+          ],
+          "media": [],
+          "author": {
+            "id": "476857931",
+            "userName": "FabianMaume",
+            "name": "Maume Fabian",
+            "followers": 437,
+            "following": 359,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "Brno",
+            "twitterUrl": "https://x.com/FabianMaume",
+            "profilePicture": "https://pbs.twimg.com/profile_images/1120588151834206208/EyXau0Em_normal.png",
+            "statusesCount": 1291,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2012-01-28T15:32:10Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097320522467967012",
+          "url": "https://x.com/apify/status/2097320522467967012",
+          "twitterUrl": "https://twitter.com/apify/status/2097320522467967012",
+          "text": "Most X research agents only see today. Which is why they all surface the same takes.\n\n@EXM7777 wired a Grok Bot agent to the official X MCP for trends, plus the Apify CLI for a profile's history. A brief every morning.\n\nFor tracking a niche or watching competitors 👇",
+          "fullText": "Most X research agents only see today. Which is why they all surface the same takes.\n\n@EXM7777 wired a Grok Bot agent to the official X MCP for trends, plus the Apify CLI for a profile's history. A brief every morning.\n\nFor tracking a niche or watching competitors 👇",
+          "createdAt": "2026-09-08T13:45:53Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 8,
+          "retweetCount": 2,
+          "replyCount": 4,
+          "quoteCount": 0,
+          "bookmarkCount": 8,
+          "viewCount": 2102,
+          "isRetweet": false,
+          "isQuote": true,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097320522467967012",
+          "hashtags": [],
+          "mentions": [
+            "EXM7777"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "quote": {
+            "id": "2095889020203291117",
+            "url": "https://x.com/EXM7777/status/2095889020203291117",
+            "twitterUrl": "https://twitter.com/EXM7777/status/2095889020203291117",
+            "text": "how to perform advanced research on X:\n\n- setup a simple agent inside Grok Bot and connect your X account\n- use the official X MCP to research keywords, bookmarks and trends\n- install the Apify CLI to extract the full tweet history of any profile\n\nall of it powered by Grok 4.6... the best model for searching X, since it's the only one with exclusive access\n\nyou can have Grok Bot perform research daily and send you a detailed brief every morning instead of having to scroll for hours",
+            "fullText": "how to perform advanced research on X:\n\n- setup a simple agent inside Grok Bot and connect your X account\n- use the official X MCP to research keywords, bookmarks and trends\n- install the Apify CLI to extract the full tweet history of any profile\n\nall of it powered by Grok 4.6... the best model for searching X, since it's the only one with exclusive access\n\nyou can have Grok Bot perform research daily and send you a detailed brief every morning instead of having to scroll for hours",
+            "createdAt": "2026-09-04T14:57:36Z",
+            "lang": "en",
+            "source": "<a href=\"https://typefully.com/\" rel=\"nofollow\">Typefully</a>",
+            "likeCount": 278,
+            "retweetCount": 6,
+            "replyCount": 21,
+            "quoteCount": 1,
+            "bookmarkCount": 476,
+            "viewCount": 19668,
+            "isRetweet": false,
+            "isQuote": false,
+            "isReply": false,
+            "isPinned": false,
+            "conversationId": "2095889020203291117",
+            "hashtags": [],
+            "mentions": [],
+            "links": [],
+            "media": [],
+            "author": {
+              "id": "3033730635",
+              "userName": "EXM7777",
+              "name": "Machina",
+              "followers": 142384,
+              "following": 715,
+              "isVerified": false,
+              "isBlueVerified": true,
+              "description": "",
+              "location": "",
+              "twitterUrl": "https://x.com/EXM7777",
+              "profilePicture": "https://pbs.twimg.com/profile_images/1922574051580563456/-OFXIxnm_normal.jpg",
+              "statusesCount": 6431,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2015-02-13T01:29:11Z"
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2095889020203291117",
+          "url": "https://x.com/EXM7777/status/2095889020203291117",
+          "twitterUrl": "https://twitter.com/EXM7777/status/2095889020203291117",
+          "text": "how to perform advanced research on X:\n\n- setup a simple agent inside Grok Bot and connect your X account\n- use the official X MCP to research keywords, bookmarks and trends\n- install the Apify CLI to extract the full tweet history of any profile\n\nall of it powered by Grok 4.6... the best model for searching X, since it's the only one with exclusive access\n\nyou can have Grok Bot perform research daily and send you a detailed brief every morning instead of having to scroll for hours",
+          "fullText": "how to perform advanced research on X:\n\n- setup a simple agent inside Grok Bot and connect your X account\n- use the official X MCP to research keywords, bookmarks and trends\n- install the Apify CLI to extract the full tweet history of any profile\n\nall of it powered by Grok 4.6... the best model for searching X, since it's the only one with exclusive access\n\nyou can have Grok Bot perform research daily and send you a detailed brief every morning instead of having to scroll for hours",
+          "createdAt": "2026-09-04T14:57:36Z",
+          "lang": "en",
+          "source": "<a href=\"https://typefully.com/\" rel=\"nofollow\">Typefully</a>",
+          "likeCount": 278,
+          "retweetCount": 6,
+          "replyCount": 21,
+          "quoteCount": 1,
+          "bookmarkCount": 476,
+          "viewCount": 19668,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2095889020203291117",
+          "hashtags": [],
+          "mentions": [],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3033730635",
+            "userName": "EXM7777",
+            "name": "Machina",
+            "followers": 142384,
+            "following": 715,
+            "isVerified": false,
+            "isBlueVerified": true,
+            "description": "",
+            "location": "",
+            "twitterUrl": "https://x.com/EXM7777",
+            "profilePicture": "https://pbs.twimg.com/profile_images/1922574051580563456/-OFXIxnm_normal.jpg",
+            "statusesCount": 6431,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-02-13T01:29:11Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097314019224772990",
+          "url": "https://x.com/apify/status/2097314019224772990",
+          "twitterUrl": "https://twitter.com/apify/status/2097314019224772990",
+          "text": "Every public post, reel, comment, profile, and hashtag on Instagram is accessible as structured data.\n\nInstagram Scraper pulls it for influencer vetting, trend tracking, competitor monitoring, and more.\nLink in 🧵 https://t.co/RQHfI0RIIe",
+          "fullText": "Every public post, reel, comment, profile, and hashtag on Instagram is accessible as structured data.\n\nInstagram Scraper pulls it for influencer vetting, trend tracking, competitor monitoring, and more.\nLink in 🧵 https://t.co/RQHfI0RIIe",
+          "createdAt": "2026-09-08T13:20:03Z",
+          "lang": "en",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 7,
+          "retweetCount": 1,
+          "replyCount": 2,
+          "quoteCount": 0,
+          "bookmarkCount": 1,
+          "viewCount": 555,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097314019224772990",
+          "hashtags": [],
+          "mentions": [],
+          "links": [],
+          "media": [
+            "https://pbs.twimg.com/media/HRsn-8OW0AAgXg6.jpg"
+          ],
+          "mediaType": "photo",
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097314021737181413",
+          "url": "https://x.com/apify/status/2097314021737181413",
+          "twitterUrl": "https://twitter.com/apify/status/2097314021737181413",
+          "text": "🔗 Try it yourself ↓\nhttps://t.co/auOGujQRWx",
+          "fullText": "🔗 Try it yourself ↓\nhttps://t.co/auOGujQRWx",
+          "createdAt": "2026-09-08T13:20:03Z",
+          "lang": "en",
+          "source": "<a href=\"https://www.tryordinal.com/\" rel=\"nofollow\">Ordinal - Social Media</a>",
+          "likeCount": 1,
+          "retweetCount": 0,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 137,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": true,
+          "isPinned": false,
+          "conversationId": "2097314019224772990",
+          "inReplyToId": "2097314019224772990",
+          "inReplyToUsername": "apify",
+          "hashtags": [],
+          "mentions": [],
+          "links": [
+            "https://apify.it/3SUteVA"
+          ],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097278721551974458",
+          "url": "https://x.com/apify/status/2097278721551974458",
+          "twitterUrl": "https://twitter.com/apify/status/2097278721551974458",
+          "text": "RT @ApexFusion: Thank you 🙏 Rooting for @apify too!",
+          "fullText": "RT @ApexFusion: Thank you 🙏 Rooting for @apify too!",
+          "createdAt": "2026-09-08T10:59:47Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 0,
+          "retweetCount": 2,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 103,
+          "isRetweet": true,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097278721551974458",
+          "hashtags": [],
+          "mentions": [
+            "ApexFusion",
+            "apify"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "retweet": {
+            "id": "2097257087319363904",
+            "url": "https://x.com/ApexFusion/status/2097257087319363904",
+            "twitterUrl": "https://twitter.com/ApexFusion/status/2097257087319363904",
+            "text": "Thank you 🙏 Rooting for @apify too!",
+            "fullText": "Thank you 🙏 Rooting for @apify too!",
+            "createdAt": "2026-09-08T09:33:49Z",
+            "lang": "en",
+            "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+            "likeCount": 8,
+            "retweetCount": 2,
+            "replyCount": 1,
+            "quoteCount": 0,
+            "bookmarkCount": 0,
+            "viewCount": 1450,
+            "isRetweet": false,
+            "isQuote": true,
+            "isReply": false,
+            "isPinned": false,
+            "conversationId": "2097257087319363904",
+            "hashtags": [],
+            "mentions": [
+              "apify"
+            ],
+            "links": [],
+            "media": [],
+            "author": {
+              "id": "1702232858683695104",
+              "userName": "ApexFusion",
+              "name": "Apex Fusion",
+              "followers": 53382,
+              "following": 100,
+              "isVerified": false,
+              "isBlueVerified": true,
+              "description": "",
+              "location": "Apex Fusion ecosystem",
+              "twitterUrl": "https://x.com/ApexFusion",
+              "profilePicture": "https://pbs.twimg.com/profile_images/1767243038835744768/Hs-ZbD4h_normal.jpg",
+              "statusesCount": 1489,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2023-09-14T08:09:17Z"
+            },
+            "quote": {
+              "id": "2097253785181548715",
+              "url": "https://x.com/apify/status/2097253785181548715",
+              "twitterUrl": "https://twitter.com/apify/status/2097253785181548715",
+              "text": "@Aces1974 @Aces1974 From a Lincoln petition to government archives is quite the pivot. Rooting for @ApexFusion 🙌",
+              "fullText": "@Aces1974 @Aces1974 From a Lincoln petition to government archives is quite the pivot. Rooting for @ApexFusion 🙌",
+              "createdAt": "2026-09-08T09:20:42Z",
+              "lang": "en",
+              "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+              "likeCount": 1,
+              "retweetCount": 0,
+              "replyCount": 1,
+              "quoteCount": 1,
+              "bookmarkCount": 0,
+              "viewCount": 1292,
+              "isRetweet": false,
+              "isQuote": false,
+              "isReply": true,
+              "isPinned": false,
+              "conversationId": "2095846176490729739",
+              "inReplyToId": "2097009401232240970",
+              "inReplyToUsername": "Aces1974",
+              "hashtags": [],
+              "mentions": [
+                "Aces1974",
+                "Aces1974",
+                "ApexFusion"
+              ],
+              "links": [],
+              "media": [],
+              "author": {
+                "id": "3510729917",
+                "userName": "apify",
+                "name": "Apify",
+                "followers": 14852,
+                "following": 300,
+                "isVerified": false,
+                "isBlueVerified": false,
+                "description": "",
+                "location": "The Interwebz",
+                "twitterUrl": "https://x.com/apify",
+                "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+                "statusesCount": 4825,
+                "mediaCount": 0,
+                "favouritesCount": 0,
+                "createdAt": "2015-09-01T08:38:01Z"
+              },
+              "sourceType": ""
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097257087319363904",
+          "url": "https://x.com/ApexFusion/status/2097257087319363904",
+          "twitterUrl": "https://twitter.com/ApexFusion/status/2097257087319363904",
+          "text": "Thank you 🙏 Rooting for @apify too!",
+          "fullText": "Thank you 🙏 Rooting for @apify too!",
+          "createdAt": "2026-09-08T09:33:49Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 8,
+          "retweetCount": 2,
+          "replyCount": 1,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 1450,
+          "isRetweet": false,
+          "isQuote": true,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097257087319363904",
+          "hashtags": [],
+          "mentions": [
+            "apify"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "1702232858683695104",
+            "userName": "ApexFusion",
+            "name": "Apex Fusion",
+            "followers": 53382,
+            "following": 100,
+            "isVerified": false,
+            "isBlueVerified": true,
+            "description": "",
+            "location": "Apex Fusion ecosystem",
+            "twitterUrl": "https://x.com/ApexFusion",
+            "profilePicture": "https://pbs.twimg.com/profile_images/1767243038835744768/Hs-ZbD4h_normal.jpg",
+            "statusesCount": 1489,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2023-09-14T08:09:17Z"
+          },
+          "quote": {
+            "id": "2097253785181548715",
+            "url": "https://x.com/apify/status/2097253785181548715",
+            "twitterUrl": "https://twitter.com/apify/status/2097253785181548715",
+            "text": "@Aces1974 @Aces1974 From a Lincoln petition to government archives is quite the pivot. Rooting for @ApexFusion 🙌",
+            "fullText": "@Aces1974 @Aces1974 From a Lincoln petition to government archives is quite the pivot. Rooting for @ApexFusion 🙌",
+            "createdAt": "2026-09-08T09:20:42Z",
+            "lang": "en",
+            "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+            "likeCount": 1,
+            "retweetCount": 0,
+            "replyCount": 1,
+            "quoteCount": 1,
+            "bookmarkCount": 0,
+            "viewCount": 1292,
+            "isRetweet": false,
+            "isQuote": false,
+            "isReply": true,
+            "isPinned": false,
+            "conversationId": "2095846176490729739",
+            "inReplyToId": "2097009401232240970",
+            "inReplyToUsername": "Aces1974",
+            "hashtags": [],
+            "mentions": [
+              "Aces1974",
+              "Aces1974",
+              "ApexFusion"
+            ],
+            "links": [],
+            "media": [],
+            "author": {
+              "id": "3510729917",
+              "userName": "apify",
+              "name": "Apify",
+              "followers": 14852,
+              "following": 300,
+              "isVerified": false,
+              "isBlueVerified": false,
+              "description": "",
+              "location": "The Interwebz",
+              "twitterUrl": "https://x.com/apify",
+              "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+              "statusesCount": 4825,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2015-09-01T08:38:01Z"
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097253785181548715",
+          "url": "https://x.com/apify/status/2097253785181548715",
+          "twitterUrl": "https://twitter.com/apify/status/2097253785181548715",
+          "text": "@Aces1974 @Aces1974 From a Lincoln petition to government archives is quite the pivot. Rooting for @ApexFusion 🙌",
+          "fullText": "@Aces1974 @Aces1974 From a Lincoln petition to government archives is quite the pivot. Rooting for @ApexFusion 🙌",
+          "createdAt": "2026-09-08T09:20:42Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 1,
+          "retweetCount": 0,
+          "replyCount": 1,
+          "quoteCount": 1,
+          "bookmarkCount": 0,
+          "viewCount": 1292,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": true,
+          "isPinned": false,
+          "conversationId": "2095846176490729739",
+          "inReplyToId": "2097009401232240970",
+          "inReplyToUsername": "Aces1974",
+          "hashtags": [],
+          "mentions": [
+            "Aces1974",
+            "Aces1974",
+            "ApexFusion"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097238736035516779",
+          "url": "https://x.com/apify/status/2097238736035516779",
+          "twitterUrl": "https://twitter.com/apify/status/2097238736035516779",
+          "text": "RT @monad: Introducing Monad API Hub\n\nOne place for developers and agents to access data, search, and AI APIs.\n\nNo API keys. No subscriptions. Pay per request with USDC on Monad.\n\nExplore API Hub: https://t.co/4om0U31xhQ https://t.co/sZl9SyUCmg",
+          "fullText": "RT @monad: Introducing Monad API Hub\n\nOne place for developers and agents to access data, search, and AI APIs.\n\nNo API keys. No subscriptions. Pay per request with USDC on Monad.\n\nExplore API Hub: https://t.co/4om0U31xhQ https://t.co/sZl9SyUCmg",
+          "createdAt": "2026-09-08T08:20:54Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 0,
+          "retweetCount": 104,
+          "replyCount": 0,
+          "quoteCount": 0,
+          "bookmarkCount": 0,
+          "viewCount": 83,
+          "isRetweet": true,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097238736035516779",
+          "hashtags": [],
+          "mentions": [
+            "monad"
+          ],
+          "links": [],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "retweet": {
+            "id": "2097021332517011525",
+            "url": "https://x.com/monad/status/2097021332517011525",
+            "twitterUrl": "https://twitter.com/monad/status/2097021332517011525",
+            "text": "Introducing Monad API Hub\n\nOne place for developers and agents to access data, search, and AI APIs.\n\nNo API keys. No subscriptions. Pay per request with USDC on Monad.\n\nExplore API Hub: https://t.co/4om0U31xhQ https://t.co/sZl9SyUCmg",
+            "fullText": "Introducing Monad API Hub\n\nOne place for developers and agents to access data, search, and AI APIs.\n\nNo API keys. No subscriptions. Pay per request with USDC on Monad.\n\nExplore API Hub: https://t.co/4om0U31xhQ https://t.co/sZl9SyUCmg",
+            "createdAt": "2026-09-07T17:57:01Z",
+            "lang": "en",
+            "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+            "likeCount": 607,
+            "retweetCount": 104,
+            "replyCount": 74,
+            "quoteCount": 22,
+            "bookmarkCount": 55,
+            "viewCount": 72916,
+            "isRetweet": false,
+            "isQuote": false,
+            "isReply": false,
+            "isPinned": false,
+            "conversationId": "2097021332517011525",
+            "hashtags": [],
+            "mentions": [],
+            "links": [
+              "https://app.monad.xyz/agents/api-hub"
+            ],
+            "media": [
+              "https://pbs.twimg.com/media/HRodm4obAAAIZhl.png"
+            ],
+            "mediaType": "photo",
+            "author": {
+              "id": "1342961741718810632",
+              "userName": "monad",
+              "name": "Monad",
+              "followers": 1172218,
+              "following": 249,
+              "isVerified": false,
+              "isBlueVerified": false,
+              "description": "",
+              "location": "",
+              "twitterUrl": "https://x.com/monad",
+              "profilePicture": "https://pbs.twimg.com/profile_images/1967693862559698944/XTfCXXGa_normal.jpg",
+              "statusesCount": 3262,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2020-12-26T22:33:49Z"
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2097021332517011525",
+          "url": "https://x.com/monad/status/2097021332517011525",
+          "twitterUrl": "https://twitter.com/monad/status/2097021332517011525",
+          "text": "Introducing Monad API Hub\n\nOne place for developers and agents to access data, search, and AI APIs.\n\nNo API keys. No subscriptions. Pay per request with USDC on Monad.\n\nExplore API Hub: https://t.co/4om0U31xhQ https://t.co/sZl9SyUCmg",
+          "fullText": "Introducing Monad API Hub\n\nOne place for developers and agents to access data, search, and AI APIs.\n\nNo API keys. No subscriptions. Pay per request with USDC on Monad.\n\nExplore API Hub: https://t.co/4om0U31xhQ https://t.co/sZl9SyUCmg",
+          "createdAt": "2026-09-07T17:57:01Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 607,
+          "retweetCount": 104,
+          "replyCount": 74,
+          "quoteCount": 22,
+          "bookmarkCount": 55,
+          "viewCount": 72916,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2097021332517011525",
+          "hashtags": [],
+          "mentions": [],
+          "links": [
+            "https://app.monad.xyz/agents/api-hub"
+          ],
+          "media": [
+            "https://pbs.twimg.com/media/HRodm4obAAAIZhl.png"
+          ],
+          "mediaType": "photo",
+          "author": {
+            "id": "1342961741718810632",
+            "userName": "monad",
+            "name": "Monad",
+            "followers": 1172218,
+            "following": 249,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "",
+            "twitterUrl": "https://x.com/monad",
+            "profilePicture": "https://pbs.twimg.com/profile_images/1967693862559698944/XTfCXXGa_normal.jpg",
+            "statusesCount": 3262,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2020-12-26T22:33:49Z"
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2096914122717671612",
+          "url": "https://x.com/apify/status/2096914122717671612",
+          "twitterUrl": "https://twitter.com/apify/status/2096914122717671612",
+          "text": "5,700+ posts feed the database deciding what @fivosaresti's team at https://t.co/GCvm205Jkx writes next. \n\nApify and @pinecone hold the data, @claudeai turns it into angles and briefs, then retargets engagers through Instantly x @heyreach_io x @clay. His full 8-part breakdown 👇",
+          "fullText": "5,700+ posts feed the database deciding what @fivosaresti's team at https://t.co/GCvm205Jkx writes next. \n\nApify and @pinecone hold the data, @claudeai turns it into angles and briefs, then retargets engagers through Instantly x @heyreach_io x @clay. His full 8-part breakdown 👇",
+          "createdAt": "2026-09-07T10:51:00Z",
+          "lang": "en",
+          "source": "<a href=\"https://mobile.twitter.com\" rel=\"nofollow\">Twitter Web App</a>",
+          "likeCount": 7,
+          "retweetCount": 0,
+          "replyCount": 1,
+          "quoteCount": 0,
+          "bookmarkCount": 4,
+          "viewCount": 1078,
+          "isRetweet": false,
+          "isQuote": true,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2096914122717671612",
+          "hashtags": [],
+          "mentions": [
+            "fivosaresti",
+            "pinecone",
+            "claudeai",
+            "heyreach_io",
+            "clay"
+          ],
+          "links": [
+            "https://Workflows.io"
+          ],
+          "media": [],
+          "author": {
+            "id": "3510729917",
+            "userName": "apify",
+            "name": "Apify",
+            "followers": 14852,
+            "following": 300,
+            "isVerified": false,
+            "isBlueVerified": false,
+            "description": "",
+            "location": "The Interwebz",
+            "twitterUrl": "https://x.com/apify",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2036008913192316928/yuW3cobE_normal.png",
+            "statusesCount": 4825,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2015-09-01T08:38:01Z"
+          },
+          "quote": {
+            "id": "2095587720168980606",
+            "url": "https://x.com/fivosaresti/status/2095587720168980606",
+            "twitterUrl": "https://twitter.com/fivosaresti/status/2095587720168980606",
+            "text": "We applied an engineering mindset to our LinkedIn content. \n\nThe result: \n\n• 80+ meetings/mo\n• 1.5M+ impressions/mo\n• 150,000+ followers across our company\n\nHere’s the full 8 part system:\n\n1. Context layer\n\nClaude Code is only as good as the context you give it, so everything gets documented first.\n\n• Notion: content templates and SOPs\n• Ergo: content interviews and sales call transcripts\n• GitHub: our Company OS (voice guides, design system, positioning, client files)\n\n2. Research layer\n\nFour research inputs, all queryable on demand.\n\n• Browserbase: live web research\n• Exa: competitor content analysis\n• Workflows(.)io: our own post analytics tool\n• Pinecone + Apify: a database of 5,700+ top-performing posts\n\n3. MCP and CLI\n\nConnected: Google Workspace, GitHub, Pinecone, Slack, Notion, Apify, Exa, Firecrawl, Ergo, n8n, Browserbase.\n\n4. Skills and agents\n\nOld SOPs became skills, and agents split the work.\n\n• Strategist: pillars, positioning and point of view\n• Researcher: reference posts, data and proof\n• Drafter: angles, outlines and formats\n• Grader: hook strength and readability\n• Analyst: what's performing and what's not\n\n5. Outputs\n\nClaude never publishes or writes the full post. It hands over ideas, research, formats, hooks and design briefs.\n\n6. The content team\n\nIt runs 3 core roles: a content writer, a graphic designer and a video editor. There's always another editor on it too.\n\n7. Pipeline\n\nEverything moves through Notion: Ideas -> Drafts -> In Progress -> QA -> Live. Every post gets tagged TOF, MOF or BOF.\n\n8. Engagement capture\n\nJungler pulls everyone who engages with a post, and we retarget them on outbound and ads (Instantly x HeyReach x Clay).\n\nIf your buyers are on LinkedIn, this is the best pipeline you'll build.",
+            "fullText": "We applied an engineering mindset to our LinkedIn content. \n\nThe result: \n\n• 80+ meetings/mo\n• 1.5M+ impressions/mo\n• 150,000+ followers across our company\n\nHere’s the full 8 part system:\n\n1. Context layer\n\nClaude Code is only as good as the context you give it, so everything gets documented first.\n\n• Notion: content templates and SOPs\n• Ergo: content interviews and sales call transcripts\n• GitHub: our Company OS (voice guides, design system, positioning, client files)\n\n2. Research layer\n\nFour research inputs, all queryable on demand.\n\n• Browserbase: live web research\n• Exa: competitor content analysis\n• Workflows(.)io: our own post analytics tool\n• Pinecone + Apify: a database of 5,700+ top-performing posts\n\n3. MCP and CLI\n\nConnected: Google Workspace, GitHub, Pinecone, Slack, Notion, Apify, Exa, Firecrawl, Ergo, n8n, Browserbase.\n\n4. Skills and agents\n\nOld SOPs became skills, and agents split the work.\n\n• Strategist: pillars, positioning and point of view\n• Researcher: reference posts, data and proof\n• Drafter: angles, outlines and formats\n• Grader: hook strength and readability\n• Analyst: what's performing and what's not\n\n5. Outputs\n\nClaude never publishes or writes the full post. It hands over ideas, research, formats, hooks and design briefs.\n\n6. The content team\n\nIt runs 3 core roles: a content writer, a graphic designer and a video editor. There's always another editor on it too.\n\n7. Pipeline\n\nEverything moves through Notion: Ideas -> Drafts -> In Progress -> QA -> Live. Every post gets tagged TOF, MOF or BOF.\n\n8. Engagement capture\n\nJungler pulls everyone who engages with a post, and we retarget them on outbound and ads (Instantly x HeyReach x Clay).\n\nIf your buyers are on LinkedIn, this is the best pipeline you'll build.",
+            "createdAt": "2026-09-03T19:00:21Z",
+            "lang": "en",
+            "source": "<a href=\"https://tweethunter.io\" rel=\"nofollow\">tweethunter [X]</a>",
+            "likeCount": 137,
+            "retweetCount": 11,
+            "replyCount": 9,
+            "quoteCount": 2,
+            "bookmarkCount": 302,
+            "viewCount": 10815,
+            "isRetweet": false,
+            "isQuote": false,
+            "isReply": false,
+            "isPinned": false,
+            "conversationId": "2095587720168980606",
+            "hashtags": [],
+            "mentions": [],
+            "links": [],
+            "media": [
+              "https://pbs.twimg.com/media/HRUF69nXkAEK8TL.jpg"
+            ],
+            "mediaType": "photo",
+            "author": {
+              "id": "1592198362572509184",
+              "userName": "fivosaresti",
+              "name": "Fivos Aresti",
+              "followers": 3944,
+              "following": 48,
+              "isVerified": false,
+              "isBlueVerified": true,
+              "description": "",
+              "location": "New York",
+              "twitterUrl": "https://x.com/fivosaresti",
+              "profilePicture": "https://pbs.twimg.com/profile_images/2008653180565884928/pgQyN6i2_normal.jpg",
+              "statusesCount": 1674,
+              "mediaCount": 0,
+              "favouritesCount": 0,
+              "createdAt": "2022-11-14T16:50:58Z"
+            },
+            "sourceType": ""
+          },
+          "sourceType": "timeline"
+        }
+      },
+      {
+        "json": {
+          "id": "2095587720168980606",
+          "url": "https://x.com/fivosaresti/status/2095587720168980606",
+          "twitterUrl": "https://twitter.com/fivosaresti/status/2095587720168980606",
+          "text": "We applied an engineering mindset to our LinkedIn content. \n\nThe result: \n\n• 80+ meetings/mo\n• 1.5M+ impressions/mo\n• 150,000+ followers across our company\n\nHere’s the full 8 part system:\n\n1. Context layer\n\nClaude Code is only as good as the context you give it, so everything gets documented first.\n\n• Notion: content templates and SOPs\n• Ergo: content interviews and sales call transcripts\n• GitHub: our Company OS (voice guides, design system, positioning, client files)\n\n2. Research layer\n\nFour research inputs, all queryable on demand.\n\n• Browserbase: live web research\n• Exa: competitor content analysis\n• Workflows(.)io: our own post analytics tool\n• Pinecone + Apify: a database of 5,700+ top-performing posts\n\n3. MCP and CLI\n\nConnected: Google Workspace, GitHub, Pinecone, Slack, Notion, Apify, Exa, Firecrawl, Ergo, n8n, Browserbase.\n\n4. Skills and agents\n\nOld SOPs became skills, and agents split the work.\n\n• Strategist: pillars, positioning and point of view\n• Researcher: reference posts, data and proof\n• Drafter: angles, outlines and formats\n• Grader: hook strength and readability\n• Analyst: what's performing and what's not\n\n5. Outputs\n\nClaude never publishes or writes the full post. It hands over ideas, research, formats, hooks and design briefs.\n\n6. The content team\n\nIt runs 3 core roles: a content writer, a graphic designer and a video editor. There's always another editor on it too.\n\n7. Pipeline\n\nEverything moves through Notion: Ideas -> Drafts -> In Progress -> QA -> Live. Every post gets tagged TOF, MOF or BOF.\n\n8. Engagement capture\n\nJungler pulls everyone who engages with a post, and we retarget them on outbound and ads (Instantly x HeyReach x Clay).\n\nIf your buyers are on LinkedIn, this is the best pipeline you'll build.",
+          "fullText": "We applied an engineering mindset to our LinkedIn content. \n\nThe result: \n\n• 80+ meetings/mo\n• 1.5M+ impressions/mo\n• 150,000+ followers across our company\n\nHere’s the full 8 part system:\n\n1. Context layer\n\nClaude Code is only as good as the context you give it, so everything gets documented first.\n\n• Notion: content templates and SOPs\n• Ergo: content interviews and sales call transcripts\n• GitHub: our Company OS (voice guides, design system, positioning, client files)\n\n2. Research layer\n\nFour research inputs, all queryable on demand.\n\n• Browserbase: live web research\n• Exa: competitor content analysis\n• Workflows(.)io: our own post analytics tool\n• Pinecone + Apify: a database of 5,700+ top-performing posts\n\n3. MCP and CLI\n\nConnected: Google Workspace, GitHub, Pinecone, Slack, Notion, Apify, Exa, Firecrawl, Ergo, n8n, Browserbase.\n\n4. Skills and agents\n\nOld SOPs became skills, and agents split the work.\n\n• Strategist: pillars, positioning and point of view\n• Researcher: reference posts, data and proof\n• Drafter: angles, outlines and formats\n• Grader: hook strength and readability\n• Analyst: what's performing and what's not\n\n5. Outputs\n\nClaude never publishes or writes the full post. It hands over ideas, research, formats, hooks and design briefs.\n\n6. The content team\n\nIt runs 3 core roles: a content writer, a graphic designer and a video editor. There's always another editor on it too.\n\n7. Pipeline\n\nEverything moves through Notion: Ideas -> Drafts -> In Progress -> QA -> Live. Every post gets tagged TOF, MOF or BOF.\n\n8. Engagement capture\n\nJungler pulls everyone who engages with a post, and we retarget them on outbound and ads (Instantly x HeyReach x Clay).\n\nIf your buyers are on LinkedIn, this is the best pipeline you'll build.",
+          "createdAt": "2026-09-03T19:00:21Z",
+          "lang": "en",
+          "source": "<a href=\"https://tweethunter.io\" rel=\"nofollow\">tweethunter [X]</a>",
+          "likeCount": 137,
+          "retweetCount": 11,
+          "replyCount": 9,
+          "quoteCount": 2,
+          "bookmarkCount": 302,
+          "viewCount": 10815,
+          "isRetweet": false,
+          "isQuote": false,
+          "isReply": false,
+          "isPinned": false,
+          "conversationId": "2095587720168980606",
+          "hashtags": [],
+          "mentions": [],
+          "links": [],
+          "media": [
+            "https://pbs.twimg.com/media/HRUF69nXkAEK8TL.jpg"
+          ],
+          "mediaType": "photo",
+          "author": {
+            "id": "1592198362572509184",
+            "userName": "fivosaresti",
+            "name": "Fivos Aresti",
+            "followers": 3944,
+            "following": 48,
+            "isVerified": false,
+            "isBlueVerified": true,
+            "description": "",
+            "location": "New York",
+            "twitterUrl": "https://x.com/fivosaresti",
+            "profilePicture": "https://pbs.twimg.com/profile_images/2008653180565884928/pgQyN6i2_normal.jpg",
+            "statusesCount": 1674,
+            "mediaCount": 0,
+            "favouritesCount": 0,
+            "createdAt": "2022-11-14T16:50:58Z"
+          },
+          "sourceType": "timeline"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Message a model4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model4": {
+      "main": [
+        [
+          {
+            "node": "Twitter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Loop Over Items4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items4": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Twitter": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Import to WordPress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "94e8260b-1f91-4583-9bb8-92caf949332b",
+  "meta": {
+    "instanceId": "a25744de212d66b7e18e31c76b4ba0610833991b8785d5e84e1fa0ce51bffecb"
+  },
+  "id": "jScuiizgNJGhcjMU",
+  "tags": []
+}

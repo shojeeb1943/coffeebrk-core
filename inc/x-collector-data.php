@@ -127,6 +127,71 @@ function coffeebrk_x_save_profile( array $data, ?int $id = null ) : array {
     return [ 'ok' => $ok, 'id' => (int) $wpdb->insert_id, 'error' => $ok ? '' : $wpdb->last_error ];
 }
 
+// Looks up a profile by username, or creates a minimal one if it doesn't
+// exist yet (used by the ingestion REST endpoint for search-discovered
+// authors that aren't an explicitly-tracked profile). New profiles are
+// created disabled so they don't silently join the Apify cron rotation;
+// an existing profile's enabled/category/etc. are left untouched.
+function coffeebrk_x_get_or_create_profile_by_username( string $username ) : ?array {
+    global $wpdb;
+    coffeebrk_x_ensure_tables();
+
+    $username = coffeebrk_x_normalize_username( $username );
+    if ( $username === '' ) return null;
+
+    $existing = coffeebrk_x_get_profile_by_username( $username );
+    if ( $existing ) return $existing;
+
+    $table = coffeebrk_x_profiles_table_name();
+    $now = current_time( 'mysql' );
+    $ok = $wpdb->insert( $table, [
+        'username'     => $username,
+        'display_name' => $username,
+        'enabled'      => 0,
+        'created_at'   => $now,
+        'updated_at'   => $now,
+    ], [ '%s', '%s', '%d', '%s', '%s' ] );
+
+    if ( ! $ok ) return null;
+
+    return coffeebrk_x_get_profile( (int) $wpdb->insert_id );
+}
+
+// Updates a profile's known-good author snapshot (display name, avatar,
+// followers, verified badge) from freshly-scraped data. Only touches
+// fields that were actually provided.
+function coffeebrk_x_update_profile_author_snapshot( int $profile_id, array $author ) : void {
+    global $wpdb;
+    $table = coffeebrk_x_profiles_table_name();
+
+    $row = [];
+    $formats = [];
+
+    if ( ! empty( $author['display_name'] ) ) {
+        $row['display_name'] = $author['display_name'];
+        $formats[] = '%s';
+    }
+    if ( ! empty( $author['avatar_url'] ) ) {
+        $row['avatar_url'] = $author['avatar_url'];
+        $formats[] = '%s';
+    }
+    if ( ! empty( $author['followers_count'] ) ) {
+        $row['followers_count'] = (int) $author['followers_count'];
+        $formats[] = '%d';
+    }
+    if ( isset( $author['is_verified'] ) ) {
+        $row['is_verified'] = (int) (bool) $author['is_verified'];
+        $formats[] = '%d';
+    }
+
+    if ( ! $row ) return;
+
+    $row['updated_at'] = current_time( 'mysql' );
+    $formats[] = '%s';
+
+    $wpdb->update( $table, $row, [ 'id' => $profile_id ], $formats, [ '%d' ] );
+}
+
 function coffeebrk_x_delete_profile( int $id ) : bool {
     global $wpdb;
     $table = coffeebrk_x_profiles_table_name();
@@ -182,7 +247,11 @@ function coffeebrk_x_update_profile_run_state( int $id, array $data ) : void {
 function coffeebrk_x_insert_post_if_new( array $row ) : bool {
     global $wpdb;
     $table = coffeebrk_x_posts_table_name();
-    $formats = [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%s', '%s', '%d', '%s', '%s' ];
+    // Positional, matching coffeebrk_x_normalize_apify_item()'s row key order:
+    // profile_id, tweet_id, author_username, text, permalink, posted_at, is_reply,
+    // like_count, retweet_count, reply_count, view_count, quote_count, bookmark_count,
+    // is_retweet, is_quote, lang, media_json, status, is_featured, raw_synced_at, created_at.
+    $formats = [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s' ];
 
     $ok = $wpdb->insert( $table, $row, $formats );
 
@@ -191,6 +260,16 @@ function coffeebrk_x_insert_post_if_new( array $row ) : bool {
     }
 
     return $ok !== false;
+}
+
+// Explicit pre-check used by the ingestion REST endpoint so it can report
+// a clean { skipped: true } response for retries, rather than relying on
+// catching the tweet_id UNIQUE KEY violation like the cron path does.
+function coffeebrk_x_post_exists_by_tweet_id( string $tweet_id ) : ?int {
+    global $wpdb;
+    $table = coffeebrk_x_posts_table_name();
+    $id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE tweet_id = %s", $tweet_id ) );
+    return $id ? (int) $id : null;
 }
 
 function coffeebrk_x_get_post( int $id ) : ?array {

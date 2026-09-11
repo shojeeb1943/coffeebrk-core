@@ -21,6 +21,7 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
 
     $dynamic_tags_manager->register( new \Coffeebrk_X_Post_Field_Tag() );
     $dynamic_tags_manager->register( new \Coffeebrk_X_Post_Image_Tag() );
+    $dynamic_tags_manager->register( new \Coffeebrk_X_Post_Author_Image_Tag() );
 
     // Register the YouTube Story group
     $dynamic_tags_manager->register_group( 'coffeebrk-story', [
