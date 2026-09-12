@@ -493,8 +493,20 @@
                 hidePlayer(this.htmlVideoInfo);
             }
 
-            hidePlayer(document.getElementById('cbk-tiktok-player-instance'));
-            hidePlayer(document.getElementById('cbk-instagram-player-instance'));
+            // TikTok/Instagram embeds are cross-origin iframes injected by their
+            // own embed.js - there's no pause() API into them, so hiding alone
+            // doesn't stop audio still playing inside. Clearing the container
+            // unloads the iframe outright; initTikTok()/initInstagram() already
+            // rebuild it fresh from scratch on every show, so this is safe.
+            const destroyEmbed = (id) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.innerHTML = '';
+                    hidePlayer(el);
+                }
+            };
+            destroyEmbed('cbk-tiktok-player-instance');
+            destroyEmbed('cbk-instagram-player-instance');
         }
 
         initYouTube(container, videoId) {
