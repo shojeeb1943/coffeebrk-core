@@ -1,0 +1,19 @@
+- generic [active] [ref=f2e1]:
+  - link "Skip to content" [ref=f2e2] [cursor=pointer]:
+    - /url: "#content"
+  - main [ref=f2e3]:
+    - generic [ref=f2e5]:
+      - generic [ref=f2e7]:
+        - link "Coffeebrk" [ref=f2e9] [cursor=pointer]:
+          - /url: https://app.coffeebrk.ai/
+          - img "Coffeebrk" [ref=f2e10]
+        - generic [ref=f2e12]:
+          - generic [ref=f2e13]:
+            - img "👋" [ref=f2e14]
+            - text: Hey there, welcome to Coffee Break
+          - paragraph [ref=f2e15]: Where curious professionals start their day with 5 minutes of AI — stories, ideas, and tools that matter to you.
+          - link "Continue" [ref=f2e16] [cursor=pointer]:
+            - /url: https://app.coffeebrk.ai/coffeebrk-login/
+      - generic [ref=f2e18]:
+        - heading "Motivation That Sticks" [level=2] [ref=f2e20]
+        - paragraph [ref=f2e21]: "\"I used to quit self-improvement apps after a week. This one? I'm on day 42. The 5-minute challenges fit perfectly into my routine — no pressure, just progress.\""

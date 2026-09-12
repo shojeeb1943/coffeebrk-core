@@ -470,6 +470,9 @@
                 this.htmlVideoInfo.pause();
                 hidePlayer(this.htmlVideoInfo);
             }
+
+            hidePlayer(document.getElementById('cbk-tiktok-player-instance'));
+            hidePlayer(document.getElementById('cbk-instagram-player-instance'));
         }
 
         initYouTube(container, videoId) {
@@ -828,7 +831,7 @@
 
     new CoffeebrkStoriesViewer();
 
-    if (window.elementorFrontend) {
+    if (window.elementorFrontend && window.elementorFrontend.hooks) {
         window.elementorFrontend.hooks.addAction('frontend/element_ready/coffeebrk_stories.default', function () {
             new CoffeebrkStoriesViewer();
         });
