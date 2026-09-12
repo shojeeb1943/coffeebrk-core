@@ -1457,7 +1457,8 @@ function coffeebrk_api_tab_mcp( $plain_token ) {
                     <tr><td><code>get_meta_fields</code></td><td>List registered Coffeebrk Dynamic Fields.</td></tr>
                     <tr><td><code>list_stories</code></td><td>Fetch Web Stories for display or mobile feed consumption.</td></tr>
                     <tr><td><code>list_x_posts</code></td><td>List ingested X (Twitter) posts from the X Collector.</td></tr>
-                    <tr><td><code>list_x_profiles</code></td><td>List monitored X collector profiles.</td></tr>
+                    <tr><td><code>create_x_post</code></td><td>Ingest a single scraped X post (from n8n/Apify) into the X Collector.</td></tr>
+                    <tr><td><code>bulk_create_x_posts</code></td><td>Batch-ingest multiple scraped X posts in one call.</td></tr>
                     <tr><td><code>get_site_info</code></td><td>Get site info, plugin version, and RSS feed diagnostics.</td></tr>
                 </tbody>
             </table>
