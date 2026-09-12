@@ -6,6 +6,7 @@ Thumbs.db
 *.zip
 *.log
 .env
+.mcp.json
 .idea/
 .vscode/
 CODEBASE_AUDIT_REPORT.md
