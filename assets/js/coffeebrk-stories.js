@@ -777,7 +777,10 @@
                 // blockquote approach below if TikTok ever changes it.
                 ttContainer.innerHTML = '';
                 const iframe = document.createElement('iframe');
-                iframe.src = `https://www.tiktok.com/embed/v2/${encodeURIComponent(videoId)}`;
+                // ponytail: muted=0/autoplay=1 are undocumented for TikTok's
+                // embed/v2 player - unverified whether TikTok actually honors
+                // them. Harmless if ignored: falls back to muted, same as before.
+                iframe.src = `https://www.tiktok.com/embed/v2/${encodeURIComponent(videoId)}?autoplay=1&muted=0`;
                 iframe.style.cssText = 'width:100%;height:100%;border:0;';
                 iframe.allow = 'autoplay; encrypted-media; picture-in-picture';
                 iframe.allowFullscreen = true;
