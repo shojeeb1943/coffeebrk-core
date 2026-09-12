@@ -11,13 +11,11 @@ function coffeebrk_x_register_rest_routes() {
         'permission_callback' => 'coffeebrk_api_permission_read',
         'callback'            => 'coffeebrk_x_api_get_posts',
         'args'                => [
-            'page'       => [ 'type' => 'integer', 'default' => 1, 'minimum' => 1 ],
-            'per_page'   => [ 'type' => 'integer', 'default' => 20, 'minimum' => 1, 'maximum' => 100 ],
-            'profile_id' => [ 'type' => 'integer', 'default' => 0 ],
-            'category'   => [ 'type' => 'integer', 'default' => 0 ],
-            'featured'   => [ 'type' => 'boolean' ],
-            'orderby'    => [ 'type' => 'string', 'default' => 'posted_at', 'enum' => [ 'posted_at', 'created_at' ] ],
-            'order'      => [ 'type' => 'string', 'default' => 'DESC', 'enum' => [ 'ASC', 'DESC' ] ],
+            'page'     => [ 'type' => 'integer', 'default' => 1, 'minimum' => 1 ],
+            'per_page' => [ 'type' => 'integer', 'default' => 20, 'minimum' => 1, 'maximum' => 100 ],
+            'featured' => [ 'type' => 'boolean' ],
+            'orderby'  => [ 'type' => 'string', 'default' => 'date', 'enum' => [ 'date', 'modified' ] ],
+            'order'    => [ 'type' => 'string', 'default' => 'DESC', 'enum' => [ 'ASC', 'DESC' ] ],
         ],
     ]);
 
@@ -53,59 +51,39 @@ function coffeebrk_x_register_rest_routes() {
 }
 
 // -- response formatting -------------------------------------------------
-// Only normalized fields ever leave these formatters: no Apify token,
-// actor id, or raw Apify field names are read from settings/DB here.
 
-function coffeebrk_x_format_profile_ref( array $profile ) : array {
-    $category = null;
-    $cid = (int) ( $profile['category_id'] ?? 0 );
-    if ( $cid > 0 ) {
-        $term = get_term( $cid, 'category' );
-        if ( $term && ! is_wp_error( $term ) ) {
-            $category = [ 'id' => (int) $term->term_id, 'name' => $term->name ];
-        }
-    }
-
-    return [
-        'id'              => (int) $profile['id'],
-        'username'        => (string) $profile['username'],
-        'display_name'    => (string) ( $profile['display_name'] ?? '' ),
-        'avatar_url'      => (string) ( $profile['avatar_url'] ?? '' ),
-        'followers_count' => (int) ( $profile['followers_count'] ?? 0 ),
-        'is_verified'     => (bool) ( $profile['is_verified'] ?? 0 ),
-        'category'        => $category,
-    ];
-}
-
-function coffeebrk_x_format_post_response( array $post, ?array $profile = null ) : array {
-    if ( $profile === null ) {
-        $profile = coffeebrk_x_get_profile( (int) $post['profile_id'] );
-    }
-
-    $media = json_decode( (string) ( $post['media_json'] ?? '' ), true );
+function coffeebrk_x_format_post_response( WP_Post $post ) : array {
+    $id = $post->ID;
+    $media = json_decode( (string) get_post_meta( $id, '_cbk_x_media_json', true ), true );
     if ( ! is_array( $media ) ) $media = [];
 
     return [
-        'id'          => (int) $post['id'],
+        'id'          => $id,
         'platform'    => 'x',
-        'profile'     => $profile ? coffeebrk_x_format_profile_ref( $profile ) : null,
-        'external_id' => (string) $post['tweet_id'],
-        'url'         => (string) $post['permalink'],
-        'text'        => (string) $post['text'],
-        'posted_at'   => $post['posted_at'] ? (string) $post['posted_at'] : null,
-        'lang'        => (string) ( $post['lang'] ?? '' ),
-        'is_reply'    => (bool) $post['is_reply'],
-        'is_retweet'  => (bool) ( $post['is_retweet'] ?? 0 ),
-        'is_quote'    => (bool) ( $post['is_quote'] ?? 0 ),
-        'is_featured' => (bool) $post['is_featured'],
-        'status'      => (string) $post['status'],
+        'author'      => [
+            'username'        => (string) get_post_meta( $id, '_cbk_x_author_username', true ),
+            'display_name'    => (string) get_post_meta( $id, '_cbk_x_author_display_name', true ),
+            'avatar_url'      => (string) get_post_meta( $id, '_cbk_x_author_avatar_url', true ),
+            'followers_count' => (int) get_post_meta( $id, '_cbk_x_author_followers', true ),
+            'is_verified'     => (bool) get_post_meta( $id, '_cbk_x_author_verified', true ),
+        ],
+        'external_id' => (string) get_post_meta( $id, '_cbk_x_tweet_id', true ),
+        'url'         => (string) get_post_meta( $id, '_cbk_x_permalink', true ),
+        'text'        => $post->post_content,
+        'posted_at'   => $post->post_date_gmt,
+        'lang'        => (string) get_post_meta( $id, '_cbk_x_lang', true ),
+        'is_reply'    => (bool) get_post_meta( $id, '_cbk_x_is_reply', true ),
+        'is_retweet'  => (bool) get_post_meta( $id, '_cbk_x_is_retweet', true ),
+        'is_quote'    => (bool) get_post_meta( $id, '_cbk_x_is_quote', true ),
+        'is_featured' => (bool) get_post_meta( $id, '_cbk_x_is_featured', true ),
+        'status'      => $post->post_status,
         'metrics'     => [
-            'likes'     => (int) $post['like_count'],
-            'reposts'   => (int) $post['retweet_count'],
-            'replies'   => (int) $post['reply_count'],
-            'views'     => (int) ( $post['view_count'] ?? 0 ),
-            'quotes'    => (int) ( $post['quote_count'] ?? 0 ),
-            'bookmarks' => (int) ( $post['bookmark_count'] ?? 0 ),
+            'likes'     => (int) get_post_meta( $id, '_cbk_x_like_count', true ),
+            'reposts'   => (int) get_post_meta( $id, '_cbk_x_retweet_count', true ),
+            'replies'   => (int) get_post_meta( $id, '_cbk_x_reply_count', true ),
+            'views'     => (int) get_post_meta( $id, '_cbk_x_view_count', true ),
+            'quotes'    => (int) get_post_meta( $id, '_cbk_x_quote_count', true ),
+            'bookmarks' => (int) get_post_meta( $id, '_cbk_x_bookmark_count', true ),
         ],
         'media'       => $media,
     ];
@@ -114,24 +92,30 @@ function coffeebrk_x_format_post_response( array $post, ?array $profile = null )
 // -- handlers --------------------------------------------------------------
 
 function coffeebrk_x_api_get_posts( WP_REST_Request $req ) {
-    $page       = max( 1, (int) $req->get_param( 'page' ) );
-    $per_page   = max( 1, min( 100, (int) $req->get_param( 'per_page' ) ) );
-    $profile_id = (int) $req->get_param( 'profile_id' );
-    $category   = (int) $req->get_param( 'category' );
-    $featured   = $req->get_param( 'featured' );
-    $orderby    = sanitize_key( (string) $req->get_param( 'orderby' ) );
-    $order      = strtoupper( (string) $req->get_param( 'order' ) ) === 'ASC' ? 'ASC' : 'DESC';
+    $page     = max( 1, (int) $req->get_param( 'page' ) );
+    $per_page = max( 1, min( 100, (int) $req->get_param( 'per_page' ) ) );
+    $featured = $req->get_param( 'featured' );
+    $orderby  = sanitize_key( (string) $req->get_param( 'orderby' ) );
+    $order    = strtoupper( (string) $req->get_param( 'order' ) ) === 'ASC' ? 'ASC' : 'DESC';
 
-    $args = [ 'page' => $page, 'per_page' => $per_page, 'orderby' => $orderby, 'order' => $order ];
-    if ( $profile_id > 0 ) $args['profile_id'] = $profile_id;
-    if ( $category > 0 )   $args['category_id'] = $category;
-    if ( $featured !== null ) $args['featured'] = (bool) $featured;
-    $args['status'] = 'published';
+    $args = [
+        'post_type'      => 'cbk_x_post',
+        'post_status'    => 'publish',
+        'paged'          => $page,
+        'posts_per_page' => $per_page,
+        'orderby'        => $orderby === 'modified' ? 'modified' : 'date',
+        'order'          => $order,
+    ];
+    if ( $featured !== null ) {
+        $args['meta_query'] = [
+            [ 'key' => '_cbk_x_is_featured', 'value' => (int) (bool) $featured, 'compare' => '=' ],
+        ];
+    }
 
-    $result = coffeebrk_x_get_posts( $args );
+    $query = new WP_Query( $args );
 
     $items = [];
-    foreach ( $result['posts'] as $post ) {
+    foreach ( $query->posts as $post ) {
         $items[] = coffeebrk_x_format_post_response( $post );
     }
 
@@ -139,57 +123,44 @@ function coffeebrk_x_api_get_posts( WP_REST_Request $req ) {
         'success'     => true,
         'page'        => $page,
         'per_page'    => $per_page,
-        'total'       => $result['total'],
-        'total_pages' => $per_page > 0 ? (int) ceil( $result['total'] / $per_page ) : 0,
+        'total'       => (int) $query->found_posts,
+        'total_pages' => (int) $query->max_num_pages,
         'items'       => $items,
     ], 200 );
 }
 
 function coffeebrk_x_api_get_post( WP_REST_Request $req ) {
     $id = (int) $req->get_param( 'id' );
-    $post = coffeebrk_x_get_post( $id );
-    if ( ! $post ) {
+    $post = get_post( $id );
+    if ( ! $post || $post->post_type !== 'cbk_x_post' ) {
         return new WP_REST_Response( [ 'success' => false, 'error' => 'post_not_found' ], 404 );
     }
     return new WP_REST_Response( [ 'success' => true, 'post' => coffeebrk_x_format_post_response( $post ) ], 200 );
 }
 
 // Core of POST /x-posts and /x-posts/bulk: normalize one raw Apify-shaped
-// tweet item, resolve/auto-create its profile, snapshot the author onto
-// that profile, and insert the post (idempotently, by tweet_id).
+// tweet item and insert it as a cbk_x_post (idempotently, by tweet_id).
 function coffeebrk_x_ingest_post_item( array $item ) : array {
-    $tweet_id_probe = coffeebrk_x_normalize_apify_item( $item, 0 );
-    if ( $tweet_id_probe === null ) {
+    $data = coffeebrk_x_normalize_apify_item( $item );
+    if ( $data === null ) {
         return [ 'ok' => false, 'error' => 'missing_tweet_id' ];
     }
-
-    $author_username = (string) $tweet_id_probe['author_username'];
-    if ( $author_username === '' ) {
+    if ( $data['author_username'] === '' ) {
         return [ 'ok' => false, 'error' => 'missing_author' ];
     }
 
-    $profile = coffeebrk_x_get_or_create_profile_by_username( $author_username );
-    if ( ! $profile ) {
-        return [ 'ok' => false, 'error' => 'profile_save_failed' ];
-    }
-
-    $author = coffeebrk_x_extract_apify_author( $item );
-    coffeebrk_x_update_profile_author_snapshot( (int) $profile['id'], $author );
-
-    $tweet_id = (string) $tweet_id_probe['tweet_id'];
+    $tweet_id = $data['tweet_id'];
     $existing_id = coffeebrk_x_post_exists_by_tweet_id( $tweet_id );
     if ( $existing_id ) {
         return [ 'ok' => true, 'skipped' => true, 'id' => $existing_id, 'tweet_id' => $tweet_id ];
     }
 
-    $row = coffeebrk_x_normalize_apify_item( $item, (int) $profile['id'] );
-    if ( $row === null || ! coffeebrk_x_insert_post_if_new( $row ) ) {
-        return [ 'ok' => false, 'error' => 'insert_failed' ];
+    $post_id = coffeebrk_x_insert_post_row( $data );
+    if ( is_wp_error( $post_id ) ) {
+        return [ 'ok' => false, 'error' => $post_id->get_error_message() ];
     }
 
-    $new_id = coffeebrk_x_post_exists_by_tweet_id( $tweet_id );
-
-    return [ 'ok' => true, 'skipped' => false, 'id' => $new_id, 'tweet_id' => $tweet_id, 'permalink' => $row['permalink'] ];
+    return [ 'ok' => true, 'skipped' => false, 'id' => $post_id, 'tweet_id' => $tweet_id, 'permalink' => $data['permalink'] ];
 }
 
 // POST /x-posts - single-tweet ingestion for n8n/Apify pipelines.
@@ -247,4 +218,3 @@ function coffeebrk_x_api_bulk_create_posts( WP_REST_Request $req ) {
         'total' => $created + $skipped, 'errors' => $errors,
     ], 200 );
 }
-

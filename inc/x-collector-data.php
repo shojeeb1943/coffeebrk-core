@@ -2,211 +2,163 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // ---------------------------------------------------------------------
-// Profiles CRUD
+// cbk_x_post CPT storage. All fields (engagement stats + author snapshot)
+// are denormalized directly onto the post as meta — there's no separate
+// "profile" entity anymore since n8n can send any author, not just a
+// curated tracked list.
 // ---------------------------------------------------------------------
 
-function coffeebrk_x_normalize_username( string $username ) : string {
-    $username = trim( $username );
-    $username = ltrim( $username, '@' );
-    return sanitize_text_field( $username );
-}
-
-function coffeebrk_x_get_profile( int $id ) : ?array {
-    global $wpdb;
-    $table = coffeebrk_x_profiles_table_name();
-    $row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), ARRAY_A );
-    return $row ? $row : null;
-}
-
-function coffeebrk_x_get_profile_by_username( string $username ) : ?array {
-    global $wpdb;
-    $table = coffeebrk_x_profiles_table_name();
-    $row = $wpdb->get_row(
-        $wpdb->prepare( "SELECT * FROM {$table} WHERE username = %s", coffeebrk_x_normalize_username( $username ) ),
-        ARRAY_A
-    );
-    return $row ? $row : null;
-}
-
-function coffeebrk_x_ensure_tables() : void {
-    static $ensured = false;
-    if ( $ensured ) return;
-    $ensured = true;
-    if ( function_exists( 'coffeebrk_x_install' ) ) {
-        coffeebrk_x_install();
-    }
-}
-
-// Looks up a profile by username, or creates a minimal one if it doesn't
-// exist yet. Every incoming n8n tweet needs a profile_id (FK), and n8n can
-// send any author — this is pure bookkeeping, not a "tracked accounts" list.
-function coffeebrk_x_get_or_create_profile_by_username( string $username ) : ?array {
-    global $wpdb;
-    coffeebrk_x_ensure_tables();
-
-    $username = coffeebrk_x_normalize_username( $username );
-    if ( $username === '' ) return null;
-
-    $existing = coffeebrk_x_get_profile_by_username( $username );
-    if ( $existing ) return $existing;
-
-    $table = coffeebrk_x_profiles_table_name();
-    $now = current_time( 'mysql' );
-    $ok = $wpdb->insert( $table, [
-        'username'     => $username,
-        'display_name' => $username,
-        'enabled'      => 0,
-        'created_at'   => $now,
-        'updated_at'   => $now,
-    ], [ '%s', '%s', '%d', '%s', '%s' ] );
-
-    if ( ! $ok ) return null;
-
-    return coffeebrk_x_get_profile( (int) $wpdb->insert_id );
-}
-
-// Updates a profile's known-good author snapshot (display name, avatar,
-// followers, verified badge) from freshly-scraped data. Only touches
-// fields that were actually provided.
-function coffeebrk_x_update_profile_author_snapshot( int $profile_id, array $author ) : void {
-    global $wpdb;
-    $table = coffeebrk_x_profiles_table_name();
-
-    $row = [];
-    $formats = [];
-
-    if ( ! empty( $author['display_name'] ) ) {
-        $row['display_name'] = $author['display_name'];
-        $formats[] = '%s';
-    }
-    if ( ! empty( $author['avatar_url'] ) ) {
-        $row['avatar_url'] = $author['avatar_url'];
-        $formats[] = '%s';
-    }
-    if ( ! empty( $author['followers_count'] ) ) {
-        $row['followers_count'] = (int) $author['followers_count'];
-        $formats[] = '%d';
-    }
-    if ( isset( $author['is_verified'] ) ) {
-        $row['is_verified'] = (int) (bool) $author['is_verified'];
-        $formats[] = '%d';
-    }
-
-    if ( ! $row ) return;
-
-    $row['updated_at'] = current_time( 'mysql' );
-    $formats[] = '%s';
-
-    $wpdb->update( $table, $row, [ 'id' => $profile_id ], $formats, [ '%d' ] );
-}
-
-// ---------------------------------------------------------------------
-// Posts CRUD
-// ---------------------------------------------------------------------
-
-// Inserts a normalized post row. Relies on the tweet_id UNIQUE KEY for
-// dedupe rather than pre-querying — cheaper, and correct even if two
-// syncs somehow overlap.
-function coffeebrk_x_insert_post_if_new( array $row ) : bool {
-    global $wpdb;
-    $table = coffeebrk_x_posts_table_name();
-    // Positional, matching coffeebrk_x_normalize_apify_item()'s row key order:
-    // profile_id, tweet_id, author_username, text, permalink, posted_at, is_reply,
-    // like_count, retweet_count, reply_count, view_count, quote_count, bookmark_count,
-    // is_retweet, is_quote, lang, media_json, status, is_featured, raw_synced_at, created_at.
-    $formats = [ '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s' ];
-
-    $ok = $wpdb->insert( $table, $row, $formats );
-
-    if ( $ok === false && strpos( (string) $wpdb->last_error, 'Duplicate entry' ) === false && function_exists( 'coffeebrk_log_error' ) ) {
-        coffeebrk_log_error( 'x post insert failed', [ 'tweet_id' => $row['tweet_id'] ?? '', 'db_error' => $wpdb->last_error ] );
-    }
-
-    return $ok !== false;
-}
-
-// Explicit pre-check used by the ingestion REST endpoint so it can report
-// a clean { skipped: true } response for retries, rather than relying on
-// catching the tweet_id UNIQUE KEY violation like the cron path does.
+// Dedupe check by tweet id, mirroring the YouTube importer's
+// _cbk_story_yt_video_id meta_query pattern (inc/youtube-importer-rest.php).
 function coffeebrk_x_post_exists_by_tweet_id( string $tweet_id ) : ?int {
-    global $wpdb;
-    $table = coffeebrk_x_posts_table_name();
-    $id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE tweet_id = %s", $tweet_id ) );
-    return $id ? (int) $id : null;
+    if ( $tweet_id === '' ) return null;
+
+    $found = get_posts([
+        'post_type'      => 'cbk_x_post',
+        'post_status'    => 'any',
+        'posts_per_page' => 1,
+        'fields'         => 'ids',
+        'meta_query'     => [
+            [ 'key' => '_cbk_x_tweet_id', 'value' => $tweet_id, 'compare' => '=' ],
+        ],
+    ]);
+
+    return ! empty( $found ) ? (int) $found[0] : null;
 }
 
-function coffeebrk_x_get_post( int $id ) : ?array {
-    global $wpdb;
-    $table = coffeebrk_x_posts_table_name();
-    $row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), ARRAY_A );
-    return $row ? $row : null;
-}
+// Inserts a normalized tweet (see coffeebrk_x_normalize_apify_item()) as a
+// cbk_x_post. Returns the new post ID, or a WP_Error on failure.
+function coffeebrk_x_insert_post_row( array $data ) {
+    $text = (string) ( $data['text'] ?? '' );
+    $title = $text !== '' ? mb_substr( $text, 0, 80 ) : 'X Post';
 
-function coffeebrk_x_get_posts( array $args = [] ) : array {
-    global $wpdb;
-    $table = coffeebrk_x_posts_table_name();
-    $profiles_table = coffeebrk_x_profiles_table_name();
+    $post_args = [
+        'post_type'    => 'cbk_x_post',
+        'post_status'  => ( ( $data['post_status'] ?? 'publish' ) === 'draft' ) ? 'draft' : 'publish',
+        'post_title'   => $title,
+        'post_content' => $text,
+    ];
 
-    $orderby = isset( $args['orderby'] ) ? (string) $args['orderby'] : 'posted_at';
-    $order   = isset( $args['order'] ) ? strtoupper( (string) $args['order'] ) : 'DESC';
-
-    $allowed_orderby = [ 'posted_at', 'created_at', 'id' ];
-    if ( ! in_array( $orderby, $allowed_orderby, true ) ) $orderby = 'posted_at';
-    if ( $order !== 'ASC' && $order !== 'DESC' ) $order = 'DESC';
-
-    $where = '1=1';
-    $params = [];
-    $joins = '';
-
-    if ( ! empty( $args['profile_id'] ) ) {
-        $where .= ' AND p.profile_id = %d';
-        $params[] = (int) $args['profile_id'];
+    // Use the tweet's own date as post_date so native WP sorting/display
+    // ("Date" column, orderby=date) reflects when it was posted on X;
+    // post_modified (left untouched) then naturally records import time.
+    if ( ! empty( $data['posted_at'] ) ) {
+        $post_args['post_date_gmt'] = $data['posted_at'];
+        $post_args['post_date']     = get_date_from_gmt( $data['posted_at'] );
     }
 
-    if ( ! empty( $args['category_id'] ) ) {
-        $joins = " INNER JOIN {$profiles_table} pr ON pr.id = p.profile_id";
-        $where .= ' AND pr.category_id = %d';
-        $params[] = (int) $args['category_id'];
+    $post_id = wp_insert_post( $post_args, true );
+    if ( is_wp_error( $post_id ) ) {
+        return $post_id;
     }
 
-    if ( array_key_exists( 'featured', $args ) ) {
-        $where .= ' AND p.is_featured = %d';
-        $params[] = (int) (bool) $args['featured'];
+    $meta = [
+        '_cbk_x_tweet_id'             => (string) ( $data['tweet_id'] ?? '' ),
+        '_cbk_x_author_username'      => (string) ( $data['author_username'] ?? '' ),
+        '_cbk_x_permalink'            => (string) ( $data['permalink'] ?? '' ),
+        '_cbk_x_is_reply'             => (int) ! empty( $data['is_reply'] ),
+        '_cbk_x_is_retweet'           => (int) ! empty( $data['is_retweet'] ),
+        '_cbk_x_is_quote'             => (int) ! empty( $data['is_quote'] ),
+        '_cbk_x_like_count'           => (int) ( $data['like_count'] ?? 0 ),
+        '_cbk_x_retweet_count'        => (int) ( $data['retweet_count'] ?? 0 ),
+        '_cbk_x_reply_count'          => (int) ( $data['reply_count'] ?? 0 ),
+        '_cbk_x_view_count'           => (int) ( $data['view_count'] ?? 0 ),
+        '_cbk_x_quote_count'          => (int) ( $data['quote_count'] ?? 0 ),
+        '_cbk_x_bookmark_count'       => (int) ( $data['bookmark_count'] ?? 0 ),
+        '_cbk_x_lang'                 => (string) ( $data['lang'] ?? '' ),
+        '_cbk_x_media_json'           => (string) ( $data['media_json'] ?? '[]' ),
+        '_cbk_x_is_featured'          => (int) ! empty( $data['is_featured'] ),
+        '_cbk_x_author_display_name'  => (string) ( $data['author_display_name'] ?? '' ),
+        '_cbk_x_author_avatar_url'    => (string) ( $data['author_avatar_url'] ?? '' ),
+        '_cbk_x_author_followers'     => (int) ( $data['author_followers'] ?? 0 ),
+        '_cbk_x_author_verified'      => (int) ! empty( $data['author_verified'] ),
+    ];
+
+    foreach ( $meta as $key => $value ) {
+        update_post_meta( $post_id, $key, $value );
     }
 
-    if ( array_key_exists( 'status', $args ) && $args['status'] !== '' ) {
-        $where .= ' AND p.status = %s';
-        $params[] = (string) $args['status'];
-    }
-
-    $per_page = isset( $args['per_page'] ) ? max( 1, min( 100, (int) $args['per_page'] ) ) : 20;
-    $page     = isset( $args['page'] ) ? max( 1, (int) $args['page'] ) : 1;
-    $offset   = ( $page - 1 ) * $per_page;
-
-    $count_sql = "SELECT COUNT(*) FROM {$table} p{$joins} WHERE {$where}";
-    $total = $params ? (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $params ) ) : (int) $wpdb->get_var( $count_sql );
-
-    $sql = "SELECT p.* FROM {$table} p{$joins} WHERE {$where} ORDER BY p.{$orderby} {$order} LIMIT %d OFFSET %d";
-    $posts = (array) $wpdb->get_results( $wpdb->prepare( $sql, array_merge( $params, [ $per_page, $offset ] ) ), ARRAY_A );
-
-    return [ 'posts' => $posts, 'total' => $total ];
+    return $post_id;
 }
 
 function coffeebrk_x_set_post_status( int $id, string $status ) : bool {
-    global $wpdb;
-    $table = coffeebrk_x_posts_table_name();
-    $status = in_array( $status, [ 'published', 'hidden' ], true ) ? $status : 'published';
-    return ( false !== $wpdb->update( $table, [ 'status' => $status ], [ 'id' => $id ], [ '%s' ], [ '%d' ] ) );
+    $status = ( $status === 'draft' ) ? 'draft' : 'publish';
+    $res = wp_update_post( [ 'ID' => $id, 'post_status' => $status ], true );
+    return ! is_wp_error( $res );
 }
 
 function coffeebrk_x_set_post_featured( int $id, bool $featured ) : bool {
-    global $wpdb;
-    $table = coffeebrk_x_posts_table_name();
-    return ( false !== $wpdb->update( $table, [ 'is_featured' => (int) $featured ], [ 'id' => $id ], [ '%d' ], [ '%d' ] ) );
+    return (bool) update_post_meta( $id, '_cbk_x_is_featured', $featured ? 1 : 0 );
 }
 
 function coffeebrk_x_delete_post( int $id ) : bool {
-    global $wpdb;
-    $table = coffeebrk_x_posts_table_name();
-    return (bool) $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+    return (bool) wp_trash_post( $id );
 }
+
+// ---------------------------------------------------------------------
+// One-time migration from the old custom-table storage (pre-CPT). Safe to
+// run repeatedly: dedupes by tweet_id, and no-ops entirely once the old
+// tables are gone or the flag is set. Does NOT drop the old tables — that's
+// a manual cleanup step once the migrated data has been verified.
+// ---------------------------------------------------------------------
+
+function coffeebrk_x_migrate_legacy_posts_to_cpt() : void {
+    if ( get_option( 'coffeebrk_x_migrated_to_cpt' ) ) return;
+
+    global $wpdb;
+    $old_posts_table = $wpdb->prefix . 'coffeebrk_x_posts';
+    $old_profiles_table = $wpdb->prefix . 'coffeebrk_x_profiles';
+
+    if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old_posts_table ) ) !== $old_posts_table ) {
+        update_option( 'coffeebrk_x_migrated_to_cpt', 1, false );
+        return;
+    }
+
+    $has_profiles_table = ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old_profiles_table ) ) === $old_profiles_table );
+
+    $rows = $wpdb->get_results( "SELECT * FROM {$old_posts_table}", ARRAY_A );
+
+    foreach ( $rows as $row ) {
+        $tweet_id = (string) ( $row['tweet_id'] ?? '' );
+        if ( $tweet_id === '' || coffeebrk_x_post_exists_by_tweet_id( $tweet_id ) ) continue;
+
+        $profile = null;
+        if ( $has_profiles_table && ! empty( $row['profile_id'] ) ) {
+            $profile = $wpdb->get_row(
+                $wpdb->prepare( "SELECT * FROM {$old_profiles_table} WHERE id = %d", (int) $row['profile_id'] ),
+                ARRAY_A
+            );
+        }
+
+        coffeebrk_x_insert_post_row([
+            'tweet_id'            => $tweet_id,
+            'author_username'     => $row['author_username'] ?? '',
+            'text'                => $row['text'] ?? '',
+            'permalink'           => $row['permalink'] ?? '',
+            'posted_at'           => $row['posted_at'] ?? null,
+            'is_reply'            => (int) ( $row['is_reply'] ?? 0 ),
+            'is_retweet'          => (int) ( $row['is_retweet'] ?? 0 ),
+            'is_quote'            => (int) ( $row['is_quote'] ?? 0 ),
+            'like_count'          => (int) ( $row['like_count'] ?? 0 ),
+            'retweet_count'       => (int) ( $row['retweet_count'] ?? 0 ),
+            'reply_count'         => (int) ( $row['reply_count'] ?? 0 ),
+            'view_count'          => (int) ( $row['view_count'] ?? 0 ),
+            'quote_count'         => (int) ( $row['quote_count'] ?? 0 ),
+            'bookmark_count'      => (int) ( $row['bookmark_count'] ?? 0 ),
+            'lang'                => (string) ( $row['lang'] ?? '' ),
+            'media_json'          => (string) ( $row['media_json'] ?? '[]' ),
+            'is_featured'         => (int) ( $row['is_featured'] ?? 0 ),
+            'post_status'         => ( ( $row['status'] ?? 'published' ) === 'hidden' ) ? 'draft' : 'publish',
+            'author_display_name' => $profile['display_name'] ?? '',
+            'author_avatar_url'   => $profile['avatar_url'] ?? '',
+            'author_followers'    => (int) ( $profile['followers_count'] ?? 0 ),
+            'author_verified'     => (int) ( $profile['is_verified'] ?? 0 ),
+        ]);
+    }
+
+    update_option( 'coffeebrk_x_migrated_to_cpt', 1, false );
+}
+// init (not admin_init) — the site may run for a while on pure n8n
+// webhooks + Elementor front-end without anyone visiting wp-admin, and this
+// is a no-op single get_option() read after the first successful run.
+add_action( 'init', 'coffeebrk_x_migrate_legacy_posts_to_cpt' );

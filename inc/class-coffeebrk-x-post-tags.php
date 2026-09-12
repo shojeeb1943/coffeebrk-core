@@ -8,45 +8,53 @@ use Elementor\Modules\DynamicTags\Module as DynModule;
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 function coffeebrk_x_get_tweet_select_options() : array {
-	static $options = null;
-	if ( $options !== null ) {
-		return $options;
-	}
-
 	$options = [
 		'latest'   => __( 'Latest published tweet', 'coffeebrk-core' ),
 		'featured' => __( 'Featured tweet', 'coffeebrk-core' ),
 	];
 
-	$result = coffeebrk_x_get_posts( [
-		'status'   => 'published',
-		'orderby'  => 'posted_at',
-		'order'    => 'DESC',
-		'per_page' => 100,
-	] );
+	$query = new WP_Query([
+		'post_type'      => 'cbk_x_post',
+		'post_status'    => 'publish',
+		'orderby'        => 'date',
+		'order'          => 'DESC',
+		'posts_per_page' => 100,
+	]);
 
-	foreach ( $result['posts'] as $post ) {
-		$snippet = mb_substr( (string) $post['text'], 0, 40 );
-		$date    = $post['posted_at'] ? date_i18n( 'Y-m-d', strtotime( (string) $post['posted_at'] ) ) : '';
-		$options[ (string) $post['id'] ] = sprintf( '@%s: %s (%s)', $post['author_username'], $snippet, $date );
+	foreach ( $query->posts as $post ) {
+		$snippet = mb_substr( $post->post_content, 0, 40 );
+		$date    = $post->post_date ? date_i18n( 'Y-m-d', strtotime( $post->post_date ) ) : '';
+		$author  = get_post_meta( $post->ID, '_cbk_x_author_username', true );
+		$options[ (string) $post->ID ] = sprintf( '@%s: %s (%s)', $author, $snippet, $date );
 	}
 
 	return $options;
 }
 
-function coffeebrk_x_resolve_selected_post( array $settings ) : ?array {
+// Resolves which cbk_x_post to render. Inside an Elementor Loop Grid/Carousel
+// item template, Elementor runs a real WP loop (the_post()/setup_postdata())
+// over cbk_x_post — so the current post IS the tweet to show, and the
+// tweet-picker control below is irrelevant there. Outside a loop (e.g. a
+// standalone "show me the latest tweet" widget), fall back to the picker.
+function coffeebrk_x_resolve_selected_post( array $settings ) : ?WP_Post {
+	if ( get_post_type() === 'cbk_x_post' && in_the_loop() ) {
+		$current = get_post();
+		if ( $current ) return $current;
+	}
+
 	$tweet = isset( $settings['tweet'] ) ? (string) $settings['tweet'] : 'latest';
 
 	if ( $tweet === 'featured' ) {
-		$result = coffeebrk_x_get_posts( [
-			'status'   => 'published',
-			'featured' => true,
-			'orderby'  => 'posted_at',
-			'order'    => 'DESC',
-			'per_page' => 1,
-		] );
-		if ( ! empty( $result['posts'][0] ) ) {
-			return $result['posts'][0];
+		$query = new WP_Query([
+			'post_type'      => 'cbk_x_post',
+			'post_status'    => 'publish',
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'posts_per_page' => 1,
+			'meta_query'     => [ [ 'key' => '_cbk_x_is_featured', 'value' => 1, 'compare' => '=' ] ],
+		]);
+		if ( ! empty( $query->posts[0] ) ) {
+			return $query->posts[0];
 		}
 		$tweet = 'latest';
 	}
@@ -54,21 +62,22 @@ function coffeebrk_x_resolve_selected_post( array $settings ) : ?array {
 	if ( $tweet !== 'latest' ) {
 		$id = (int) $tweet;
 		if ( $id > 0 ) {
-			$post = coffeebrk_x_get_post( $id );
-			if ( $post && $post['status'] === 'published' ) {
+			$post = get_post( $id );
+			if ( $post && $post->post_type === 'cbk_x_post' && $post->post_status === 'publish' ) {
 				return $post;
 			}
 		}
 	}
 
-	$result = coffeebrk_x_get_posts( [
-		'status'   => 'published',
-		'orderby'  => 'posted_at',
-		'order'    => 'DESC',
-		'per_page' => 1,
-	] );
+	$query = new WP_Query([
+		'post_type'      => 'cbk_x_post',
+		'post_status'    => 'publish',
+		'orderby'        => 'date',
+		'order'          => 'DESC',
+		'posts_per_page' => 1,
+	]);
 
-	return $result['posts'][0] ?? null;
+	return $query->posts[0] ?? null;
 }
 
 class Coffeebrk_X_Post_Field_Tag extends Tag {
@@ -91,7 +100,7 @@ class Coffeebrk_X_Post_Field_Tag extends Tag {
 
 	protected function register_controls() {
 		$this->add_control( 'tweet', [
-			'label'   => __( 'Tweet', 'coffeebrk-core' ),
+			'label'   => __( 'Tweet (ignored inside a Loop Grid)', 'coffeebrk-core' ),
 			'type'    => Controls_Manager::SELECT,
 			'default' => 'latest',
 			'options' => coffeebrk_x_get_tweet_select_options(),
@@ -130,48 +139,57 @@ class Coffeebrk_X_Post_Field_Tag extends Tag {
 		}
 
 		$field = $settings['field'] ?? 'text';
+		$id = $post->ID;
 
 		switch ( $field ) {
 			case 'permalink':
-				echo esc_url( (string) $post['permalink'] );
+				echo esc_url( (string) get_post_meta( $id, '_cbk_x_permalink', true ) );
 				break;
 			case 'author':
-				echo esc_html( '@' . (string) $post['author_username'] );
+				echo esc_html( '@' . (string) get_post_meta( $id, '_cbk_x_author_username', true ) );
 				break;
 			case 'author_display_name':
+				echo esc_html( (string) get_post_meta( $id, '_cbk_x_author_display_name', true ) );
+				break;
 			case 'author_followers':
-				$profile = coffeebrk_x_get_profile( (int) $post['profile_id'] );
-				if ( ! $profile ) {
-					break;
-				}
-				if ( $field === 'author_display_name' ) {
-					echo esc_html( (string) ( $profile['display_name'] ?? '' ) );
-				} else {
-					echo esc_html( (string) (int) ( $profile['followers_count'] ?? 0 ) );
-				}
+				echo esc_html( (string) (int) get_post_meta( $id, '_cbk_x_author_followers', true ) );
 				break;
 			case 'posted_at':
-				echo esc_html( (string) $post['posted_at'] );
+				echo esc_html( (string) $post->post_date );
 				break;
 			case 'lang':
-				echo esc_html( (string) ( $post['lang'] ?? '' ) );
+				echo esc_html( (string) get_post_meta( $id, '_cbk_x_lang', true ) );
 				break;
 			case 'like_count':
+				echo esc_html( (string) (int) get_post_meta( $id, '_cbk_x_like_count', true ) );
+				break;
 			case 'retweet_count':
+				echo esc_html( (string) (int) get_post_meta( $id, '_cbk_x_retweet_count', true ) );
+				break;
 			case 'reply_count':
+				echo esc_html( (string) (int) get_post_meta( $id, '_cbk_x_reply_count', true ) );
+				break;
 			case 'view_count':
+				echo esc_html( (string) (int) get_post_meta( $id, '_cbk_x_view_count', true ) );
+				break;
 			case 'quote_count':
+				echo esc_html( (string) (int) get_post_meta( $id, '_cbk_x_quote_count', true ) );
+				break;
 			case 'bookmark_count':
-				echo esc_html( (string) (int) ( $post[ $field ] ?? 0 ) );
+				echo esc_html( (string) (int) get_post_meta( $id, '_cbk_x_bookmark_count', true ) );
 				break;
 			case 'is_reply':
+				echo esc_html( get_post_meta( $id, '_cbk_x_is_reply', true ) ? __( 'Yes', 'coffeebrk-core' ) : __( 'No', 'coffeebrk-core' ) );
+				break;
 			case 'is_retweet':
+				echo esc_html( get_post_meta( $id, '_cbk_x_is_retweet', true ) ? __( 'Yes', 'coffeebrk-core' ) : __( 'No', 'coffeebrk-core' ) );
+				break;
 			case 'is_quote':
-				echo esc_html( ! empty( $post[ $field ] ) ? __( 'Yes', 'coffeebrk-core' ) : __( 'No', 'coffeebrk-core' ) );
+				echo esc_html( get_post_meta( $id, '_cbk_x_is_quote', true ) ? __( 'Yes', 'coffeebrk-core' ) : __( 'No', 'coffeebrk-core' ) );
 				break;
 			case 'text':
 			default:
-				echo esc_html( (string) $post['text'] );
+				echo esc_html( $post->post_content );
 				break;
 		}
 	}
@@ -197,7 +215,7 @@ class Coffeebrk_X_Post_Image_Tag extends Data_Tag {
 
 	protected function register_controls() {
 		$this->add_control( 'tweet', [
-			'label'   => __( 'Tweet', 'coffeebrk-core' ),
+			'label'   => __( 'Tweet (ignored inside a Loop Grid)', 'coffeebrk-core' ),
 			'type'    => Controls_Manager::SELECT,
 			'default' => 'latest',
 			'options' => coffeebrk_x_get_tweet_select_options(),
@@ -211,7 +229,7 @@ class Coffeebrk_X_Post_Image_Tag extends Data_Tag {
 			return [ 'id' => 0, 'url' => '' ];
 		}
 
-		$media = json_decode( (string) ( $post['media_json'] ?? '' ), true );
+		$media = json_decode( (string) get_post_meta( $post->ID, '_cbk_x_media_json', true ), true );
 		if ( ! is_array( $media ) ) {
 			$media = [];
 		}
@@ -248,7 +266,7 @@ class Coffeebrk_X_Post_Author_Image_Tag extends Data_Tag {
 
 	protected function register_controls() {
 		$this->add_control( 'tweet', [
-			'label'   => __( 'Tweet', 'coffeebrk-core' ),
+			'label'   => __( 'Tweet (ignored inside a Loop Grid)', 'coffeebrk-core' ),
 			'type'    => Controls_Manager::SELECT,
 			'default' => 'latest',
 			'options' => coffeebrk_x_get_tweet_select_options(),
@@ -262,8 +280,7 @@ class Coffeebrk_X_Post_Author_Image_Tag extends Data_Tag {
 			return [ 'id' => 0, 'url' => '' ];
 		}
 
-		$profile = coffeebrk_x_get_profile( (int) $post['profile_id'] );
-		$url = ( $profile && ! empty( $profile['avatar_url'] ) ) ? (string) $profile['avatar_url'] : '';
+		$url = (string) get_post_meta( $post->ID, '_cbk_x_author_avatar_url', true );
 
 		return [
 			'id'  => 0,

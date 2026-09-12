@@ -1,12 +1,13 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Pure Apify item -> CoffeeBRK x_posts row mapping. No $wpdb, no HTTP.
-// The exact field names Apify's feedminer/x-tweet-scraper actor returns
-// aren't guaranteed, so every field is read defensively with fallbacks
-// and this function never throws — malformed input just yields null
-// (skip) or sane defaults, never a fatal.
-function coffeebrk_x_normalize_apify_item( array $item, int $profile_id ) : ?array {
+// Pure Apify item -> cbk_x_post insert-row mapping. No $wpdb, no HTTP, no
+// WordPress post/meta calls — coffeebrk_x_insert_post_row() (x-collector-data.php)
+// does the actual insert. The exact field names Apify's feedminer/x-tweet-scraper
+// actor returns aren't guaranteed, so every field is read defensively with
+// fallbacks and this function never throws — malformed input just yields
+// null (skip) or sane defaults, never a fatal.
+function coffeebrk_x_normalize_apify_item( array $item ) : ?array {
     $tweet_id = '';
     foreach ( [ 'id', 'tweetId', 'id_str' ] as $k ) {
         if ( ! empty( $item[ $k ] ) ) { $tweet_id = (string) $item[ $k ]; break; }
@@ -91,28 +92,31 @@ function coffeebrk_x_normalize_apify_item( array $item, int $profile_id ) : ?arr
         }
     }
 
+    $author = coffeebrk_x_extract_apify_author( $item );
+
     return [
-        'profile_id'      => $profile_id,
-        'tweet_id'        => sanitize_text_field( $tweet_id ),
-        'author_username' => sanitize_text_field( $author_username ),
-        'text'            => wp_kses( $text, [] ),
-        'permalink'       => $permalink,
-        'posted_at'       => $posted_at,
-        'is_reply'        => $is_reply,
-        'like_count'      => $like_count,
-        'retweet_count'   => $retweet_count,
-        'reply_count'     => $reply_count,
-        'view_count'      => $view_count,
-        'quote_count'     => $quote_count,
-        'bookmark_count'  => $bookmark_count,
-        'is_retweet'      => $is_retweet,
-        'is_quote'        => $is_quote,
-        'lang'            => $lang,
-        'media_json'      => wp_json_encode( $media ),
-        'status'          => 'published',
-        'is_featured'     => 0,
-        'raw_synced_at'   => current_time( 'mysql' ),
-        'created_at'      => current_time( 'mysql' ),
+        'tweet_id'            => sanitize_text_field( $tweet_id ),
+        'author_username'     => sanitize_text_field( $author_username ),
+        'text'                => wp_kses( $text, [] ),
+        'permalink'           => $permalink,
+        'posted_at'           => $posted_at,
+        'is_reply'            => $is_reply,
+        'like_count'          => $like_count,
+        'retweet_count'       => $retweet_count,
+        'reply_count'         => $reply_count,
+        'view_count'          => $view_count,
+        'quote_count'         => $quote_count,
+        'bookmark_count'      => $bookmark_count,
+        'is_retweet'          => $is_retweet,
+        'is_quote'            => $is_quote,
+        'lang'                => $lang,
+        'media_json'          => wp_json_encode( $media ),
+        'is_featured'         => 0,
+        'post_status'         => 'publish',
+        'author_display_name' => $author['display_name'],
+        'author_avatar_url'   => $author['avatar_url'],
+        'author_followers'    => $author['followers_count'],
+        'author_verified'     => $author['is_verified'],
     ];
 }
 
