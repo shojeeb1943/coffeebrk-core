@@ -75,6 +75,7 @@
             });
 
             this.setupLoopCards();
+            this.setupUniversalVideoCards();
 
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') this.closeViewer();
@@ -179,6 +180,27 @@
                     });
                 });
                 wrapper.appendChild(catcher);
+            });
+        }
+
+        // Handles the Coffeebrk Universal Video widget - a drop-in replacement
+        // for Elementor's native Video widget that we control the markup for
+        // directly, so binding is just a plain click listener (no need to
+        // reverse-engineer Elementor's own widget settings like setupLoopCards does).
+        setupUniversalVideoCards() {
+            const els = document.querySelectorAll('.cbk-universal-video');
+            if (!els.length) return;
+
+            const stories = Array.from(els).map(el => ({ videoUrl: el.dataset.videoUrl }));
+
+            els.forEach((el, index) => {
+                if (el.dataset.cbkUvBound) return;
+                el.dataset.cbkUvBound = 'true';
+                el.addEventListener('click', () => {
+                    this.openViewer(stories, index, 'cbk-stories-viewer-universal', {
+                        autoplay: true, loop: true, startMuted: true,
+                    });
+                });
             });
         }
 

@@ -240,6 +240,43 @@
 }
 
 /* ============================================
+   Universal Video Widget
+   ============================================ */
+.cbk-universal-video {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    cursor: pointer;
+    background: #000;
+    border-radius: inherit;
+}
+
+.cbk-universal-video--9-16 { aspect-ratio: 9 / 16; }
+.cbk-universal-video--16-9 { aspect-ratio: 16 / 9; }
+.cbk-universal-video--1-1  { aspect-ratio: 1 / 1; }
+.cbk-universal-video--4-5  { aspect-ratio: 4 / 5; }
+
+.cbk-universal-video__thumbnail {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+}
+
+.cbk-universal-video__thumbnail--placeholder {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.cbk-universal-video__play-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    color: #323232;
+}
+
+/* ============================================
    Story Viewer Modal
    ============================================ */
 .cbk-stories-viewer {

@@ -719,51 +719,7 @@ class Coffeebrk_Stories_Widget extends Widget_Base {
      * Get video thumbnail from URL
      */
     private function get_video_thumbnail( $url ) {
-        if ( empty( $url ) ) {
-            return '';
-        }
-
-        // YouTube (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
-        if ( preg_match( '/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/', $url, $matches ) ) {
-            // maxresdefault is 16:9, hqdefault is 4:3 with bars. We use hqdefault as base but CSS covers it.
-            // Using hqdefault as it's most reliable for all videos.
-            return 'https://img.youtube.com/vi/' . $matches[1] . '/hqdefault.jpg';
-        }
-
-        // Vimeo
-        if ( preg_match( '/vimeo\.com\/(\d+)/', $url, $matches ) ) {
-            // For Vimeo we ideally need an API call, but we can't do that synchronously without caching.
-            // For now, we'll try to use a placeholder or skip, as fetching requires a remote request.
-            // Optionally, we could use a JS-side solution for Vimeo if needed.
-            return '';
-        }
-
-        // TikTok - fetch via oEmbed (no API key needed) and cache the result,
-        // since this runs on every widget render.
-        if ( preg_match( '/tiktok\.com\//', $url ) ) {
-            $cache_key = 'cbk_tt_thumb_' . md5( $url );
-            $cached = get_transient( $cache_key );
-            if ( $cached !== false ) {
-                return $cached;
-            }
-
-            $thumb = '';
-            $response = wp_remote_get( 'https://www.tiktok.com/oembed?url=' . urlencode( $url ), [ 'timeout' => 3 ] );
-            if ( ! is_wp_error( $response ) && wp_remote_retrieve_response_code( $response ) === 200 ) {
-                $body = json_decode( wp_remote_retrieve_body( $response ), true );
-                $thumb = esc_url_raw( $body['thumbnail_url'] ?? '' );
-            }
-
-            // Cache success for a week; cache a failed lookup for an hour so a
-            // slow/down TikTok endpoint isn't hit on every single render.
-            set_transient( $cache_key, $thumb, $thumb ? 7 * DAY_IN_SECONDS : HOUR_IN_SECONDS );
-            return $thumb;
-        }
-
-        // Instagram thumbnails require the token-gated Graph API oEmbed, which
-        // this project doesn't have configured. Falls through to the
-        // placeholder gradient card unless a featured image is set manually.
-        return '';
+        return cbk_story_get_video_thumbnail( $url );
     }
 
     protected function content_template() {

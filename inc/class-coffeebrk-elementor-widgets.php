@@ -38,6 +38,15 @@ add_action( 'elementor/widgets/register', function( $widgets_manager ) {
     if ( class_exists( '\\Coffeebrk_Stories_Widget' ) ) {
         $widgets_manager->register( new \Coffeebrk_Stories_Widget() );
     }
+
+    $universal_video = __DIR__ . '/widgets/class-coffeebrk-universal-video-widget.php';
+    if ( file_exists( $universal_video ) ) {
+        require_once $universal_video;
+    }
+
+    if ( class_exists( '\\Coffeebrk_Universal_Video_Widget' ) ) {
+        $widgets_manager->register( new \Coffeebrk_Universal_Video_Widget() );
+    }
 } );
 
 // Backward compatibility for older Elementor versions
@@ -66,6 +75,11 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         require_once $stories;
     }
 
+    $universal_video = __DIR__ . '/widgets/class-coffeebrk-universal-video-widget.php';
+    if ( file_exists( $universal_video ) ) {
+        require_once $universal_video;
+    }
+
     $plugin = \Elementor\Plugin::instance();
     if ( isset( $plugin->widgets_manager ) && method_exists( $plugin->widgets_manager, 'register_widget_type' ) ) {
         if ( class_exists( '\\Coffeebrk_External_Image_Widget' ) ) {
@@ -79,6 +93,9 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         }
         if ( class_exists( '\\Coffeebrk_Stories_Widget' ) ) {
             $plugin->widgets_manager->register_widget_type( new \Coffeebrk_Stories_Widget() );
+        }
+        if ( class_exists( '\\Coffeebrk_Universal_Video_Widget' ) ) {
+            $plugin->widgets_manager->register_widget_type( new \Coffeebrk_Universal_Video_Widget() );
         }
     }
 } );
@@ -96,7 +113,7 @@ add_action( 'elementor/frontend/after_enqueue_styles', function() {
         'coffeebrk-stories',
         COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-stories.css',
         [],
-        '1.9.7'
+        '1.9.8'
     );
 } );
 
@@ -106,7 +123,7 @@ add_action( 'elementor/frontend/after_enqueue_scripts', function() {
         'coffeebrk-stories',
         COFFEEBRK_CORE_URL . 'assets/js/coffeebrk-stories.js',
         [],
-        '1.9.7',
+        '1.9.8',
         true
     );
 } );
