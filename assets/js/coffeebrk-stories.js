@@ -7,6 +7,19 @@
 (function () {
     'use strict';
 
+    // videoUrl ultimately comes from post meta set via the REST API (n8n,
+    // YouTube importer, etc.) and is interpolated into innerHTML below for
+    // the TikTok/Instagram embeds - escape it so a crafted URL can't break
+    // out of the attribute and inject markup.
+    function escapeHtmlAttr(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     class CoffeebrkStoriesViewer {
         constructor() {
             this.currentIndex = 0;
@@ -21,6 +34,7 @@
             this.ytPlayer = null;
             this.vimeoPlayer = null;
             this.htmlVideoInfo = null; // Store reference to current HTML element
+            this.storyTimer = null; // Fixed-duration auto-advance timer (TikTok/Instagram)
 
             this.init();
         }
@@ -46,6 +60,13 @@
                 tag.src = "https://player.vimeo.com/api/player.js";
                 document.head.appendChild(tag);
             }
+            if (!window.instgrm) {
+                const tag = document.createElement('script');
+                tag.src = "https://www.instagram.com/embed.js";
+                document.head.appendChild(tag);
+            }
+            // TikTok's embed.js is loaded fresh on every initTikTok() call
+            // instead (it has no re-scan API), so nothing to preload here.
         }
 
         bindEvents() {
@@ -399,6 +420,8 @@
             // Detect Type (supports youtube.com/watch, youtube.com/shorts, youtube.com/embed, youtu.be)
             const youtubeMatch = videoUrl && videoUrl.match(/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
             const vimeoMatch = videoUrl && videoUrl.match(/(?:vimeo\.com\/)(\d+)/);
+            const tiktokMatch = videoUrl && videoUrl.match(/tiktok\.com\/(?:@[\w.-]+\/video\/(\d+)|t\/\w+)/i);
+            const instagramMatch = videoUrl && videoUrl.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
 
             // Hide/Pause other players
             this.pauseAllPlayers();
@@ -407,6 +430,10 @@
                 this.initYouTube(videoContainer, youtubeMatch[1]);
             } else if (vimeoMatch) {
                 this.initVimeo(videoContainer, vimeoMatch[1]);
+            } else if (tiktokMatch) {
+                this.initTikTok(videoContainer, videoUrl, tiktokMatch[1] || '');
+            } else if (instagramMatch) {
+                this.initInstagram(videoContainer, videoUrl);
             } else if (videoUrl) {
                 this.initHTMLVideo(videoContainer, videoUrl);
             } else {
@@ -418,6 +445,11 @@
         }
 
         pauseAllPlayers() {
+            if (this.storyTimer) {
+                clearTimeout(this.storyTimer);
+                this.storyTimer = null;
+            }
+
             const hidePlayer = (el) => {
                 if (el) {
                     el.style.visibility = 'hidden';
@@ -517,6 +549,11 @@
                                         this.hideUnmuteButton();
                                     }
                                 }
+                            },
+                            'onError': (event) => {
+                                // ponytail: no retry/backoff - a dead video (deleted,
+                                // private, embedding disabled) is dead, just move on.
+                                this.nextStory();
                             }
                         }
                     });
@@ -674,6 +711,77 @@
                     playPromise.catch(() => { });
                 }
             }
+        }
+
+        initTikTok(container, url, videoId) {
+            let ttContainer = document.getElementById('cbk-tiktok-player-instance');
+            if (!ttContainer) {
+                ttContainer = document.createElement('div');
+                ttContainer.id = 'cbk-tiktok-player-instance';
+                Object.assign(ttContainer.style, {
+                    position: 'absolute', top: '0', left: '0', width: '100%', height: '100%'
+                });
+                container.appendChild(ttContainer);
+            } else if (ttContainer.parentNode !== container) {
+                container.appendChild(ttContainer);
+            }
+
+            ttContainer.style.visibility = 'visible';
+            ttContainer.style.opacity = '1';
+            ttContainer.style.zIndex = '1';
+
+            const safeUrl = escapeHtmlAttr(url);
+            const safeVideoId = videoId ? escapeHtmlAttr(videoId) : '';
+            ttContainer.innerHTML = `<blockquote class="tiktok-embed" cite="${safeUrl}" ${safeVideoId ? `data-video-id="${safeVideoId}"` : ''} style="max-width:100%;min-width:280px;"><section></section></blockquote>`;
+
+            // ponytail: TikTok's embed.js has no documented re-scan API (unlike
+            // Instagram's instgrm.Embeds.process()) - removing and re-adding a
+            // fresh script tag is the only reliable way to make it pick up a
+            // dynamically inserted blockquote. Upgrade if TikTok ever ships one.
+            const old = document.getElementById('cbk-tiktok-embed-script');
+            if (old) old.remove();
+            const script = document.createElement('script');
+            script.id = 'cbk-tiktok-embed-script';
+            script.async = true;
+            script.src = 'https://www.tiktok.com/embed.js';
+            document.body.appendChild(script);
+
+            this.startFixedTimer();
+        }
+
+        initInstagram(container, url) {
+            let igContainer = document.getElementById('cbk-instagram-player-instance');
+            if (!igContainer) {
+                igContainer = document.createElement('div');
+                igContainer.id = 'cbk-instagram-player-instance';
+                Object.assign(igContainer.style, {
+                    position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+                    overflow: 'auto', background: '#000'
+                });
+                container.appendChild(igContainer);
+            } else if (igContainer.parentNode !== container) {
+                container.appendChild(igContainer);
+            }
+
+            igContainer.style.visibility = 'visible';
+            igContainer.style.opacity = '1';
+            igContainer.style.zIndex = '1';
+
+            const safeUrl = escapeHtmlAttr(url);
+            igContainer.innerHTML = `<blockquote class="instagram-media" data-instgrm-permalink="${safeUrl}" data-instgrm-version="14" style="width:100%;"><a href="${safeUrl}"></a></blockquote>`;
+
+            if (window.instgrm && window.instgrm.Embeds) {
+                window.instgrm.Embeds.process();
+            } // else: loadAPIs() already queued embed.js; it auto-processes on load.
+
+            this.startFixedTimer();
+        }
+
+        startFixedTimer() {
+            // ponytail: naive fixed-duration timer, not a real end-of-video signal -
+            // neither TikTok's nor Instagram's embed widget fires a JS "ended" event.
+            // Upgrade if either platform ever ships a postMessage-based player API.
+            this.storyTimer = setTimeout(() => this.nextStory(), 15000);
         }
 
         createPlaceholder() {

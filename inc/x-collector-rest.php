@@ -48,6 +48,33 @@ function coffeebrk_x_register_rest_routes() {
         'callback'            => 'coffeebrk_x_api_get_post',
         'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
     ]);
+
+    register_rest_route( $namespace, '/x-posts/(?P<id>\d+)', [
+        'methods'             => [ 'PUT', 'PATCH' ],
+        'permission_callback' => 'coffeebrk_api_permission_write',
+        'callback'            => 'coffeebrk_x_api_update_post',
+        'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+    ]);
+
+    register_rest_route( $namespace, '/x-posts/(?P<id>\d+)', [
+        'methods'             => 'DELETE',
+        'permission_callback' => 'coffeebrk_api_permission_delete',
+        'callback'            => 'coffeebrk_x_api_delete_post',
+        'args'                => [ 'id' => [ 'type' => 'integer', 'required' => true ] ],
+    ]);
+
+    register_rest_route( $namespace, '/x-posts/activity', [
+        'methods'             => 'GET',
+        'permission_callback' => 'coffeebrk_api_permission_read',
+        'callback'            => 'coffeebrk_x_api_get_activity',
+        'args'                => [ 'limit' => [ 'type' => 'integer', 'default' => 50, 'minimum' => 1, 'maximum' => 200 ] ],
+    ]);
+
+    register_rest_route( $namespace, '/x-posts/stats', [
+        'methods'             => 'GET',
+        'permission_callback' => 'coffeebrk_api_permission_read',
+        'callback'            => 'coffeebrk_x_api_get_stats',
+    ]);
 }
 
 // -- response formatting -------------------------------------------------
@@ -138,6 +165,58 @@ function coffeebrk_x_api_get_post( WP_REST_Request $req ) {
     return new WP_REST_Response( [ 'success' => true, 'post' => coffeebrk_x_format_post_response( $post ) ], 200 );
 }
 
+// PUT/PATCH /x-posts/{id} - publish/draft status and featured toggle. Wraps
+// the existing coffeebrk_x_set_post_status()/coffeebrk_x_set_post_featured()
+// helpers already used by the admin UI (inc/x-collector-data.php).
+function coffeebrk_x_api_update_post( WP_REST_Request $req ) {
+    $id = (int) $req->get_param( 'id' );
+    $post = get_post( $id );
+    if ( ! $post || $post->post_type !== 'cbk_x_post' ) {
+        return new WP_REST_Response( [ 'success' => false, 'error' => 'post_not_found' ], 404 );
+    }
+
+    $params = coffeebrk_get_request_params( $req );
+
+    if ( array_key_exists( 'status', $params ) ) {
+        coffeebrk_x_set_post_status( $id, (string) $params['status'] );
+    }
+    if ( array_key_exists( 'is_featured', $params ) ) {
+        coffeebrk_x_set_post_featured( $id, (bool) $params['is_featured'] );
+    }
+
+    $post = get_post( $id );
+    return new WP_REST_Response( [ 'success' => true, 'post' => coffeebrk_x_format_post_response( $post ) ], 200 );
+}
+
+// DELETE /x-posts/{id} - trash (wraps coffeebrk_x_delete_post()).
+function coffeebrk_x_api_delete_post( WP_REST_Request $req ) {
+    $id = (int) $req->get_param( 'id' );
+    $post = get_post( $id );
+    if ( ! $post || $post->post_type !== 'cbk_x_post' ) {
+        return new WP_REST_Response( [ 'success' => false, 'error' => 'post_not_found' ], 404 );
+    }
+
+    $ok = coffeebrk_x_delete_post( $id );
+    return new WP_REST_Response( [ 'success' => $ok, 'id' => $id ], $ok ? 200 : 500 );
+}
+
+// GET /x-posts/activity - recent ingestion log entries (newest first).
+function coffeebrk_x_api_get_activity( WP_REST_Request $req ) {
+    $limit = max( 1, min( 200, (int) $req->get_param( 'limit' ) ) );
+    $log = array_reverse( coffeebrk_x_log_get_last_24h() );
+
+    return new WP_REST_Response( [
+        'success' => true,
+        'total'   => count( $log ),
+        'items'   => array_slice( $log, 0, $limit ),
+    ], 200 );
+}
+
+// GET /x-posts/stats - aggregate counts + token usage snapshot.
+function coffeebrk_x_api_get_stats( WP_REST_Request $req ) {
+    return new WP_REST_Response( array_merge( [ 'success' => true ], coffeebrk_x_get_stats() ), 200 );
+}
+
 // Core of POST /x-posts and /x-posts/bulk: normalize one raw Apify-shaped
 // tweet item and insert it as a cbk_x_post (idempotently, by tweet_id).
 function coffeebrk_x_ingest_post_item( array $item ) : array {
@@ -165,22 +244,48 @@ function coffeebrk_x_ingest_post_item( array $item ) : array {
 
 // POST /x-posts - single-tweet ingestion for n8n/Apify pipelines.
 function coffeebrk_x_api_create_post( WP_REST_Request $req ) {
+    $token_info = coffeebrk_x_get_request_token_info( $req );
     $params = coffeebrk_get_request_params( $req );
     if ( empty( $params ) ) {
+        coffeebrk_x_log_append([
+            'event' => 'single', 'status' => 'error', 'reason' => 'empty_body',
+            'token_id' => $token_info['id'], 'token_name' => $token_info['name'],
+            'created' => 0, 'skipped' => 0, 'total' => 0,
+        ]);
         return new WP_REST_Response( [ 'success' => false, 'error' => 'empty_body' ], 400 );
     }
 
     $res = coffeebrk_x_ingest_post_item( $params );
     if ( empty( $res['ok'] ) ) {
-        return new WP_REST_Response( [ 'success' => false, 'error' => $res['error'] ?? 'failed' ], 400 );
+        $reason = $res['error'] ?? 'failed';
+        coffeebrk_x_log_append([
+            'event' => 'single', 'status' => 'error', 'reason' => $reason,
+            'token_id' => $token_info['id'], 'token_name' => $token_info['name'],
+            'created' => 0, 'skipped' => 0, 'total' => 0,
+        ]);
+        coffeebrk_log_error( 'x ingest single failed: ' . $reason, [ 'source' => 'x_collector', 'token_id' => $token_info['id'] ] );
+        return new WP_REST_Response( [ 'success' => false, 'error' => $reason ], 400 );
     }
 
     if ( ! empty( $res['skipped'] ) ) {
+        coffeebrk_x_log_append([
+            'event' => 'single', 'status' => 'skip',
+            'token_id' => $token_info['id'], 'token_name' => $token_info['name'],
+            'created' => 0, 'skipped' => 1, 'total' => 1,
+            'tweet_ids' => [ $res['tweet_id'] ],
+        ]);
         return new WP_REST_Response( [
             'success' => true, 'skipped' => true, 'id' => $res['id'], 'tweet_id' => $res['tweet_id'],
             'message' => 'Tweet already imported.',
         ], 200 );
     }
+
+    coffeebrk_x_log_append([
+        'event' => 'single', 'status' => 'ok',
+        'token_id' => $token_info['id'], 'token_name' => $token_info['name'],
+        'created' => 1, 'skipped' => 0, 'total' => 1,
+        'tweet_ids' => [ $res['tweet_id'] ],
+    ]);
 
     return new WP_REST_Response( [
         'success' => true, 'skipped' => false, 'id' => $res['id'],
@@ -190,6 +295,7 @@ function coffeebrk_x_api_create_post( WP_REST_Request $req ) {
 
 // POST /x-posts/bulk - array of raw tweet items, same ingestion per item.
 function coffeebrk_x_api_bulk_create_posts( WP_REST_Request $req ) {
+    $token_info = coffeebrk_x_get_request_token_info( $req );
     $items = $req->get_param( 'posts' );
     if ( ! is_array( $items ) || empty( $items ) ) {
         return new WP_REST_Response( [ 'success' => false, 'error' => 'empty_posts' ], 400 );
@@ -198,6 +304,7 @@ function coffeebrk_x_api_bulk_create_posts( WP_REST_Request $req ) {
     $created = 0;
     $skipped = 0;
     $errors = [];
+    $tweet_ids = [];
 
     foreach ( $items as $item ) {
         if ( ! is_array( $item ) ) continue;
@@ -211,6 +318,23 @@ function coffeebrk_x_api_bulk_create_posts( WP_REST_Request $req ) {
         } else {
             $created++;
         }
+        if ( ! empty( $res['tweet_id'] ) && count( $tweet_ids ) < 20 ) {
+            $tweet_ids[] = $res['tweet_id'];
+        }
+    }
+
+    coffeebrk_x_log_append([
+        'event' => 'bulk', 'status' => empty( $errors ) ? 'ok' : 'partial',
+        'token_id' => $token_info['id'], 'token_name' => $token_info['name'],
+        'created' => $created, 'skipped' => $skipped, 'total' => $created + $skipped,
+        'tweet_ids' => $tweet_ids, 'errors' => array_slice( $errors, 0, 20 ),
+    ]);
+
+    if ( ! empty( $errors ) ) {
+        coffeebrk_log_error( 'x bulk ingest had errors', [
+            'source' => 'x_collector', 'token_id' => $token_info['id'],
+            'count' => count( $errors ), 'sample' => array_slice( $errors, 0, 5 ),
+        ]);
     }
 
     return new WP_REST_Response( [

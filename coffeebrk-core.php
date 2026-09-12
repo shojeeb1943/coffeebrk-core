@@ -23,7 +23,8 @@ require_once COFFEEBRK_CORE_PATH . 'inc/logger.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rss.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/x-collector.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/stories-cpt.php';
- 
+require_once COFFEEBRK_CORE_PATH . 'inc/story-video-healthcheck.php';
+
 /**
  * Plugin activation hook.
  *
@@ -47,6 +48,9 @@ register_activation_hook( __FILE__, function() {
     }
     if ( function_exists( 'coffeebrk_x_schedule_cron' ) ) {
         coffeebrk_x_schedule_cron();
+    }
+    if ( function_exists( 'coffeebrk_story_healthcheck_schedule_cron' ) ) {
+        coffeebrk_story_healthcheck_schedule_cron();
     }
     do_action('coffeebrk_core_activate');
     // Seed default dynamic fields if empty
@@ -80,6 +84,9 @@ register_deactivation_hook( __FILE__, function() {
     }
     if ( function_exists( 'coffeebrk_x_clear_cron' ) ) {
         coffeebrk_x_clear_cron();
+    }
+    if ( function_exists( 'coffeebrk_story_healthcheck_clear_cron' ) ) {
+        coffeebrk_story_healthcheck_clear_cron();
     }
     flush_rewrite_rules();
 });
@@ -272,6 +279,10 @@ require_once COFFEEBRK_CORE_PATH . 'inc/feed.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/api-tokens.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rest-api.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/youtube-importer-rest.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/rss-rest.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/stories-rest.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/tokens-rest.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/monitoring-rest.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/public-api.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/auth.php';
 require_once COFFEEBRK_CORE_PATH . 'admin/json-articles-importer.php';

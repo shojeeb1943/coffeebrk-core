@@ -207,7 +207,7 @@ function coffeebrk_update_token_name( $token_id, $name ) {
  */
 function coffeebrk_update_token_permissions( $token_id, $permissions ) {
     $tokens = coffeebrk_get_api_tokens();
-    $valid_permissions = [ 'read', 'write', 'delete' ];
+    $valid_permissions = [ 'read', 'write', 'delete', 'manage' ];
     $permissions = array_intersect( $permissions, $valid_permissions );
 
     foreach ( $tokens as $key => $token ) {
@@ -301,6 +301,7 @@ add_action( 'admin_post_coffeebrk_create_token', function() {
     if ( isset( $_POST['perm_read'] ) ) $permissions[] = 'read';
     if ( isset( $_POST['perm_write'] ) ) $permissions[] = 'write';
     if ( isset( $_POST['perm_delete'] ) ) $permissions[] = 'delete';
+    if ( isset( $_POST['perm_manage'] ) ) $permissions[] = 'manage';
 
     if ( empty( $permissions ) ) {
         $permissions = [ 'read', 'write', 'delete' ];
@@ -385,6 +386,7 @@ add_action( 'admin_post_coffeebrk_update_token', function() {
     if ( isset( $_POST['perm_read'] ) ) $permissions[] = 'read';
     if ( isset( $_POST['perm_write'] ) ) $permissions[] = 'write';
     if ( isset( $_POST['perm_delete'] ) ) $permissions[] = 'delete';
+    if ( isset( $_POST['perm_manage'] ) ) $permissions[] = 'manage';
 
     if ( ! empty( $permissions ) ) {
         coffeebrk_update_token_permissions( $token_id, $permissions );

@@ -127,6 +127,7 @@ class Coffeebrk_X_Post_Field_Tag extends Tag {
 				'is_reply'            => __( 'Is Reply (Yes/No)', 'coffeebrk-core' ),
 				'is_retweet'          => __( 'Is Retweet (Yes/No)', 'coffeebrk-core' ),
 				'is_quote'            => __( 'Is Quote (Yes/No)', 'coffeebrk-core' ),
+				'embed_html'          => __( 'X Embed Code (blockquote + script)', 'coffeebrk-core' ),
 			],
 		] );
 	}
@@ -186,6 +187,15 @@ class Coffeebrk_X_Post_Field_Tag extends Tag {
 				break;
 			case 'is_quote':
 				echo esc_html( get_post_meta( $id, '_cbk_x_is_quote', true ) ? __( 'Yes', 'coffeebrk-core' ) : __( 'No', 'coffeebrk-core' ) );
+				break;
+			case 'embed_html':
+				// Raw markup on purpose (X's own widgets.js renders the real
+				// card client-side) — only the URL is untrusted, so only it
+				// is escaped; the rest is a fixed, hand-written template.
+				$permalink = (string) get_post_meta( $id, '_cbk_x_permalink', true );
+				if ( $permalink === '' ) break;
+				echo '<blockquote class="twitter-tweet"><a href="' . esc_url( $permalink ) . '"></a></blockquote>'
+					. '<script async src="https://platform.x.com/widgets.js" charset="utf-8"></script>';
 				break;
 			case 'text':
 			default:

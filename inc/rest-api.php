@@ -223,6 +223,22 @@ function coffeebrk_api_permission_delete( WP_REST_Request $req ) {
     return is_user_logged_in() && current_user_can( 'delete_posts' );
 }
 
+/**
+ * Permission callback for sensitive management operations (API tokens,
+ * error/login logs). Deliberately does NOT fall back to any Bearer token
+ * without the explicit 'manage' scope — a token with only read/write/delete
+ * must not be able to mint or revoke other tokens, or read PII-bearing logs.
+ * Allows: Bearer token with 'manage' permission OR a logged-in admin.
+ */
+function coffeebrk_api_permission_manage( WP_REST_Request $req ) {
+    $token = coffeebrk_core_get_bearer_token_from_rest_request( $req );
+    if ( $token !== '' && function_exists( 'coffeebrk_token_has_permission' ) && coffeebrk_token_has_permission( $token, 'manage' ) ) {
+        return true;
+    }
+
+    return is_user_logged_in() && current_user_can( 'manage_options' );
+}
+
 // =============================================================================
 // SCHEMA HELPERS
 // =============================================================================

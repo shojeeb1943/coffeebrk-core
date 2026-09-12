@@ -1,6 +1,6 @@
 # ☕ Coffeebrk Core MCP Server
 
-Model Context Protocol (MCP) server for **Coffeebrk Core**, enabling AI agents (Claude, Antigravity, Cursor, Windsurf, Cline, etc.) to read, create, update, and manage WordPress articles, web stories, RSS feeds, X collector posts, and custom dynamic fields.
+Model Context Protocol (MCP) server for **Coffeebrk Core**, enabling AI agents (Claude, Antigravity, Cursor, Windsurf, Cline, etc.) to read, create, update, and manage every module of the plugin — WordPress articles, web stories, RSS feeds, X collector posts, API tokens, and custom dynamic fields — and to check what's currently going on across the live site (recent imports, errors, aggregate stats).
 
 ---
 
@@ -11,9 +11,12 @@ With this MCP server connected, your AI agents can:
 * 🏷️ **Dynamic Meta & Attribution**: Attach source names (`_source_name`), source URLs (`_source_url`), external image URLs, categories, and tags.
 * 📦 **Bulk Post Ingestion**: Ingest batches of news articles in a single prompt.
 * 🔍 **Smart Search & Filter**: Search posts by keywords, categories, date ranges, or meta fields.
-* 📱 **Web Stories Integration**: Retrieve interactive mobile web stories.
-* 🐦 **X (Twitter) Ingestion**: Query ingested tweets from monitored X profiles.
-* 🗂️ **Taxonomies & Diagnostics**: Inspect categories, registered dynamic fields, and RSS diagnostics.
+* 📱 **Web Stories**: Full CRUD for stories, including ones ingested via the YouTube n8n pipeline.
+* 🐦 **X (Twitter) Ingestion**: Query, update, or delete ingested tweets, and check ingestion activity/stats.
+* 📡 **RSS Aggregator**: Manage feed sources, trigger manual imports, and check import history.
+* 🔑 **API Token Management**: List, create, update, and revoke API tokens (requires the `manage` scope).
+* 📊 **Live Monitoring**: Tail error/login logs and get an aggregate "what's going on" snapshot across the whole plugin.
+* 🗂️ **Taxonomies & Diagnostics**: Inspect categories, registered dynamic fields, and RSS output-feed diagnostics.
 
 ---
 
@@ -30,9 +33,24 @@ With this MCP server connected, your AI agents can:
 | `list_categories` | List categories with post counts | `hide_empty` (boolean) |
 | `get_meta_fields` | List registered Coffeebrk Dynamic Fields | _None_ |
 | `list_stories` | Fetch web stories | `page`, `per_page` |
-| `list_x_posts` | Retrieve collected X / Twitter posts | `page`, `per_page`, `profile_id`, `category`, `featured` |
-| `list_x_profiles` | List monitored X collector profiles | `enabled` (boolean) |
-| `get_site_info` | Get site info, plugin version, and RSS status | _None_ |
+| `get_story` / `create_story` / `update_story` / `delete_story` | Full CRUD for a single Web Story | `id`, `title`, `video_url`, `thumbnail_url`, `show_frontend`, `gradient`, `text_color`, `gradient_intensity` |
+| `get_stories_stats` | Aggregate story counts (total, YouTube-sourced, visible) | _None_ |
+| `list_x_posts` | Retrieve collected X / Twitter posts | `page`, `per_page`, `featured`, `orderby`, `order` |
+| `create_x_post` / `bulk_create_x_posts` | Ingest one or many scraped X posts (idempotent by tweet id) | raw tweet object(s) |
+| `update_x_post` | Update an X post's publish status or featured flag | `id`, `status`, `is_featured` |
+| `delete_x_post` | Trash an X post | `id` |
+| `get_x_activity_log` | Recent X ingestion activity (last 24h) | `limit` |
+| `get_x_stats` | Aggregate X-collector counts + token usage | _None_ |
+| `list_rss_feeds` / `get_rss_feed` | List or fetch RSS feed sources | `orderby`, `order`, `enabled` / `id` |
+| `create_rss_feed` / `update_rss_feed` / `delete_rss_feed` | Manage RSS feed sources | `feed_name`, `feed_url`, `enabled`, `import_limit`, `category_id` |
+| `run_rss_feed` / `run_all_rss_feeds` | Manually trigger an RSS import now | `id` (for single feed) |
+| `get_rss_activity_log` / `get_rss_stats` | RSS import history and aggregate counts | `limit` |
+| `list_api_tokens` / `create_api_token` / `update_api_token` / `revoke_api_token` | Manage API tokens — never returns the secret except once on creation. **Requires the `manage` scope.** | `name`, `permissions`, `status` |
+| `get_error_log` / `get_login_log` | Tail the error/login logs. **Requires the `manage` scope.** | `limit` |
+| `get_site_activity` | Aggregate "what's going on" snapshot across every module | _None_ |
+| `get_site_info` | Get site info and RSS output-feed diagnostics | _None_ |
+
+> **The `manage` scope**: token/log endpoints are more sensitive than everyday content CRUD, so they require a token explicitly granted the `manage` permission (check it when creating a token on the API page), or a logged-in admin session. A plain read/write/delete token gets a 403 on these.
 
 ---
 

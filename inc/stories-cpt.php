@@ -9,6 +9,29 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+/**
+ * Shared video-platform detection, used by the admin "Platform" column,
+ * the stories widget thumbnail lookup, and the video health-check cron.
+ */
+function cbk_story_detect_platform( $url ) {
+    if ( empty( $url ) ) {
+        return '';
+    }
+    if ( preg_match( '/(?:youtube\.com\/(?:shorts\/|watch\?v=|embed\/|v\/)|youtu\.be\/)/', $url ) ) {
+        return 'youtube';
+    }
+    if ( preg_match( '/vimeo\.com\//', $url ) ) {
+        return 'vimeo';
+    }
+    if ( preg_match( '/tiktok\.com\//', $url ) ) {
+        return 'tiktok';
+    }
+    if ( preg_match( '/instagram\.com\/(?:p|reel|tv)\//', $url ) ) {
+        return 'instagram';
+    }
+    return 'video';
+}
+
 add_action( 'init', function() {
     register_post_type( 'cbk_story', [
         'labels' => [
@@ -127,6 +150,32 @@ add_action( 'admin_init', function() {
 });
 
 /**
+ * Show a notice after the "Recheck Videos Now" action redirects back here.
+ */
+add_action( 'admin_init', function() {
+    if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'cbk-stories-import' ) {
+        return;
+    }
+    if ( ! isset( $_GET['cbk_recheck_done'] ) ) {
+        return;
+    }
+
+    $checked = isset( $_GET['checked'] ) ? intval( $_GET['checked'] ) : 0;
+    $hidden  = isset( $_GET['hidden'] ) ? intval( $_GET['hidden'] ) : 0;
+
+    add_settings_error(
+        'cbk_stories_import',
+        'recheck_done',
+        sprintf(
+            __( 'Checked %1$d videos, hid %2$d dead one(s).', 'coffeebrk-core' ),
+            $checked,
+            $hidden
+        ),
+        'updated'
+    );
+});
+
+/**
  * Handle Sample JSON Download
  */
 add_action( 'admin_init', function() {
@@ -181,6 +230,16 @@ function cbk_stories_import_page() {
                     <input type="submit" class="button button-primary" value="<?php _e( 'Start Import', 'coffeebrk-core' ); ?>">
                     <a href="<?php echo esc_url( add_query_arg( 'action', 'cbk_download_sample_stories', admin_url() ) ); ?>" class="button button-secondary"><?php _e( 'Download Sample JSON', 'coffeebrk-core' ); ?></a>
                 </p>
+            </form>
+        </div>
+
+        <div class="card" style="max-width: 800px; padding: 20px; margin-top: 20px;">
+            <h2 style="margin-top: 0;"><?php _e( 'Video Health Check', 'coffeebrk-core' ); ?></h2>
+            <p><?php _e( 'Checks every visible story\'s YouTube/TikTok video and automatically hides ones that have been deleted or made private.', 'coffeebrk-core' ); ?></p>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <input type="hidden" name="action" value="cbk_recheck_story_videos">
+                <?php wp_nonce_field( 'cbk_recheck_story_videos' ); ?>
+                <input type="submit" class="button button-secondary" value="<?php esc_attr_e( 'Recheck Videos Now', 'coffeebrk-core' ); ?>">
             </form>
         </div>
 
@@ -353,6 +412,7 @@ add_filter( 'manage_cbk_story_posts_columns', function( $columns ) {
     $new_columns['thumbnail'] = __( 'Thumbnail', 'coffeebrk-core' );
     $new_columns['title'] = $columns['title'];
     $new_columns['video'] = __( 'Video', 'coffeebrk-core' );
+    $new_columns['platform'] = __( 'Platform', 'coffeebrk-core' );
     $new_columns['show_frontend'] = __( 'Show', 'coffeebrk-core' );
     $new_columns['date'] = $columns['date'];
     return $new_columns;
@@ -374,6 +434,10 @@ add_action( 'manage_cbk_story_posts_custom_column', function( $column, $post_id 
             } else {
                 echo '—';
             }
+            break;
+        case 'platform':
+            $platform = cbk_story_detect_platform( get_post_meta( $post_id, '_cbk_story_video_url', true ) );
+            echo $platform ? esc_html( ucfirst( $platform ) ) : '—';
             break;
         case 'show_frontend':
             $show = get_post_meta( $post_id, '_cbk_story_show_frontend', true );

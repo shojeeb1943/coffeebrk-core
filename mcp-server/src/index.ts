@@ -389,9 +389,9 @@ const TOOLS: Tool[] = [
       properties: {
         page: { type: "integer", default: 1 },
         per_page: { type: "integer", default: 20 },
-        profile_id: { type: "integer", description: "Filter by profile ID" },
-        category: { type: "integer", description: "Filter by category ID" },
         featured: { type: "boolean", description: "Filter by featured status" },
+        orderby: { type: "string", enum: ["date", "modified"], description: "Sort field" },
+        order: { type: "string", enum: ["ASC", "DESC"], description: "Sort direction" },
       },
     },
   },
@@ -427,6 +427,263 @@ const TOOLS: Tool[] = [
       type: "object",
       properties: {},
     },
+  },
+
+  // --- X-Collector: activity + CRUD gap fill ---
+  {
+    name: "get_x_activity_log",
+    description: "Get recent X-collector ingestion activity (last 24h) — one entry per ingest call from n8n, with created/skipped counts and errors.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", default: 50, description: "Max entries to return (1-200)" },
+      },
+    },
+  },
+  {
+    name: "get_x_stats",
+    description: "Get aggregate X-collector stats: post counts, imports today/last-24h, last import time, and API token usage.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "update_x_post",
+    description: "Update an ingested X post's publish status (draft/publish) or featured flag.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "integer", description: "X post ID" },
+        status: { type: "string", enum: ["draft", "publish"], description: "Publish status" },
+        is_featured: { type: "boolean", description: "Featured flag" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_x_post",
+    description: "Trash an ingested X post by ID.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "X post ID" } },
+      required: ["id"],
+    },
+  },
+
+  // --- RSS Importer: feed source management ---
+  {
+    name: "list_rss_feeds",
+    description: "List RSS aggregator feed sources with their enabled state, import limit, category mapping, and last run/import times.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        orderby: { type: "string", description: "id, feed_name, feed_url, enabled, last_import, or last_run" },
+        order: { type: "string", enum: ["ASC", "DESC"] },
+        enabled: { type: "boolean", description: "Filter by enabled state" },
+      },
+    },
+  },
+  {
+    name: "get_rss_feed",
+    description: "Get a single RSS feed source by ID.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "Feed ID" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "create_rss_feed",
+    description: "Add a new RSS feed source to the aggregator.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        feed_name: { type: "string", description: "Display name for the feed" },
+        feed_url: { type: "string", description: "RSS/Atom feed URL" },
+        enabled: { type: "boolean", default: true },
+        import_limit: { type: "integer", default: 5, description: "Max items to import per run (1-50)" },
+        category_id: { type: "integer", description: "WordPress category to assign imported posts to" },
+      },
+      required: ["feed_name", "feed_url"],
+    },
+  },
+  {
+    name: "update_rss_feed",
+    description: "Update an existing RSS feed source's name, URL, enabled state, import limit, or category.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "integer", description: "Feed ID to update" },
+        feed_name: { type: "string" },
+        feed_url: { type: "string" },
+        enabled: { type: "boolean" },
+        import_limit: { type: "integer" },
+        category_id: { type: "integer" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_rss_feed",
+    description: "Delete an RSS feed source.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "Feed ID" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "run_rss_feed",
+    description: "Manually trigger an import run for a single RSS feed right now (doesn't wait for the hourly cron).",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "Feed ID to run" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "run_all_rss_feeds",
+    description: "Manually trigger an import run for all enabled RSS feeds right now.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_rss_activity_log",
+    description: "Get recent RSS import activity (last 24h): feed runs, drafted posts, skipped items, and errors.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 50, description: "Max entries to return (1-200)" } },
+    },
+  },
+  {
+    name: "get_rss_stats",
+    description: "Get aggregate RSS aggregator stats: total/enabled feed counts and the next scheduled cron run.",
+    inputSchema: { type: "object", properties: {} },
+  },
+
+  // --- Stories: full CRUD (covers YouTube-ingested stories too) ---
+  {
+    name: "get_story",
+    description: "Get a single Web Story by ID, including YouTube-ingestion metadata if applicable.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "Story ID" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "create_story",
+    description: "Create a new Web Story (manual, not YouTube-ingestion — use the n8n YouTube pipeline for that).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        video_url: { type: "string" },
+        thumbnail_url: { type: "string", description: "Image URL to sideload as the featured thumbnail" },
+        show_frontend: { type: "boolean", default: true },
+        gradient: { type: "string", description: "Hex color, e.g. #F5F5FF" },
+        text_color: { type: "string", description: "Hex color, e.g. #323232" },
+        gradient_intensity: { type: "integer", description: "0-100" },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "update_story",
+    description: "Update an existing Web Story's title, video URL, visibility, or styling.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "integer", description: "Story ID to update" },
+        title: { type: "string" },
+        video_url: { type: "string" },
+        thumbnail_url: { type: "string" },
+        show_frontend: { type: "boolean" },
+        gradient: { type: "string" },
+        text_color: { type: "string" },
+        gradient_intensity: { type: "integer" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "delete_story",
+    description: "Trash a Web Story by ID.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "integer", description: "Story ID" } },
+      required: ["id"],
+    },
+  },
+  {
+    name: "get_stories_stats",
+    description: "Get aggregate story counts: total, published, YouTube-sourced, and visible-on-frontend.",
+    inputSchema: { type: "object", properties: {} },
+  },
+
+  // --- API Tokens: management (requires the 'manage' scope) ---
+  {
+    name: "list_api_tokens",
+    description: "List all API tokens (name, permissions, status, last used) — never returns the secret value. Requires a token with the 'manage' scope or a logged-in admin.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "create_api_token",
+    description: "Create a new API token. Returns the plaintext token once — it is never shown again. Requires the 'manage' scope.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Label for the token, e.g. 'n8n Production'" },
+        permissions: {
+          type: "array",
+          items: { type: "string", enum: ["read", "write", "delete", "manage"] },
+          description: "Scopes to grant (default: read, write, delete)",
+        },
+      },
+    },
+  },
+  {
+    name: "update_api_token",
+    description: "Update an API token's name, permissions, or active/inactive status. Requires the 'manage' scope.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Token ID (e.g. tok_xxxxx)" },
+        name: { type: "string" },
+        permissions: { type: "array", items: { type: "string", enum: ["read", "write", "delete", "manage"] } },
+        status: { type: "string", enum: ["active", "inactive"] },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "revoke_api_token",
+    description: "Permanently revoke (delete) an API token. Requires the 'manage' scope.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Token ID (e.g. tok_xxxxx)" } },
+      required: ["id"],
+    },
+  },
+
+  // --- Monitoring: logs + site-wide activity ---
+  {
+    name: "get_error_log",
+    description: "Tail the plugin's error log (ingestion failures, sideload errors, etc.). Requires the 'manage' scope — contains IPs and user-agents.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 50, description: "Max entries to return (1-200)" } },
+    },
+  },
+  {
+    name: "get_login_log",
+    description: "Tail the WordPress login log (user, email, IP, user-agent per login). Requires the 'manage' scope.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "integer", default: 50, description: "Max entries to return (1-200)" } },
+    },
+  },
+  {
+    name: "get_site_activity",
+    description: "Get an aggregate 'what's going on' snapshot across the whole plugin: post/story/X-post counts, RSS feed counts and next cron run, API token counts, and errors/logins in the last 24h.",
+    inputSchema: { type: "object", properties: {} },
   },
 ];
 
@@ -626,6 +883,147 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ],
           isError: res.isError,
         };
+      }
+
+      // --- X-Collector ---
+      case "get_x_activity_log": {
+        const res = await callApi("/x-posts/activity", "GET", undefined, args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "get_x_stats": {
+        const res = await callApi("/x-posts/stats", "GET");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "update_x_post": {
+        const { id, ...body } = args as any;
+        const res = await callApi(`/x-posts/${id}`, "PUT", body);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "delete_x_post": {
+        const { id } = args as any;
+        const res = await callApi(`/x-posts/${id}`, "DELETE");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      // --- RSS Importer ---
+      case "list_rss_feeds": {
+        const res = await callApi("/rss-feeds", "GET", undefined, args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "get_rss_feed": {
+        const { id } = args as any;
+        const res = await callApi(`/rss-feeds/${id}`, "GET");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "create_rss_feed": {
+        const res = await callApi("/rss-feeds", "POST", args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "update_rss_feed": {
+        const { id, ...body } = args as any;
+        const res = await callApi(`/rss-feeds/${id}`, "PUT", body);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "delete_rss_feed": {
+        const { id } = args as any;
+        const res = await callApi(`/rss-feeds/${id}`, "DELETE");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "run_rss_feed": {
+        const { id } = args as any;
+        const res = await callApi(`/rss-feeds/${id}/run`, "POST");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "run_all_rss_feeds": {
+        const res = await callApi("/rss-feeds/run-all", "POST");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "get_rss_activity_log": {
+        const res = await callApi("/rss-feeds/activity", "GET", undefined, args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "get_rss_stats": {
+        const res = await callApi("/rss-feeds/stats", "GET");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      // --- Stories ---
+      case "get_story": {
+        const { id } = args as any;
+        const res = await callApi(`/stories/${id}`, "GET");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "create_story": {
+        const res = await callApi("/stories", "POST", args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "update_story": {
+        const { id, ...body } = args as any;
+        const res = await callApi(`/stories/${id}`, "PUT", body);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "delete_story": {
+        const { id } = args as any;
+        const res = await callApi(`/stories/${id}`, "DELETE");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "get_stories_stats": {
+        const res = await callApi("/stories/stats", "GET");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      // --- API Tokens ---
+      case "list_api_tokens": {
+        const res = await callApi("/tokens", "GET");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "create_api_token": {
+        const res = await callApi("/tokens", "POST", args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "update_api_token": {
+        const { id, ...body } = args as any;
+        const res = await callApi(`/tokens/${id}`, "PATCH", body);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "revoke_api_token": {
+        const { id } = args as any;
+        const res = await callApi(`/tokens/${id}`, "DELETE");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      // --- Monitoring ---
+      case "get_error_log": {
+        const res = await callApi("/logs/errors", "GET", undefined, args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "get_login_log": {
+        const res = await callApi("/logs/logins", "GET", undefined, args);
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
+      }
+
+      case "get_site_activity": {
+        const res = await callApi("/site-activity", "GET");
+        return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }], isError: res.isError };
       }
 
       default:

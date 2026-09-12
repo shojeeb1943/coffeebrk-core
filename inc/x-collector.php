@@ -45,6 +45,7 @@ add_action( 'init', function() {
 });
 
 require_once __DIR__ . '/x-collector-data.php';
+require_once __DIR__ . '/x-collector-log.php';
 require_once __DIR__ . '/x-collector-normalizer.php';
 require_once __DIR__ . '/x-collector-rest.php';
 

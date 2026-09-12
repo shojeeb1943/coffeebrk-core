@@ -197,6 +197,8 @@ function coffeebrk_core_dashboard_page(){
     $token_hash = (string) get_option( 'coffeebrk_core_api_token_hash', '' );
     $has_token  = $token_hash !== '';
 
+    $site_stats = function_exists( 'coffeebrk_get_site_stats' ) ? coffeebrk_get_site_stats() : null;
+
     // ---- Navigation links ----
     $nav = [
         [ 'url' => admin_url('admin.php?page=coffeebrk-core-auth'),          'icon' => 'dashicons-shield',          'label' => 'Auth Settings' ],
@@ -208,6 +210,7 @@ function coffeebrk_core_dashboard_page(){
         [ 'url' => admin_url('admin.php?page=coffeebrk-core-api&tab=mcp'),   'icon' => 'dashicons-admin-generic',   'label' => 'MCP Server' ],
         [ 'url' => admin_url('admin.php?page=coffeebrk-core-logs'),          'icon' => 'dashicons-list-view',       'label' => 'Logs' ],
         [ 'url' => admin_url('edit.php?post_type=cbk_story'),                'icon' => 'dashicons-format-video',    'label' => 'Stories' ],
+        [ 'url' => admin_url('admin.php?page=coffeebrk-core-x-activity'),    'icon' => 'dashicons-twitter',         'label' => 'X Activity' ],
     ];
 
     // ---- Render ----
@@ -265,6 +268,17 @@ function coffeebrk_core_dashboard_page(){
     echo '    <p class="cbk-stat__value">' . esc_html( (string) count( $aspires ) ) . '</p>';
     echo '  </div>';
     echo '</div>';
+
+    if ( $site_stats ) {
+        echo '<div class="cbk-stat">';
+        echo '  <div class="cbk-stat__icon"><span class="dashicons dashicons-twitter"></span></div>';
+        echo '  <div class="cbk-stat__body">';
+        echo '    <p class="cbk-stat__label">X / Social Posts</p>';
+        echo '    <p class="cbk-stat__value">' . esc_html( (string) $site_stats['x_posts']['published'] ) . '</p>';
+        echo '    <p class="cbk-stat__sub">' . esc_html( (string) $site_stats['x_posts']['draft'] ) . ' draft</p>';
+        echo '  </div>';
+        echo '</div>';
+    }
 
     echo '</div>'; // .cbk-stats
 
@@ -340,6 +354,27 @@ function coffeebrk_core_dashboard_page(){
     echo '  </div>';
     echo '  <span class="cbk-pill cbk-pill--green">' . esc_html( (string) $json_log_count ) . '</span>';
     echo '</li>';
+
+    if ( $site_stats ) {
+        // API Tokens (multi-token count)
+        echo '<li class="cbk-health-item">';
+        echo '  <div class="cbk-health-item__left">';
+        echo '    <div class="cbk-health-item__icon cbk-health-item__icon--amber"><span class="dashicons dashicons-admin-network"></span></div>';
+        echo '    <div><div class="cbk-health-item__label">API Tokens</div><div class="cbk-health-item__detail">' . esc_html( (string) $site_stats['api_tokens']['active'] ) . ' active of ' . esc_html( (string) $site_stats['api_tokens']['total'] ) . '</div></div>';
+        echo '  </div>';
+        echo '  <span class="cbk-pill cbk-pill--green">' . esc_html( (string) $site_stats['api_tokens']['active'] ) . '</span>';
+        echo '</li>';
+
+        // Errors (24h)
+        $err_pill = $site_stats['errors_last_24h'] > 0 ? 'cbk-pill--red' : 'cbk-pill--green';
+        echo '<li class="cbk-health-item">';
+        echo '  <div class="cbk-health-item__left">';
+        echo '    <div class="cbk-health-item__icon cbk-health-item__icon--blue"><span class="dashicons dashicons-warning"></span></div>';
+        echo '    <div><div class="cbk-health-item__label">Errors (24h)</div><div class="cbk-health-item__detail">See Logs page for details</div></div>';
+        echo '  </div>';
+        echo '  <span class="cbk-pill ' . esc_attr( $err_pill ) . '">' . esc_html( (string) $site_stats['errors_last_24h'] ) . '</span>';
+        echo '</li>';
+    }
 
     echo '  </ul></div>';
     echo '</div>'; // panel
@@ -585,6 +620,7 @@ function coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $tok
         .cbk-perm-badge.read { background:#e3f2fd; color:#1565c0; }
         .cbk-perm-badge.write { background:#fff3e0; color:#e65100; }
         .cbk-perm-badge.delete { background:#ffebee; color:#c62828; }
+        .cbk-perm-badge.manage { background:#f3e5f5; color:#6a1b9a; }
         .cbk-new-token-form { background:#fff; border:1px solid #0073aa; border-radius:8px; padding:20px; margin-bottom:20px; }
         .cbk-form-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
         .cbk-form-group { flex:1; min-width:200px; }
@@ -656,6 +692,7 @@ function coffeebrk_api_tab_overview( $rest_base, $plain_token, $token_hash, $tok
                             <label><input type="checkbox" name="perm_read" checked /> Read</label>
                             <label><input type="checkbox" name="perm_write" checked /> Write</label>
                             <label><input type="checkbox" name="perm_delete" checked /> Delete</label>
+                            <label><input type="checkbox" name="perm_manage" /> Manage (tokens &amp; logs)</label>
                         </div>
                     </div>
 
@@ -1459,7 +1496,20 @@ function coffeebrk_api_tab_mcp( $plain_token ) {
                     <tr><td><code>list_x_posts</code></td><td>List ingested X (Twitter) posts from the X Collector.</td></tr>
                     <tr><td><code>create_x_post</code></td><td>Ingest a single scraped X post (from n8n/Apify) into the X Collector.</td></tr>
                     <tr><td><code>bulk_create_x_posts</code></td><td>Batch-ingest multiple scraped X posts in one call.</td></tr>
-                    <tr><td><code>get_site_info</code></td><td>Get site info, plugin version, and RSS feed diagnostics.</td></tr>
+                    <tr><td><code>update_x_post</code></td><td>Update an X post's publish status or featured flag.</td></tr>
+                    <tr><td><code>delete_x_post</code></td><td>Trash an X post.</td></tr>
+                    <tr><td><code>get_x_activity_log</code></td><td>Recent X ingestion activity (last 24h).</td></tr>
+                    <tr><td><code>get_x_stats</code></td><td>Aggregate X-collector counts and token usage.</td></tr>
+                    <tr><td><code>list_rss_feeds</code> / <code>get_rss_feed</code></td><td>List or fetch RSS aggregator feed sources.</td></tr>
+                    <tr><td><code>create_rss_feed</code> / <code>update_rss_feed</code> / <code>delete_rss_feed</code></td><td>Manage RSS feed sources.</td></tr>
+                    <tr><td><code>run_rss_feed</code> / <code>run_all_rss_feeds</code></td><td>Manually trigger an RSS import for one or all enabled feeds.</td></tr>
+                    <tr><td><code>get_rss_activity_log</code> / <code>get_rss_stats</code></td><td>RSS import history and aggregate counts.</td></tr>
+                    <tr><td><code>get_story</code> / <code>create_story</code> / <code>update_story</code> / <code>delete_story</code></td><td>Full CRUD for Web Stories (including YouTube-ingested ones).</td></tr>
+                    <tr><td><code>get_stories_stats</code></td><td>Aggregate story counts (total, YouTube-sourced, visible).</td></tr>
+                    <tr><td><code>list_api_tokens</code> / <code>create_api_token</code> / <code>update_api_token</code> / <code>revoke_api_token</code></td><td>Manage API tokens. Requires a token with the <code>manage</code> scope (or a logged-in admin session).</td></tr>
+                    <tr><td><code>get_error_log</code> / <code>get_login_log</code></td><td>Tail the error/login logs. Requires the <code>manage</code> scope.</td></tr>
+                    <tr><td><code>get_site_activity</code></td><td>Aggregate site-wide stats across every module (posts, stories, X posts, RSS feeds, tokens, recent errors/logins).</td></tr>
+                    <tr><td><code>get_site_info</code></td><td>Get site info and RSS output-feed diagnostics.</td></tr>
                 </tbody>
             </table>
         </div>
