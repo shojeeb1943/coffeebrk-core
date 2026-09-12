@@ -176,7 +176,7 @@
                 catcher.className = 'cbk-story-click-catcher';
                 catcher.addEventListener('click', () => {
                     this.openViewer(stories, index, 'cbk-stories-viewer-story-feed', {
-                        autoplay: true, loop: true, startMuted: true,
+                        autoplay: true, loop: true, startMuted: false,
                     });
                 });
                 wrapper.appendChild(catcher);
@@ -198,7 +198,7 @@
                 el.dataset.cbkUvBound = 'true';
                 el.addEventListener('click', () => {
                     this.openViewer(stories, index, 'cbk-stories-viewer-universal', {
-                        autoplay: true, loop: true, startMuted: true,
+                        autoplay: true, loop: true, startMuted: false,
                     });
                 });
             });
@@ -767,21 +767,35 @@
             ttContainer.style.opacity = '1';
             ttContainer.style.zIndex = '1';
 
-            const safeUrl = escapeHtmlAttr(url);
-            const safeVideoId = videoId ? escapeHtmlAttr(videoId) : '';
-            ttContainer.innerHTML = `<blockquote class="tiktok-embed" cite="${safeUrl}" ${safeVideoId ? `data-video-id="${safeVideoId}"` : ''} style="max-width:100%;min-width:280px;"><section></section></blockquote>`;
+            if (videoId) {
+                // Direct iframe embed - the same URL TikTok's own embed.js
+                // ultimately points its generated iframe at. Far more reliable
+                // than the blockquote+script approach: that depended on
+                // embed.js noticing a blockquote re-injected after its first
+                // load, which it didn't reliably do on repeat views.
+                // ponytail: undocumented TikTok endpoint - fall back to the
+                // blockquote approach below if TikTok ever changes it.
+                ttContainer.innerHTML = '';
+                const iframe = document.createElement('iframe');
+                iframe.src = `https://www.tiktok.com/embed/v2/${encodeURIComponent(videoId)}`;
+                iframe.style.cssText = 'width:100%;height:100%;border:0;';
+                iframe.allow = 'autoplay; encrypted-media; picture-in-picture';
+                iframe.allowFullscreen = true;
+                ttContainer.appendChild(iframe);
+            } else {
+                // No extractable video ID (short/share link, e.g. vm.tiktok.com) -
+                // fall back to the official blockquote embed.
+                const safeUrl = escapeHtmlAttr(url);
+                ttContainer.innerHTML = `<blockquote class="tiktok-embed" cite="${safeUrl}" style="max-width:100%;min-width:280px;"><section></section></blockquote>`;
 
-            // ponytail: TikTok's embed.js has no documented re-scan API (unlike
-            // Instagram's instgrm.Embeds.process()) - removing and re-adding a
-            // fresh script tag is the only reliable way to make it pick up a
-            // dynamically inserted blockquote. Upgrade if TikTok ever ships one.
-            const old = document.getElementById('cbk-tiktok-embed-script');
-            if (old) old.remove();
-            const script = document.createElement('script');
-            script.id = 'cbk-tiktok-embed-script';
-            script.async = true;
-            script.src = 'https://www.tiktok.com/embed.js';
-            document.body.appendChild(script);
+                const old = document.getElementById('cbk-tiktok-embed-script');
+                if (old) old.remove();
+                const script = document.createElement('script');
+                script.id = 'cbk-tiktok-embed-script';
+                script.async = true;
+                script.src = 'https://www.tiktok.com/embed.js';
+                document.body.appendChild(script);
+            }
 
             this.startFixedTimer();
         }
