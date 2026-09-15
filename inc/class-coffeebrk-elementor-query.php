@@ -29,9 +29,17 @@ add_action( 'elementor/element/loop-grid/section_query/after_section_end', funct
  * widget's own Order/Order By controls (date DESC by default) natively.
  */
 add_filter( 'elementor/query/query_args', function( $query_args, $widget ) {
-    if ( 'loop-grid' === $widget->get_name()
-        && isset( $query_args['post_type'] )
-        && 'coffeebrk_posts_stories' === $query_args['post_type']
+    if ( 'loop-grid' !== $widget->get_name() ) {
+        return $query_args;
+    }
+
+    // Elementor Pro resolves/defaults post_query_post_type before this
+    // generic filter runs, so 'coffeebrk_posts_stories' rarely survives on
+    // $query_args['post_type']. Read the widget's own saved setting instead.
+    $selected = $widget->get_settings_for_display( 'post_query_post_type' );
+
+    if ( 'coffeebrk_posts_stories' === $selected
+        || ( isset( $query_args['post_type'] ) && 'coffeebrk_posts_stories' === $query_args['post_type'] )
     ) {
         $query_args['post_type'] = [ 'post', 'cbk_story' ];
     }
