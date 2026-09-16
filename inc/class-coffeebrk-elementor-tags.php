@@ -57,9 +57,27 @@ add_action( 'elementor/dynamic_tags/register', function( $dynamic_tags_manager )
         if ($key === '_source_name' || $key === '_source_url') { continue; }
 
         if ( $type === 'image_url' && class_exists( '\\Coffeebrk_Dynamic_Image_Url_Tag' ) ) {
-            $tag = new \Coffeebrk_Dynamic_Image_Url_Tag();
-            $tag->set_tag_name( 'cbk_img_' . ltrim( (string) $key, '_' ) );
-            $dynamic_tags_manager->register( $tag );
+            $clean_key = sanitize_key( ltrim( (string) $key, '_' ) );
+            $tag_name = 'cbk_img_' . $clean_key;
+            $class_name = 'Coffeebrk_Dynamic_Image_Field_Tag_' . str_replace( '-', '_', $clean_key );
+
+            if ( ! class_exists( $class_name ) ) {
+                eval("
+                    class {$class_name} extends \\Coffeebrk_Dynamic_Image_Url_Tag {
+                        public function get_name() {
+                            return '" . addslashes( $tag_name ) . "';
+                        }
+                        public function get_title() {
+                            return '" . addslashes( $label ) . "';
+                        }
+                        protected function get_field_meta_key() {
+                            return '" . addslashes( $key ) . "';
+                        }
+                    }
+                ");
+            }
+
+            $dynamic_tags_manager->register( new $class_name() );
             continue;
         }
 

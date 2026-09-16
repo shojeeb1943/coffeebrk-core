@@ -1,0 +1,69 @@
+.cbk-bento-grid {
+    width: 100%;
+}
+
+.cbk-bento-item {
+    display: inline-block;
+    width: 100%;
+    break-inside: avoid;
+}
+
+/* Radius + overflow-clip live one level below the break-inside:avoid
+   element on purpose - Chromium renders a 1px black seam at rounded
+   corners when border-radius/overflow sit on the same element that's
+   also fragmented by a CSS column layout. */
+.cbk-bento-item__inner {
+    position: relative;
+}
+
+.cbk-bento-item__media-link {
+    display: block;
+}
+
+.cbk-bento-item__img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.cbk-bento-item__img--placeholder {
+    aspect-ratio: 4 / 3;
+    background: #222;
+}
+
+.cbk-bento-item__external {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    text-decoration: none;
+}
+
+.cbk-bento-item__body {
+    padding: 12px 4px 4px;
+}
+
+.cbk-bento-item__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 0.8rem;
+    opacity: 0.7;
+    margin-bottom: 4px;
+}
+
+.cbk-bento-item__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.35;
+}

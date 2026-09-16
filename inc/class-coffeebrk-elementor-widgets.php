@@ -47,6 +47,15 @@ add_action( 'elementor/widgets/register', function( $widgets_manager ) {
     if ( class_exists( '\\Coffeebrk_Universal_Video_Widget' ) ) {
         $widgets_manager->register( new \Coffeebrk_Universal_Video_Widget() );
     }
+
+    $bento_grid = __DIR__ . '/widgets/class-coffeebrk-bento-grid-widget.php';
+    if ( file_exists( $bento_grid ) ) {
+        require_once $bento_grid;
+    }
+
+    if ( class_exists( '\\Coffeebrk_Bento_Grid_Widget' ) ) {
+        $widgets_manager->register( new \Coffeebrk_Bento_Grid_Widget() );
+    }
 } );
 
 // Backward compatibility for older Elementor versions
@@ -80,6 +89,11 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         require_once $universal_video;
     }
 
+    $bento_grid = __DIR__ . '/widgets/class-coffeebrk-bento-grid-widget.php';
+    if ( file_exists( $bento_grid ) ) {
+        require_once $bento_grid;
+    }
+
     $plugin = \Elementor\Plugin::instance();
     if ( isset( $plugin->widgets_manager ) && method_exists( $plugin->widgets_manager, 'register_widget_type' ) ) {
         if ( class_exists( '\\Coffeebrk_External_Image_Widget' ) ) {
@@ -96,6 +110,9 @@ add_action( 'elementor/widgets/widgets_registered', function() {
         }
         if ( class_exists( '\\Coffeebrk_Universal_Video_Widget' ) ) {
             $plugin->widgets_manager->register_widget_type( new \Coffeebrk_Universal_Video_Widget() );
+        }
+        if ( class_exists( '\\Coffeebrk_Bento_Grid_Widget' ) ) {
+            $plugin->widgets_manager->register_widget_type( new \Coffeebrk_Bento_Grid_Widget() );
         }
     }
 } );
@@ -114,6 +131,13 @@ add_action( 'elementor/frontend/after_enqueue_styles', function() {
         COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-stories.css',
         [],
         '1.9.8'
+    );
+
+    wp_enqueue_style(
+        'coffeebrk-bento-grid',
+        COFFEEBRK_CORE_URL . 'assets/css/coffeebrk-bento-grid.css',
+        [],
+        '1.0.0'
     );
 } );
 

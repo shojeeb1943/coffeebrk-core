@@ -18,7 +18,8 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
         }
 
         if ( is_array( $data ) ) {
-            foreach ( [ 'name', 'tag_name', 'id' ] as $k ) {
+            // Note: do not check 'id' here, as Elementor passes a random tag instance ID in $data['id']
+            foreach ( [ 'name', 'tag_name' ] as $k ) {
                 if ( ! empty( $data[ $k ] ) && is_string( $data[ $k ] ) ) {
                     $this->cbk_tag_name = $data[ $k ];
                     break;
@@ -37,7 +38,7 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
     }
 
     public function get_title() {
-        $meta_key = $this->get_meta_key();
+        $meta_key = $this->get_field_meta_key();
 
         $fields = (array) get_option( 'coffeebrk_dynamic_fields', [] );
         foreach ( $fields as $f ) {
@@ -73,10 +74,17 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
         );
     }
 
+    protected function get_field_meta_key() {
+        return $this->get_meta_key();
+    }
+
     public function get_value( array $options = [] ) {
-        $meta_key = $this->get_meta_key();
+        $meta_key = $this->get_field_meta_key();
         if ( empty( $meta_key ) ) {
-            return null;
+            return [
+                'id'  => 0,
+                'url' => '',
+            ];
         }
 
         $candidates = [];
@@ -84,10 +92,24 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
             $candidates[] = (int) $options['post_id'];
         }
         $candidates[] = (int) get_the_ID();
-        $candidates[] = (int) get_queried_object_id();
         $p = get_post();
         if ( $p && isset( $p->ID ) ) {
             $candidates[] = (int) $p->ID;
+        }
+        $candidates[] = (int) get_queried_object_id();
+
+        // If in Elementor preview or editor, check document preview settings.
+        if ( class_exists( '\\Elementor\\Plugin' ) && isset( \Elementor\Plugin::$instance->documents ) ) {
+            $doc = \Elementor\Plugin::$instance->documents->get_current();
+            if ( $doc ) {
+                $preview_id = (int) $doc->get_settings( 'preview_id' );
+                if ( ! $preview_id ) {
+                    $preview_id = (int) $doc->get_settings( 'preview_post_id' );
+                }
+                if ( $preview_id > 0 ) {
+                    $candidates[] = $preview_id;
+                }
+            }
         }
 
         // De-duplicate & remove empties while preserving order.
@@ -95,10 +117,7 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
         $post_ids = [];
         foreach ( $candidates as $cid ) {
             $cid = (int) $cid;
-            if ( $cid <= 0 ) {
-                continue;
-            }
-            if ( isset( $seen[ $cid ] ) ) {
+            if ( $cid <= 0 || isset( $seen[ $cid ] ) ) {
                 continue;
             }
             $seen[ $cid ] = true;
@@ -106,7 +125,10 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
         }
 
         if ( empty( $post_ids ) ) {
-            return null;
+            return [
+                'id'  => 0,
+                'url' => '',
+            ];
         }
 
         $image_url = '';
@@ -132,15 +154,14 @@ class Coffeebrk_Dynamic_Image_Url_Tag extends Data_Tag {
         if ( empty( $image_url ) ) {
             $placeholder = $this->get_settings( 'placeholder_url' );
             $placeholder = is_string( $placeholder ) ? trim( $placeholder ) : '';
-            if ( empty( $placeholder ) ) {
-                return null;
+            if ( ! empty( $placeholder ) ) {
+                $image_url = $placeholder;
             }
-            $image_url = $placeholder;
         }
 
         return [
             'id'  => 0,
-            'url' => esc_url( $image_url ),
+            'url' => $image_url ? esc_url( $image_url ) : '',
         ];
     }
 
