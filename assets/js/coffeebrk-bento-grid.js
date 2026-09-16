@@ -87,6 +87,15 @@
     // asynchronously after its own script runs.
     window.cbkBentoGridRelayout = relayoutAll;
 
+    // Public API so the story popup can fetch more videos on demand, independent
+    // of the background grid's own scroll-triggered pagination (which can't fire
+    // while the modal has document.body.style.overflow = 'hidden').
+    window.cbkBentoGridLoadMore = function () {
+        var controller = paginationControllers.filter(function (c) { return !c.isDone(); })[0];
+        if (!controller) return Promise.resolve(false);
+        return controller.loadNext();
+    };
+
     function fetchPage(restUrl, query, page) {
         var params = new URLSearchParams(query);
         params.set('paged', page);
@@ -116,6 +125,8 @@
         }
     }
 
+    var paginationControllers = [];
+
     function initPagination(paginationEl) {
         if (paginationEl.dataset.cbkBound) return;
         paginationEl.dataset.cbkBound = 'true';
@@ -129,26 +140,28 @@
         var loading = false;
 
         function loadNext() {
-            if (loading || done) return;
+            if (loading || done) return Promise.resolve(false);
             loading = true;
             paginationEl.classList.add('cbk-bento-pagination--loading');
 
-            fetchPage(config.restUrl, config.query, currentPage + 1)
+            return fetchPage(config.restUrl, config.query, currentPage + 1)
                 .then(function (data) {
                     // current_page/has_more come from the server on every
                     // response - treated as authoritative so a stray empty
                     // page can never stall currentPage and cause the same
                     // page number to be re-requested indefinitely.
+                    var appended = false;
                     if (data && data.success) {
-                        if (data.html) appendHtml(grid, data.html);
+                        if (data.html) { appendHtml(grid, data.html); appended = true; }
                         currentPage = data.current_page;
                         if (!data.has_more) done = true;
                     } else {
                         done = true; // malformed response - stop rather than retry forever
                     }
+                    return appended;
                 })
-                .catch(function () { done = true; })
-                .then(function () {
+                .catch(function () { done = true; return false; })
+                .then(function (appended) {
                     loading = false;
                     paginationEl.classList.remove('cbk-bento-pagination--loading');
 
@@ -156,8 +169,11 @@
                         paginationEl.classList.add('cbk-bento-pagination--done');
                         if (observer) observer.disconnect();
                     }
+                    return appended;
                 });
         }
+
+        paginationControllers.push({ loadNext: loadNext, isDone: function () { return done; } });
 
         var observer = null;
 

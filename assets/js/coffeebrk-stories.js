@@ -34,8 +34,9 @@
             this.ytPlayer = null;
             this.vimeoPlayer = null;
             this.htmlVideoInfo = null; // Store reference to current HTML element
-            this.storyTimer = null; // Fixed-duration auto-advance timer (TikTok/Instagram)
-            this.storyGen = 0; // Bumped on every showStory() so stale async timers/observers can tell they're outdated
+            this.universalVideoStories = []; // Persistent, append-only - shared by every .cbk-universal-video card across AJAX pages
+            this.loadMoreEnabled = false;
+            this.loadMorePending = false;
 
             this.init();
         }
@@ -192,14 +193,16 @@
             const els = document.querySelectorAll('.cbk-universal-video');
             if (!els.length) return;
 
-            const stories = Array.from(els).map(el => ({ videoUrl: el.dataset.videoUrl }));
-
-            els.forEach((el, index) => {
+            els.forEach((el) => {
                 if (el.dataset.cbkUvBound) return;
                 el.dataset.cbkUvBound = 'true';
+                // New cards are always appended at the end of the DOM (AJAX pages
+                // insertAdjacentHTML('beforeend', ...)), so push order == DOM order.
+                const index = this.universalVideoStories.length;
+                this.universalVideoStories.push({ videoUrl: el.dataset.videoUrl });
                 el.addEventListener('click', () => {
-                    this.openViewer(stories, index, 'cbk-stories-viewer-universal', {
-                        autoplay: true, loop: true, startMuted: false,
+                    this.openViewer(this.universalVideoStories, index, 'cbk-stories-viewer-universal', {
+                        autoplay: true, loop: true, startMuted: false, loadMore: true,
                     });
                 });
             });
@@ -277,6 +280,7 @@
             this.autoplay = settings.autoplay !== false;
             this.loop = !!settings.loop;
             this.startMuted = settings.startMuted !== false;
+            this.loadMoreEnabled = !!settings.loadMore;
 
             this.viewer = document.getElementById(viewerId);
 
@@ -431,7 +435,6 @@
             if (index < 0 || index >= this.stories.length) return;
 
             this.currentIndex = index;
-            this.storyGen++;
             const story = this.stories[index];
             const videoUrl = story.videoUrl;
             const videoContainer = this.viewer.querySelector('.cbk-stories-viewer__video-container');
@@ -478,11 +481,6 @@
         }
 
         pauseAllPlayers() {
-            if (this.storyTimer) {
-                clearTimeout(this.storyTimer);
-                this.storyTimer = null;
-            }
-
             const hidePlayer = (el) => {
                 if (el) {
                     el.style.visibility = 'hidden';
@@ -565,9 +563,6 @@
                                 this.handleYouTubeMuteAndPlay();
                             },
                             'onStateChange': (event) => {
-                                // Loop Logic
-                                if (event.data === YT.PlayerState.ENDED) this.nextStory();
-
                                 // Check mute state when playing
                                 if (event.data === YT.PlayerState.PLAYING) {
                                     const isMuted = event.target.isMuted();
@@ -678,8 +673,6 @@
                         loop: false
                     });
 
-                    this.vimeoPlayer.on('ended', () => this.nextStory());
-
                     // Enforcement Logic
                     this.vimeoPlayer.on('play', () => {
                         if (!this.startMuted) {
@@ -729,7 +722,6 @@
                 video.id = 'cbk-html-video-instance';
                 video.controls = true;
                 video.playsInline = true;
-                video.addEventListener('ended', () => this.nextStory());
                 // Force absolute positioning
                 video.style.position = 'absolute';
                 video.style.top = '0';
@@ -810,8 +802,6 @@
                 script.src = 'https://www.tiktok.com/embed.js';
                 document.body.appendChild(script);
             }
-
-            this.armAutoAdvance(ttContainer);
         }
 
         initInstagram(container, url) {
@@ -838,48 +828,6 @@
             if (window.instgrm && window.instgrm.Embeds) {
                 window.instgrm.Embeds.process();
             } // else: loadAPIs() already queued embed.js; it auto-processes on load.
-
-            this.armAutoAdvance(igContainer);
-        }
-
-        // ponytail: still a naive fixed-duration timer, not a real end-of-video signal -
-        // neither TikTok's nor Instagram's embed widget fires a JS "ended" event. Upgrade
-        // if either platform ever ships a postMessage-based player API.
-        //
-        // What this does fix: it used to start counting from the moment we injected the
-        // embed markup, before TikTok/Instagram's embed.js had even fetched and rendered
-        // the iframe. That load time (often several seconds, worse on slow connections)
-        // was eating into the 15s budget, so playback visibly got cut to ~8-10s. Now it
-        // waits for the embed's iframe to actually finish loading before starting the
-        // clock, with a timeout fallback in case the iframe never shows up (blocked embed).
-        armAutoAdvance(container) {
-            const DURATION_MS = 15000;
-            const LOAD_WAIT_MS = 4000;
-            const gen = this.storyGen;
-
-            const arm = () => {
-                if (gen !== this.storyGen || this.storyTimer) return; // navigated away, or already armed
-                this.storyTimer = setTimeout(() => this.nextStory(), DURATION_MS);
-            };
-
-            const existingIframe = container.querySelector('iframe');
-            if (existingIframe) {
-                existingIframe.addEventListener('load', arm, { once: true });
-                setTimeout(arm, LOAD_WAIT_MS); // safety net if 'load' never fires
-                return;
-            }
-
-            // Blockquote embeds (Instagram, TikTok's link-only fallback) inject their
-            // iframe asynchronously via embed.js - watch for it instead of guessing.
-            const observer = new MutationObserver(() => {
-                const iframe = container.querySelector('iframe');
-                if (iframe) {
-                    observer.disconnect();
-                    iframe.addEventListener('load', arm, { once: true });
-                }
-            });
-            observer.observe(container, { childList: true, subtree: true });
-            setTimeout(() => { observer.disconnect(); arm(); }, LOAD_WAIT_MS);
         }
 
         createPlaceholder() {
@@ -892,12 +840,9 @@
         updateNavigation() {
             const prevBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--prev');
             const nextBtn = this.viewer.querySelector('.cbk-stories-viewer__nav--next');
-            if (this.loop) {
-                prevBtn.disabled = nextBtn.disabled = false;
-            } else {
-                prevBtn.disabled = this.currentIndex === 0;
-                nextBtn.disabled = this.currentIndex === this.stories.length - 1;
-            }
+            const atEnd = this.currentIndex === this.stories.length - 1;
+            prevBtn.disabled = !this.loop && this.currentIndex === 0;
+            nextBtn.disabled = !this.loop && atEnd && !this.loadMoreEnabled;
         }
 
         prevStory() {
@@ -911,7 +856,21 @@
         nextStory() {
             if (this.currentIndex < this.stories.length - 1) {
                 this.showStory(this.currentIndex + 1, 1);
-            } else if (this.loop) {
+                return;
+            }
+            if (this.loadMoreEnabled && typeof window.cbkBentoGridLoadMore === 'function' && !this.loadMorePending) {
+                this.loadMorePending = true;
+                window.cbkBentoGridLoadMore().then((appended) => {
+                    this.loadMorePending = false;
+                    if (appended && this.currentIndex < this.stories.length - 1) {
+                        this.showStory(this.currentIndex + 1, 1);
+                    } else if (this.loop) {
+                        this.showStory(0, 1);
+                    }
+                });
+                return;
+            }
+            if (this.loop) {
                 this.showStory(0, 1);
             }
         }
