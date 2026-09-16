@@ -279,6 +279,7 @@ function coffeebrk_public_video_embed( WP_REST_Request $req ) {
     }
 
     $embed_url = '';
+    $is_instagram = false;
 
     // YouTube Shorts
     if ( preg_match( '/youtube\.com\/shorts\/([a-zA-Z0-9_-]+)/', $url, $m ) ) {
@@ -296,18 +297,43 @@ function coffeebrk_public_video_embed( WP_REST_Request $req ) {
     elseif ( preg_match( '/tiktok\.com\/@[\w.-]+\/video\/(\d+)/', $url, $m ) ) {
         $embed_url = 'https://www.tiktok.com/embed/v2/' . $m[1];
     }
-    // Instagram (posts, Reels, IGTV)
+    // Instagram (posts, Reels, IGTV) — handled separately below via
+    // Instagram's own official embed.js widget instead of a raw iframe URL,
+    // matching the same invocation the coffeebrk-core plugin's stories
+    // viewer uses (assets/js/coffeebrk-stories.js initInstagram()).
     elseif ( preg_match( '/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/', $url, $m ) ) {
-        $embed_url = 'https://www.instagram.com/p/' . $m[1] . '/embed/captioned/';
+        $is_instagram = true;
     }
 
-    if ( empty( $embed_url ) ) {
+    if ( empty( $embed_url ) && ! $is_instagram ) {
         return new WP_REST_Response( [ 'error' => 'Unsupported video URL' ], 400 );
     }
 
     // Output HTML page directly
     header( 'Content-Type: text/html; charset=utf-8' );
     header( 'X-Frame-Options: ALLOWALL' );
+
+    if ( $is_instagram ) {
+        $safe_url = esc_url( $url );
+        echo '<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Video</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;background:#000}
+</style>
+</head>
+<body>
+<blockquote class="instagram-media" data-instgrm-permalink="' . $safe_url . '" data-instgrm-version="14" style="width:100%;"><a href="' . $safe_url . '"></a></blockquote>
+<script async src="https://www.instagram.com/embed.js"></script>
+</body>
+</html>';
+        exit;
+    }
+
     echo '<!DOCTYPE html>
 <html>
 <head>
