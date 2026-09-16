@@ -3,10 +3,13 @@
  * Story video health check
  *
  * Periodically verifies that YouTube/TikTok videos behind cbk_story posts
- * are still available, and auto-hides ones that have been deleted or made
- * private using the existing _cbk_story_show_frontend toggle. Instagram is
- * skipped — its oEmbed API requires a Meta Graph API token this project
- * doesn't have; those rely on the existing manual show/hide toggle.
+ * are still available, and auto-hides ones that fail two consecutive daily
+ * checks (to avoid one-off false positives from geo-blocks, rate limits, or
+ * network hiccups) using the existing _cbk_story_show_frontend toggle.
+ * Stories it auto-hides are also auto-restored once a later check confirms
+ * the video is alive again. Instagram is skipped — its oEmbed API requires
+ * a Meta Graph API token this project doesn't have; those rely on the
+ * existing manual show/hide toggle.
  *
  * @package Coffeebrk_Core
  */
@@ -49,12 +52,14 @@ function cbk_story_check_oembed( $oembed_url ) {
 }
 
 /**
- * Checks every visible cbk_story's YouTube/TikTok video and hides dead ones.
- * Only ever flips show_frontend 'yes' -> 'no' — never un-hides, since a
- * post already marked 'no' might have been hidden manually on purpose.
+ * Checks every non-manually-hidden cbk_story's YouTube/TikTok video.
+ * Hides a story only after 2 consecutive failing checks (avoids one-off
+ * false positives), and auto-restores a story it previously auto-hid once
+ * a later check confirms the video is alive again. Posts hidden manually
+ * (show_frontend = 'no' without the auto-hidden flag) are left alone.
  */
 function cbk_story_healthcheck_run() {
-    $stats = [ 'checked' => 0, 'hidden' => 0, 'skipped' => 0, 'errors' => 0 ];
+    $stats = [ 'checked' => 0, 'hidden' => 0, 'restored' => 0, 'pending' => 0, 'skipped' => 0, 'errors' => 0 ];
 
     $post_ids = get_posts( [
         'post_type'      => 'cbk_story',
@@ -64,9 +69,11 @@ function cbk_story_healthcheck_run() {
     ] );
 
     foreach ( $post_ids as $post_id ) {
-        $show = get_post_meta( $post_id, '_cbk_story_show_frontend', true );
-        if ( $show === 'no' ) {
-            $stats['skipped']++;
+        $show        = get_post_meta( $post_id, '_cbk_story_show_frontend', true );
+        $auto_hidden = get_post_meta( $post_id, '_cbk_story_auto_hidden', true ) === 'yes';
+
+        if ( $show === 'no' && ! $auto_hidden ) {
+            $stats['skipped']++; // hidden manually — leave it alone
             continue;
         }
 
@@ -84,10 +91,26 @@ function cbk_story_healthcheck_run() {
         }
 
         $stats['checked']++;
+
         if ( $alive === false ) {
-            update_post_meta( $post_id, '_cbk_story_show_frontend', 'no' );
-            $stats['hidden']++;
-        } elseif ( $alive === null ) {
+            $fails = (int) get_post_meta( $post_id, '_cbk_story_healthcheck_fails', true ) + 1;
+            if ( $fails >= 2 ) {
+                update_post_meta( $post_id, '_cbk_story_show_frontend', 'no' );
+                update_post_meta( $post_id, '_cbk_story_auto_hidden', 'yes' );
+                update_post_meta( $post_id, '_cbk_story_healthcheck_fails', 0 );
+                $stats['hidden']++;
+            } else {
+                update_post_meta( $post_id, '_cbk_story_healthcheck_fails', $fails );
+                $stats['pending']++;
+            }
+        } elseif ( $alive === true ) {
+            update_post_meta( $post_id, '_cbk_story_healthcheck_fails', 0 );
+            if ( $show === 'no' && $auto_hidden ) {
+                update_post_meta( $post_id, '_cbk_story_show_frontend', 'yes' );
+                delete_post_meta( $post_id, '_cbk_story_auto_hidden' );
+                $stats['restored']++;
+            }
+        } else {
             $stats['errors']++;
         }
     }
@@ -111,6 +134,68 @@ add_action( 'admin_post_cbk_recheck_story_videos', function() {
         'cbk_recheck_done' => 1,
         'checked'          => $stats['checked'],
         'hidden'           => $stats['hidden'],
+    ], admin_url( 'admin.php' ) ) );
+    exit;
+});
+
+/**
+ * One-time backlog cleanup: re-checks every currently-hidden YouTube/TikTok
+ * story (including ones hidden before the 2-strike/auto-restore logic
+ * existed) and restores any that are confirmed alive. This can also restore
+ * a story an editor hid on purpose if that video happens to still be live —
+ * there's no way to tell the two apart retroactively; re-hide manually if so.
+ */
+function cbk_story_restore_healthcheck_backlog() {
+    $stats = [ 'checked' => 0, 'restored' => 0 ];
+
+    $post_ids = get_posts( [
+        'post_type'      => 'cbk_story',
+        'post_status'    => 'publish',
+        'posts_per_page' => -1,
+        'fields'         => 'ids',
+        'meta_key'       => '_cbk_story_show_frontend',
+        'meta_value'     => 'no',
+    ] );
+
+    foreach ( $post_ids as $post_id ) {
+        $url      = get_post_meta( $post_id, '_cbk_story_video_url', true );
+        $platform = cbk_story_detect_platform( $url );
+
+        if ( $platform === 'youtube' ) {
+            $yt_id     = get_post_meta( $post_id, '_cbk_story_yt_video_id', true );
+            $check_url = $yt_id ? 'https://www.youtube.com/watch?v=' . $yt_id : $url;
+            $alive     = cbk_story_check_oembed( 'https://www.youtube.com/oembed?url=' . urlencode( $check_url ) . '&format=json' );
+        } elseif ( $platform === 'tiktok' ) {
+            $alive = cbk_story_check_oembed( 'https://www.tiktok.com/oembed?url=' . urlencode( $url ) );
+        } else {
+            continue;
+        }
+
+        $stats['checked']++;
+        if ( $alive === true ) {
+            update_post_meta( $post_id, '_cbk_story_show_frontend', 'yes' );
+            delete_post_meta( $post_id, '_cbk_story_auto_hidden' );
+            update_post_meta( $post_id, '_cbk_story_healthcheck_fails', 0 );
+            $stats['restored']++;
+        }
+    }
+
+    return $stats;
+}
+
+add_action( 'admin_post_cbk_restore_healthcheck_backlog', function() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'Unauthorized' );
+    }
+    check_admin_referer( 'cbk_restore_healthcheck_backlog' );
+
+    $stats = cbk_story_restore_healthcheck_backlog();
+
+    wp_safe_redirect( add_query_arg( [
+        'page'              => 'cbk-stories-import',
+        'cbk_restore_done'  => 1,
+        'checked'           => $stats['checked'],
+        'restored'          => $stats['restored'],
     ], admin_url( 'admin.php' ) ) );
     exit;
 });

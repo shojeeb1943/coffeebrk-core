@@ -227,8 +227,13 @@ function coffeebrk_core_allowed_origins(): array {
 
 add_filter('rest_pre_serve_request', function($served, $result){
     $req_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
-    // Handle both Supabase and Firebase endpoints
-    if ( strpos($req_uri, '/coffeebrk/v1/supabase/login') === false && strpos($req_uri, '/coffeebrk/v1/firebase/login') === false ) return $served;
+    // Handle Supabase/Firebase login endpoints and the /me session-check endpoint
+    $credentialed_routes = ['/coffeebrk/v1/supabase/login', '/coffeebrk/v1/firebase/login', '/coffeebrk/v1/me'];
+    $matched = false;
+    foreach ($credentialed_routes as $route) {
+        if ( strpos($req_uri, $route) !== false ) { $matched = true; break; }
+    }
+    if ( ! $matched ) return $served;
     $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
     $allowed = coffeebrk_core_allowed_origins();
     if ( $origin && in_array($origin, $allowed, true) ) {
@@ -236,7 +241,7 @@ add_filter('rest_pre_serve_request', function($served, $result){
         header('Vary: Origin');
         header('Access-Control-Allow-Credentials: true');
         header('Access-Control-Allow-Headers: Content-Type');
-        header('Access-Control-Allow-Methods: POST, OPTIONS');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     }
     if ( 'OPTIONS' === ($_SERVER['REQUEST_METHOD'] ?? '') ) {
         echo '';

@@ -229,6 +229,32 @@ add_action( 'admin_init', function() {
 });
 
 /**
+ * Show a notice after the "Restore Wrongly-Hidden Videos" action redirects back here.
+ */
+add_action( 'admin_init', function() {
+    if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'cbk-stories-import' ) {
+        return;
+    }
+    if ( ! isset( $_GET['cbk_restore_done'] ) ) {
+        return;
+    }
+
+    $checked  = isset( $_GET['checked'] ) ? intval( $_GET['checked'] ) : 0;
+    $restored = isset( $_GET['restored'] ) ? intval( $_GET['restored'] ) : 0;
+
+    add_settings_error(
+        'cbk_stories_import',
+        'restore_done',
+        sprintf(
+            __( 'Checked %1$d hidden videos, restored %2$d that are still alive.', 'coffeebrk-core' ),
+            $checked,
+            $restored
+        ),
+        'updated'
+    );
+});
+
+/**
  * Handle Sample JSON Download
  */
 add_action( 'admin_init', function() {
@@ -293,6 +319,13 @@ function cbk_stories_import_page() {
                 <input type="hidden" name="action" value="cbk_recheck_story_videos">
                 <?php wp_nonce_field( 'cbk_recheck_story_videos' ); ?>
                 <input type="submit" class="button button-secondary" value="<?php esc_attr_e( 'Recheck Videos Now', 'coffeebrk-core' ); ?>">
+            </form>
+
+            <p style="margin-top: 15px;"><?php _e( 'One-time cleanup: re-checks every currently-hidden YouTube/TikTok story and restores any that are actually still alive.', 'coffeebrk-core' ); ?></p>
+            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <input type="hidden" name="action" value="cbk_restore_healthcheck_backlog">
+                <?php wp_nonce_field( 'cbk_restore_healthcheck_backlog' ); ?>
+                <input type="submit" class="button button-secondary" value="<?php esc_attr_e( 'Restore Wrongly-Hidden Videos', 'coffeebrk-core' ); ?>">
             </form>
         </div>
 

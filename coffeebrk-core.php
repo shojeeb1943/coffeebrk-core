@@ -24,6 +24,7 @@ require_once COFFEEBRK_CORE_PATH . 'inc/rss.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/x-collector.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/stories-cpt.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/story-video-healthcheck.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/import-review-notice.php';
 
 /**
  * Plugin activation hook.
@@ -281,6 +282,7 @@ require_once COFFEEBRK_CORE_PATH . 'dashboard/admin-aspires.php';
 require_once COFFEEBRK_CORE_PATH . 'meta/meta-dynamic-fields.php';
 require_once COFFEEBRK_CORE_PATH . 'meta/meta-aspires.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/feed.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/me-rest.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/api-tokens.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rest-api.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/youtube-importer-rest.php';
