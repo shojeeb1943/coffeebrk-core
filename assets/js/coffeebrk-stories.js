@@ -367,9 +367,18 @@
                 else this.prevStory();
             };
 
+            let wheelAccum = 0;
+            let wheelResetTimer = null;
             content.addEventListener('wheel', (e) => {
                 e.preventDefault();
-                navigate(e.deltaY > 0 ? 1 : -1);
+                if (this.gestureLocked) return;
+                wheelAccum += e.deltaY;
+                clearTimeout(wheelResetTimer);
+                wheelResetTimer = setTimeout(() => { wheelAccum = 0; }, 150);
+                if (Math.abs(wheelAccum) > SWIPE_THRESHOLD) {
+                    wheelAccum = 0;
+                    navigate(e.deltaY > 0 ? 1 : -1);
+                }
             }, { passive: false });
 
             let touchStartY = 0;
