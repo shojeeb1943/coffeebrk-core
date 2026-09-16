@@ -35,6 +35,7 @@
             this.vimeoPlayer = null;
             this.htmlVideoInfo = null; // Store reference to current HTML element
             this.storyTimer = null; // Fixed-duration auto-advance timer (TikTok/Instagram)
+            this.storyGen = 0; // Bumped on every showStory() so stale async timers/observers can tell they're outdated
 
             this.init();
         }
@@ -430,6 +431,7 @@
             if (index < 0 || index >= this.stories.length) return;
 
             this.currentIndex = index;
+            this.storyGen++;
             const story = this.stories[index];
             const videoUrl = story.videoUrl;
             const videoContainer = this.viewer.querySelector('.cbk-stories-viewer__video-container');
@@ -809,7 +811,7 @@
                 document.body.appendChild(script);
             }
 
-            this.startFixedTimer();
+            this.armAutoAdvance(ttContainer);
         }
 
         initInstagram(container, url) {
@@ -837,14 +839,47 @@
                 window.instgrm.Embeds.process();
             } // else: loadAPIs() already queued embed.js; it auto-processes on load.
 
-            this.startFixedTimer();
+            this.armAutoAdvance(igContainer);
         }
 
-        startFixedTimer() {
-            // ponytail: naive fixed-duration timer, not a real end-of-video signal -
-            // neither TikTok's nor Instagram's embed widget fires a JS "ended" event.
-            // Upgrade if either platform ever ships a postMessage-based player API.
-            this.storyTimer = setTimeout(() => this.nextStory(), 15000);
+        // ponytail: still a naive fixed-duration timer, not a real end-of-video signal -
+        // neither TikTok's nor Instagram's embed widget fires a JS "ended" event. Upgrade
+        // if either platform ever ships a postMessage-based player API.
+        //
+        // What this does fix: it used to start counting from the moment we injected the
+        // embed markup, before TikTok/Instagram's embed.js had even fetched and rendered
+        // the iframe. That load time (often several seconds, worse on slow connections)
+        // was eating into the 15s budget, so playback visibly got cut to ~8-10s. Now it
+        // waits for the embed's iframe to actually finish loading before starting the
+        // clock, with a timeout fallback in case the iframe never shows up (blocked embed).
+        armAutoAdvance(container) {
+            const DURATION_MS = 15000;
+            const LOAD_WAIT_MS = 4000;
+            const gen = this.storyGen;
+
+            const arm = () => {
+                if (gen !== this.storyGen || this.storyTimer) return; // navigated away, or already armed
+                this.storyTimer = setTimeout(() => this.nextStory(), DURATION_MS);
+            };
+
+            const existingIframe = container.querySelector('iframe');
+            if (existingIframe) {
+                existingIframe.addEventListener('load', arm, { once: true });
+                setTimeout(arm, LOAD_WAIT_MS); // safety net if 'load' never fires
+                return;
+            }
+
+            // Blockquote embeds (Instagram, TikTok's link-only fallback) inject their
+            // iframe asynchronously via embed.js - watch for it instead of guessing.
+            const observer = new MutationObserver(() => {
+                const iframe = container.querySelector('iframe');
+                if (iframe) {
+                    observer.disconnect();
+                    iframe.addEventListener('load', arm, { once: true });
+                }
+            });
+            observer.observe(container, { childList: true, subtree: true });
+            setTimeout(() => { observer.disconnect(); arm(); }, LOAD_WAIT_MS);
         }
 
         createPlaceholder() {
