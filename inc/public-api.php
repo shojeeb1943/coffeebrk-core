@@ -292,6 +292,14 @@ function coffeebrk_public_video_embed( WP_REST_Request $req ) {
     elseif ( preg_match( '/vimeo\.com\/(\d+)/', $url, $m ) ) {
         $embed_url = 'https://player.vimeo.com/video/' . $m[1] . '?autoplay=1';
     }
+    // TikTok
+    elseif ( preg_match( '/tiktok\.com\/@[\w.-]+\/video\/(\d+)/', $url, $m ) ) {
+        $embed_url = 'https://www.tiktok.com/embed/v2/' . $m[1];
+    }
+    // Instagram (posts, Reels, IGTV)
+    elseif ( preg_match( '/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/', $url, $m ) ) {
+        $embed_url = 'https://www.instagram.com/p/' . $m[1] . '/embed/captioned/';
+    }
 
     if ( empty( $embed_url ) ) {
         return new WP_REST_Response( [ 'error' => 'Unsupported video URL' ], 400 );
