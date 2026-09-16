@@ -3,7 +3,7 @@
  * Plugin Name: Coffeebrk Core
  * Plugin URI:  https://coffeebrk.ai
  * Description: Core functionality plugin for coffeebrk.ai — adds global fields, Elementor dynamic tags, and future features.
- * Version:     2.3.6
+ * Version:     2.3.7
  * Author:      Coffeebrk
  * Author URI:  https://coffeebrk.ai
  * License:     GPL-2.0+
@@ -286,6 +286,7 @@ require_once COFFEEBRK_CORE_PATH . 'inc/rest-api.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/youtube-importer-rest.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/rss-rest.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/stories-rest.php';
+require_once COFFEEBRK_CORE_PATH . 'inc/bento-grid-rest.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/tokens-rest.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/monitoring-rest.php';
 require_once COFFEEBRK_CORE_PATH . 'inc/public-api.php';

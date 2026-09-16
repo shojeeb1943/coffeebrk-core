@@ -880,7 +880,11 @@
         }
     }
 
-    new CoffeebrkStoriesViewer();
+    // Exposed so other scripts (e.g. coffeebrk-bento-grid.js) can re-run
+    // setupUniversalVideoCards() after appending new cards via AJAX - the
+    // method already no-ops on elements it has bound before, so this is
+    // safe to call repeatedly.
+    window.cbkStoriesViewer = new CoffeebrkStoriesViewer();
 
     if (window.elementorFrontend && window.elementorFrontend.hooks) {
         window.elementorFrontend.hooks.addAction('frontend/element_ready/coffeebrk_stories.default', function () {

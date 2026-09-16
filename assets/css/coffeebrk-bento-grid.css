@@ -1,17 +1,30 @@
 .cbk-bento-grid {
+    position: relative; /* positioning context for absolute .cbk-bento-item children */
     width: 100%;
+    --cbk-bento-columns: 3;  /* fallback; Elementor's responsive controls override this per breakpoint */
+    --cbk-bento-gap: 16px;
+    opacity: 0;
+}
+
+/* JS (coffeebrk-bento-grid.js) adds this once the first layout pass has
+   positioned every item - avoids a flash of stacked/unstyled cards. */
+.cbk-bento-grid--ready {
+    opacity: 1;
+    transition: opacity 0.2s ease;
 }
 
 .cbk-bento-item {
-    display: inline-block;
-    width: 100%;
-    break-inside: avoid;
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: transform 0.25s ease;
+    will-change: transform;
 }
 
-/* Radius + overflow-clip live one level below the break-inside:avoid
-   element on purpose - Chromium renders a 1px black seam at rounded
-   corners when border-radius/overflow sit on the same element that's
-   also fragmented by a CSS column layout. */
+/* Radius/overflow-clip/background live on .cbk-bento-item__inner rather
+   than .cbk-bento-item itself so the box-shadow control (which targets
+   .cbk-bento-item) can render outside the rounded/clipped media instead of
+   being clipped away by its own overflow:hidden. */
 .cbk-bento-item__inner {
     position: relative;
 }
@@ -66,4 +79,30 @@
     font-size: 1rem;
     font-weight: 700;
     line-height: 1.35;
+}
+
+.cbk-bento-pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+.cbk-bento-pagination--done {
+    display: none;
+}
+
+.cbk-bento-load-more {
+    padding: 10px 28px;
+    border: none;
+    border-radius: 999px;
+    background: #111;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.cbk-bento-pagination--loading .cbk-bento-load-more {
+    opacity: 0.6;
+    pointer-events: none;
 }

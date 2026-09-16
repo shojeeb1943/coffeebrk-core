@@ -1,12 +1,13 @@
 <?php
 /**
- * Bento/masonry grid widget that queries Posts and/or Stories directly and
- * renders them into a CSS-column masonry (native, no JS library) - the same
- * effect as Loop Grid's Masonry toggle, but self-contained so it doesn't
- * depend on Elementor Pro's Loop Grid + Theme Builder conditions being wired
- * up per post type. Video items reuse the Coffeebrk Universal Video widget's
- * exact markup/classes so the existing coffeebrk-stories.js click-to-play
- * binding picks them up for free.
+ * Bento/masonry grid widget that queries Posts and/or Stories, force-
+ * interleaves the two types (see merge_and_fetch()), and renders them into
+ * a JS-computed shortest-column masonry (assets/js/coffeebrk-bento-grid.js)
+ * - self-contained so it doesn't depend on Elementor Pro's Loop Grid +
+ * Theme Builder conditions being wired up per post type. Video items reuse
+ * the Coffeebrk Universal Video widget's exact markup/classes so the
+ * existing coffeebrk-stories.js click-to-play binding picks them up for
+ * free.
  *
  * @package Coffeebrk_Core
  */
@@ -41,7 +42,7 @@ class Coffeebrk_Bento_Grid_Widget extends Widget_Base {
     }
 
     public function get_script_depends() {
-        return [ 'coffeebrk-stories' ];
+        return [ 'coffeebrk-stories', 'coffeebrk-bento-grid' ];
     }
 
     public function get_style_depends() {
@@ -69,6 +70,31 @@ class Coffeebrk_Bento_Grid_Widget extends Widget_Base {
                     'cbk_story' => __( 'Stories Only', 'coffeebrk-core' ),
                 ],
                 'default' => 'both',
+            ]
+        );
+
+        $this->add_control(
+            'video_ratio_min',
+            [
+                'label' => __( 'Articles per Video (Min)', 'coffeebrk-core' ),
+                'type' => Controls_Manager::NUMBER,
+                'default' => 1,
+                'min' => 1,
+                'max' => 10,
+                'condition' => [ 'content_types' => 'both' ],
+                'description' => __( 'The gap before the next video varies randomly within this range, seeded fresh each page load - set both to the same number for a fixed rhythm instead.', 'coffeebrk-core' ),
+            ]
+        );
+
+        $this->add_control(
+            'video_ratio_max',
+            [
+                'label' => __( 'Articles per Video (Max)', 'coffeebrk-core' ),
+                'type' => Controls_Manager::NUMBER,
+                'default' => 4,
+                'min' => 1,
+                'max' => 10,
+                'condition' => [ 'content_types' => 'both' ],
             ]
         );
 
@@ -168,7 +194,7 @@ class Coffeebrk_Bento_Grid_Widget extends Widget_Base {
                 'tablet_default' => '2',
                 'mobile_default' => '1',
                 'selectors' => [
-                    '{{WRAPPER}} .cbk-bento-grid' => 'column-count: {{VALUE}};',
+                    '{{WRAPPER}} .cbk-bento-grid' => '--cbk-bento-columns: {{VALUE}};',
                 ],
             ]
         );
@@ -184,8 +210,9 @@ class Coffeebrk_Bento_Grid_Widget extends Widget_Base {
                 ],
                 'default' => [ 'size' => 16 ],
                 'selectors' => [
-                    '{{WRAPPER}} .cbk-bento-grid' => 'column-gap: {{SIZE}}{{UNIT}};',
-                    '{{WRAPPER}} .cbk-bento-item' => 'margin-bottom: {{SIZE}}{{UNIT}};',
+                    // Read by the JS masonry engine (assets/js/coffeebrk-bento-grid.js)
+                    // via getComputedStyle() - not consumed by CSS directly.
+                    '{{WRAPPER}} .cbk-bento-grid' => '--cbk-bento-gap: {{SIZE}}{{UNIT}};',
                 ],
             ]
         );
@@ -271,6 +298,40 @@ class Coffeebrk_Bento_Grid_Widget extends Widget_Base {
                 'label_off' => __( 'No', 'coffeebrk-core' ),
                 'return_value' => 'yes',
                 'default' => 'yes',
+            ]
+        );
+
+        $this->end_controls_section();
+
+        $this->start_controls_section(
+            'section_pagination',
+            [
+                'label' => __( 'Pagination', 'coffeebrk-core' ),
+                'tab' => Controls_Manager::TAB_CONTENT,
+            ]
+        );
+
+        $this->add_control(
+            'pagination_type',
+            [
+                'label' => __( 'Pagination', 'coffeebrk-core' ),
+                'type' => Controls_Manager::SELECT,
+                'options' => [
+                    'none' => __( 'None', 'coffeebrk-core' ),
+                    'load_more' => __( 'Load More Button', 'coffeebrk-core' ),
+                    'infinite_scroll' => __( 'Infinite Scroll', 'coffeebrk-core' ),
+                ],
+                'default' => 'none',
+            ]
+        );
+
+        $this->add_control(
+            'load_more_text',
+            [
+                'label' => __( 'Button Text', 'coffeebrk-core' ),
+                'type' => Controls_Manager::TEXT,
+                'default' => __( 'Load More', 'coffeebrk-core' ),
+                'condition' => [ 'pagination_type' => 'load_more' ],
             ]
         );
 
@@ -372,63 +433,420 @@ class Coffeebrk_Bento_Grid_Widget extends Widget_Base {
     protected function render() {
         $settings = $this->get_settings_for_display();
 
-        $post_types = $settings['content_types'] === 'both'
-            ? [ 'post', 'cbk_story' ]
-            : [ $settings['content_types'] ];
+        // Picked fresh on every real page load, then carried through
+        // pagination's data-settings/REST args (render_pagination_control())
+        // so "Load More"/infinite scroll continue the SAME randomized
+        // video/article rhythm this page load started with, instead of
+        // reshuffling mid-scroll.
+        $settings['interleave_seed'] = wp_rand( 0, 999999 );
 
-        $args = [
-            'post_type' => $post_types,
-            'post_status' => 'publish',
-            'posts_per_page' => (int) ( $settings['posts_per_page'] ?: 12 ),
-            'orderby' => $settings['orderby'] ?: 'date',
-            'order' => $settings['order'] ?: 'DESC',
-            'ignore_sticky_posts' => true,
-        ];
+        $result = $this->merge_and_fetch( $settings, 1 );
 
-        // Respect the same "hidden from frontend" story toggle every other
-        // Coffeebrk story query honors (inc/stories-rest.php). Regular posts
-        // never have this meta key, so they always pass the NOT EXISTS leg.
-        if ( in_array( 'cbk_story', $post_types, true ) ) {
-            $args['meta_query'] = [
-                'relation' => 'OR',
-                [ 'key' => '_cbk_story_show_frontend', 'value' => 'yes' ],
-                [ 'key' => '_cbk_story_show_frontend', 'compare' => 'NOT EXISTS' ],
-            ];
-        }
-
-        $query = new WP_Query( $args );
-
-        if ( ! $query->have_posts() ) {
+        if ( empty( $result['posts'] ) ) {
             return;
         }
 
         echo '<div class="cbk-bento-grid">';
 
-        while ( $query->have_posts() ) {
-            $query->the_post();
-            $this->render_item( get_post(), $settings );
-        }
+        $this->iterate_posts( $result['posts'], function( $post ) use ( $settings ) {
+            $this->render_item( $post, $settings );
+        } );
 
         echo '</div>';
 
+        if ( $settings['pagination_type'] !== 'none' && $result['total_pages'] > 1 ) {
+            $this->render_pagination_control( $settings, $result['total_pages'] );
+        }
+    }
+
+    /**
+     * Renders one additional page of items as an HTML string - used by the
+     * "Load More" / infinite scroll REST endpoint (inc/bento-grid-rest.php)
+     * so pagination reuses the exact same query + card markup as the initial
+     * server-side render instead of drifting out of sync with it.
+     */
+    public function render_items_page( array $settings, $paged ) {
+        $settings = array_merge( $this->get_settings_defaults(), $settings );
+        $result = $this->merge_and_fetch( $settings, $paged );
+
+        ob_start();
+        $this->iterate_posts( $result['posts'], function( $post ) use ( $settings ) {
+            $this->render_item( $post, $settings );
+        } );
+
+        return [
+            'html' => ob_get_clean(),
+            'total_pages' => $result['total_pages'],
+        ];
+    }
+
+    /**
+     * Runs $callback( $post ) once per post with correct global post-data
+     * context, WITHOUT touching $GLOBALS['wp_query'] (the site's main page
+     * query) - required for Loop Item templates' Elementor dynamic tags to
+     * resolve the right post per card.
+     *
+     * $posts comes from a hand-merged array (two separate per-type
+     * WP_Query results interleaved in PHP), not one WP_Query's own
+     * have_posts()/the_post() loop, so that context has to be rebuilt. The
+     * global setup_postdata() function is NOT a safe way to do this: WP
+     * core defines it as delegating to $GLOBALS['wp_query']->setup_postdata()
+     * - i.e. it mutates the site's MAIN query object, not an isolated one.
+     * Calling it once per card corrupts that shared object for the rest of
+     * the page render. Instead, seed an empty (never-queried) WP_Query with
+     * the merged posts and use ITS OWN the_post()/setup_postdata() instance
+     * methods, which scope all postdata mutation to that throwaway object -
+     * exactly what a single real WP_Query loop did before this merge existed.
+     */
+    private function iterate_posts( array $posts, callable $callback ) {
+        if ( empty( $posts ) ) {
+            return;
+        }
+
+        $fake_query = new WP_Query();
+        $fake_query->posts = $posts;
+        $fake_query->post_count = count( $posts );
+        $fake_query->current_post = -1;
+        $fake_query->in_the_loop = false;
+        $fake_query->is_main_query = false;
+
+        while ( $fake_query->have_posts() ) {
+            $fake_query->the_post();
+            $callback( get_post() );
+        }
+
         wp_reset_postdata();
+    }
+
+    /**
+     * Single-type query path (content_types = 'post' or 'cbk_story' only).
+     * Ordinary WP_Query pagination - no interleaving needed.
+     */
+    private function build_query_args( $settings, $paged ) {
+        $post_type = $settings['content_types'];
+
+        $args = [
+            'post_type' => $post_type,
+            'post_status' => 'publish',
+            'posts_per_page' => (int) ( $settings['posts_per_page'] ?: 12 ),
+            'paged' => max( 1, (int) $paged ),
+            'orderby' => $this->resolve_orderby( $settings, $paged ),
+            'order' => $settings['order'] ?: 'DESC',
+            'ignore_sticky_posts' => true,
+        ];
+
+        if ( $post_type === 'cbk_story' ) {
+            $args['meta_query'] = $this->story_visibility_meta_query();
+        }
+
+        return $args;
+    }
+
+    /**
+     * Per-type query args used by the interleave path - same filters as
+     * build_query_args() but offset/count driven (no 'paged') so two
+     * independent per-type queries can be sliced precisely for one merged
+     * page (see compute_interleave_page()).
+     */
+    private function build_type_query_args( $settings, $post_type, $offset, $count, $paged ) {
+        $args = [
+            'post_type' => $post_type,
+            'post_status' => 'publish',
+            'posts_per_page' => max( 1, (int) $count ),
+            'offset' => max( 0, (int) $offset ),
+            'orderby' => $this->resolve_orderby( $settings, $paged ),
+            'order' => $settings['order'] ?: 'DESC',
+            'ignore_sticky_posts' => true,
+        ];
+
+        if ( $post_type === 'cbk_story' ) {
+            $args['meta_query'] = $this->story_visibility_meta_query();
+        }
+
+        return $args;
+    }
+
+    // Respect the same "hidden from frontend" story toggle every other
+    // Coffeebrk story query honors (inc/stories-rest.php). Regular posts
+    // never have this meta key, so they always pass the NOT EXISTS leg.
+    private function story_visibility_meta_query() {
+        return [
+            'relation' => 'OR',
+            [ 'key' => '_cbk_story_show_frontend', 'value' => 'yes' ],
+            [ 'key' => '_cbk_story_show_frontend', 'compare' => 'NOT EXISTS' ],
+        ];
+    }
+
+    // orderby=rand + offset/paged-based pagination don't mix - each request
+    // reshuffles, so an offset stops meaning anything between page loads.
+    // Coerce to date ordering once pagination is actually in play.
+    private function resolve_orderby( $settings, $paged ) {
+        $orderby = $settings['orderby'] ?: 'date';
+        $paginating = $paged > 1 || ( ( $settings['pagination_type'] ?? 'none' ) !== 'none' );
+
+        return ( $orderby === 'rand' && $paginating ) ? 'date' : $orderby;
+    }
+
+    /**
+     * Returns [$video_total, $article_total] - cheap posts_per_page=1
+     * queries reusing build_type_query_args() so the count honors the exact
+     * same filters (story visibility, status) as the real fetch below.
+     */
+    private function get_type_totals( $settings, $paged ) {
+        $video_query = new WP_Query( $this->build_type_query_args( $settings, 'cbk_story', 0, 1, $paged ) );
+        $article_query = new WP_Query( $this->build_type_query_args( $settings, 'post', 0, 1, $paged ) );
+
+        return [ (int) $video_query->found_posts, (int) $article_query->found_posts ];
+    }
+
+    /**
+     * Deterministic hash-based PRNG - deliberately NOT mt_rand()/mt_srand(),
+     * which mutate PHP's process-wide RNG state and would drift between the
+     * initial render() and later REST "load more" requests (separate PHP
+     * processes). Same ($seed, $draw) always returns the same value, which
+     * is what lets compute_interleave_page() below replay an identical
+     * random sequence on every request for one page load's $seed, while a
+     * fresh $seed (picked once per real page load) gives the next reload a
+     * different pattern.
+     */
+    private function seeded_rand( $seed, $draw, $min, $max ) {
+        if ( $max <= $min ) {
+            return $min;
+        }
+
+        $hash = crc32( $seed . ':' . $draw );
+        return $min + ( $hash % ( $max - $min + 1 ) );
+    }
+
+    /**
+     * Walks a virtual slot sequence, placing a video then a randomized
+     * (video_ratio_min..video_ratio_max) run of articles before the next
+     * one, falling back to whichever type still has posts once the other
+     * is exhausted. Returns exactly the offset/count each per-type query
+     * needs to produce $page's items, plus the ordered video/article
+     * sequence to merge the two fetched arrays back together correctly.
+     *
+     * Always replays the walk from slot 0 (not just from $page's start) so
+     * the random gap sizes stay consistent regardless of which page is
+     * being requested - required for the seeded PRNG's sequence to line up
+     * the same way across separate "Load More" requests.
+     */
+    private function compute_interleave_page( $page, $per_page, $ratio_min, $ratio_max, $seed, $video_total, $article_total ) {
+        $page = max( 1, (int) $page );
+        $per_page = max( 1, (int) $per_page );
+
+        $total_items = $video_total + $article_total;
+        $total_pages = max( 1, (int) ceil( $total_items / $per_page ) );
+        $page_start = ( $page - 1 ) * $per_page;
+
+        if ( $page_start >= $total_items ) {
+            return [
+                'video_offset' => $video_total,
+                'video_count' => 0,
+                'article_offset' => $article_total,
+                'article_count' => 0,
+                'page_sequence' => [],
+                'total_pages' => $total_pages,
+            ];
+        }
+
+        $target = $page * $per_page;
+        $video_cursor = 0;
+        $article_cursor = 0;
+        $video_offset_at_start = 0;
+        $article_offset_at_start = 0;
+        $page_sequence = [];
+        $video_draws = 0;    // how many random gaps have been drawn so far
+        $next_video_at = 0;  // slot index the next video is due at
+
+        for ( $i = 0; $i < $target; $i++ ) {
+            if ( $i === $page_start ) {
+                $video_offset_at_start = $video_cursor;
+                $article_offset_at_start = $article_cursor;
+            }
+
+            $want_video = ( $i === $next_video_at );
+
+            if ( $want_video && $video_cursor < $video_total ) {
+                $type = 'video';
+            } elseif ( ! $want_video && $article_cursor < $article_total ) {
+                $type = 'article';
+            } elseif ( $video_cursor < $video_total ) {
+                $type = 'video';
+            } elseif ( $article_cursor < $article_total ) {
+                $type = 'article';
+            } else {
+                break; // Both exhausted.
+            }
+
+            if ( $type === 'video' ) {
+                $video_cursor++;
+                $gap = $this->seeded_rand( $seed, $video_draws, $ratio_min, $ratio_max );
+                $video_draws++;
+                $next_video_at = $i + 1 + $gap;
+            } else {
+                $article_cursor++;
+            }
+
+            if ( $i >= $page_start ) {
+                $page_sequence[] = $type;
+            }
+        }
+
+        return [
+            'video_offset' => $video_offset_at_start,
+            'video_count' => $video_cursor - $video_offset_at_start,
+            'article_offset' => $article_offset_at_start,
+            'article_count' => $article_cursor - $article_offset_at_start,
+            'page_sequence' => $page_sequence,
+            'total_pages' => $total_pages,
+        ];
+    }
+
+    /**
+     * Single entry point for both render() and render_items_page(): returns
+     * ['posts' => WP_Post[], 'total_pages' => int]. Single-type mode is an
+     * ordinary WP_Query; 'both' mode force-interleaves per video_ratio.
+     */
+    private function merge_and_fetch( $settings, $paged ) {
+        $paged = max( 1, (int) $paged );
+
+        if ( $settings['content_types'] !== 'both' ) {
+            $query = new WP_Query( $this->build_query_args( $settings, $paged ) );
+            return [
+                'posts' => $query->posts,
+                'total_pages' => (int) $query->max_num_pages,
+            ];
+        }
+
+        $per_page = (int) ( $settings['posts_per_page'] ?: 12 );
+        $ratio_min = max( 1, (int) ( $settings['video_ratio_min'] ?: 1 ) );
+        $ratio_max = max( $ratio_min, (int) ( $settings['video_ratio_max'] ?: 4 ) );
+        $seed = (int) ( $settings['interleave_seed'] ?? 0 );
+
+        [ $video_total, $article_total ] = $this->get_type_totals( $settings, $paged );
+        $slice = $this->compute_interleave_page( $paged, $per_page, $ratio_min, $ratio_max, $seed, $video_total, $article_total );
+
+        $video_posts = [];
+        if ( $slice['video_count'] > 0 ) {
+            $video_query = new WP_Query( $this->build_type_query_args( $settings, 'cbk_story', $slice['video_offset'], $slice['video_count'], $paged ) );
+            $video_posts = $video_query->posts;
+        }
+
+        $article_posts = [];
+        if ( $slice['article_count'] > 0 ) {
+            $article_query = new WP_Query( $this->build_type_query_args( $settings, 'post', $slice['article_offset'], $slice['article_count'], $paged ) );
+            $article_posts = $article_query->posts;
+        }
+
+        $merged = [];
+        foreach ( $slice['page_sequence'] as $type ) {
+            if ( $type === 'video' && $video_posts ) {
+                $merged[] = array_shift( $video_posts );
+            } elseif ( $type === 'article' && $article_posts ) {
+                $merged[] = array_shift( $article_posts );
+            }
+        }
+
+        return [
+            'posts' => $merged,
+            'total_pages' => $slice['total_pages'],
+        ];
+    }
+
+    private function render_pagination_control( $settings, $total_pages ) {
+        $query_settings = [
+            'content_types' => $settings['content_types'],
+            'video_ratio_min' => (int) ( $settings['video_ratio_min'] ?: 1 ),
+            'video_ratio_max' => (int) ( $settings['video_ratio_max'] ?: 4 ),
+            'interleave_seed' => (int) ( $settings['interleave_seed'] ?? 0 ),
+            'posts_per_page' => (int) $settings['posts_per_page'],
+            'orderby' => $settings['orderby'],
+            'order' => $settings['order'],
+            'article_template_id' => (int) ( $settings['article_template_id'] ?: 0 ),
+            'video_template_id' => (int) ( $settings['video_template_id'] ?: 0 ),
+            'source_display' => $settings['source_display'],
+            'source_meta_key' => $settings['source_meta_key'],
+            'show_date' => $settings['show_date'],
+            'date_format' => $settings['date_format'],
+            'show_external_icon' => $settings['show_external_icon'],
+            'video_aspect' => $settings['video_aspect'],
+        ];
+
+        $data = wp_json_encode( [
+            'restUrl' => rest_url( 'coffeebrk/v1/bento-grid' ),
+            'query' => $query_settings,
+            'currentPage' => 1,
+            'totalPages' => $total_pages,
+        ] );
+        ?>
+        <div class="cbk-bento-pagination" data-type="<?php echo esc_attr( $settings['pagination_type'] ); ?>" data-settings='<?php echo esc_attr( $data ); ?>'>
+            <?php if ( $settings['pagination_type'] === 'load_more' ) : ?>
+                <button type="button" class="cbk-bento-load-more"><?php echo esc_html( $settings['load_more_text'] ?: __( 'Load More', 'coffeebrk-core' ) ); ?></button>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    private function get_settings_defaults() {
+        return [
+            'content_types' => 'both',
+            'video_ratio_min' => 1,
+            'video_ratio_max' => 4,
+            'interleave_seed' => 0,
+            'posts_per_page' => 12,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'article_template_id' => '',
+            'video_template_id' => '',
+            'source_display' => 'author',
+            'source_meta_key' => '_source_name',
+            'show_date' => 'yes',
+            'date_format' => 'F j, Y',
+            'show_external_icon' => 'yes',
+            'video_aspect' => '9-16',
+        ];
     }
 
     private function render_item( $post, $settings ) {
         $post_id = $post->ID;
         $is_video = $post->post_type === 'cbk_story';
-        $template_id = $is_video ? ( $settings['video_template_id'] ?? '' ) : ( $settings['article_template_id'] ?? '' );
+        $template_id = $is_video ? (int) ( $settings['video_template_id'] ?? 0 ) : (int) ( $settings['article_template_id'] ?? 0 );
+
+        if ( $template_id && ! $this->is_valid_loop_item_template( $template_id ) ) {
+            $template_id = 0;
+        }
         ?>
         <div class="cbk-bento-item <?php echo $is_video ? 'cbk-bento-item--video' : 'cbk-bento-item--article'; ?>">
             <div class="cbk-bento-item__inner">
                 <?php if ( $template_id ) : ?>
-                    <?php echo \Elementor\Plugin::$instance->frontend->get_builder_content_for_display( (int) $template_id, true ); ?>
+                    <?php echo \Elementor\Plugin::$instance->frontend->get_builder_content_for_display( $template_id, true ); ?>
                 <?php else : ?>
                     <?php $this->render_default_card( $post, $settings ); ?>
                 <?php endif; ?>
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * Template IDs reach here from the REST "load more" endpoint as raw,
+     * unauthenticated public input, so this must confirm the ID is really a
+     * published Loop Item template before it's handed to
+     * get_builder_content_for_display() - otherwise a crafted request could
+     * use that call to render the content of an arbitrary post/page.
+     */
+    private function is_valid_loop_item_template( $id ) {
+        if ( $id <= 0 ) {
+            return false;
+        }
+
+        $post = get_post( $id );
+        if ( ! $post || $post->post_type !== 'elementor_library' || $post->post_status !== 'publish' ) {
+            return false;
+        }
+
+        return get_post_meta( $id, '_elementor_template_type', true ) === 'loop-item';
     }
 
     private function render_default_card( $post, $settings ) {
@@ -517,11 +935,16 @@ class Coffeebrk_Bento_Grid_Widget extends Widget_Base {
     }
 
     private function render_article_media( $post_id, $title, $permalink ) {
-        $thumb_url = has_post_thumbnail( $post_id ) ? get_the_post_thumbnail_url( $post_id, 'medium_large' ) : '';
+        // width/height (not just the URL) so the browser reserves the
+        // correct aspect-ratio box before the byte data arrives - the JS
+        // masonry engine measures each item's height on insert and can't
+        // wait for lazy-loaded images to finish downloading.
+        $thumb_id = get_post_thumbnail_id( $post_id );
+        $thumb_src = $thumb_id ? wp_get_attachment_image_src( $thumb_id, 'medium_large' ) : false;
         ?>
         <a class="cbk-bento-item__media-link" href="<?php echo esc_url( $permalink ); ?>">
-            <?php if ( $thumb_url ) : ?>
-                <img class="cbk-bento-item__img" src="<?php echo esc_url( $thumb_url ); ?>" alt="<?php echo esc_attr( $title ); ?>" loading="lazy" />
+            <?php if ( $thumb_src ) : ?>
+                <img class="cbk-bento-item__img" src="<?php echo esc_url( $thumb_src[0] ); ?>" width="<?php echo esc_attr( $thumb_src[1] ); ?>" height="<?php echo esc_attr( $thumb_src[2] ); ?>" alt="<?php echo esc_attr( $title ); ?>" loading="lazy" />
             <?php else : ?>
                 <div class="cbk-bento-item__img cbk-bento-item__img--placeholder"></div>
             <?php endif; ?>

@@ -150,6 +150,14 @@ add_action( 'elementor/frontend/after_enqueue_scripts', function() {
         '1.9.11',
         true
     );
+
+    wp_enqueue_script(
+        'coffeebrk-bento-grid',
+        COFFEEBRK_CORE_URL . 'assets/js/coffeebrk-bento-grid.js',
+        [ 'coffeebrk-stories' ],
+        '1.0.0',
+        true
+    );
 } );
 
 add_action( 'elementor/elements/categories_registered', function( $elements_manager ) {
